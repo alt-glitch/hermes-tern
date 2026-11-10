@@ -38,7 +38,6 @@ const isSafeInteger = (value: unknown): value is number => Number.isSafeInteger(
 /** Session `sid`'s current execution generation (the fence for steer/interrupt). */
 export async function currentGeneration(gw: Pick<GatewayClient, 'request'>, sid: string): Promise<number> {
   const snapshot = await rpc(gw, 'session.resume', { session_id: sid })
-  // Only the shared gateway's snapshot carries one; a private gateway's has no fence.
   const generation = snapshot && 'execution_generation' in snapshot ? snapshot.execution_generation : undefined
 
   if (!isSafeInteger(generation)) {

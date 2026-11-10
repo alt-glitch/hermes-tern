@@ -9,10 +9,9 @@ import { basename } from 'node:path'
 import type { GatewayClient } from '@hermes/shared/gateway-client'
 
 import { errorText } from '../core/errors.js'
-import { imagePathOf, withClipboardImage } from '../hermes/clipboardImage.js'
+import { imagePathOf } from '../hermes/clipboardImage.js'
 import { type Attachment, imageSize, uploadImage } from '../hermes/images.js'
 import type { ImageSource, NoticeEntry } from '../model.js'
-import { rpc } from '../wire/rpc.js'
 
 /**
  * An uploaded image a prompt carries (the shared gateway takes it on prompt.submit), with the name
@@ -41,8 +40,8 @@ export type ClipboardReader = (use: (path: string) => Promise<boolean>) => Promi
 
 /** What the attachments reach of the app. */
 export interface AttachmentsHost {
-  /** Uploads go to it; a private gateway takes the startup image by path. */
-  readonly gw: Pick<GatewayClient, 'isCanonical' | 'request'>
+  /** Uploads go to it. */
+  readonly gw: Pick<GatewayClient, 'request'>
   /** The folder the launcher ran in: an upload's path resolves against it. */
   readonly launchCwd: string
   /** The open session's runtime id: null before the first session and while the gateway is down. */
@@ -73,8 +72,8 @@ export class Attachments {
   /** The launcher's startup image until it is attached to the first session (the queue waits for it). */
   #startup: string
 
-  /** `startup`: the launcher's `--image` (''); `clipboard`: reads the clipboard's image (tests fake it). */
-  constructor(host: AttachmentsHost, { clipboard = use => withClipboardImage(use), startup = '' }: { clipboard?: ClipboardReader; startup?: string } = {}) {
+  /** `clipboard`: reads the clipboard's image; `startup`: the launcher's `--image` (''). */
+  constructor(host: AttachmentsHost, { clipboard, startup = '' }: { clipboard: ClipboardReader; startup?: string }) {
     this.#host = host
     this.#clipboard = clipboard
     this.#startup = startup
@@ -156,22 +155,18 @@ export class Attachments {
   }
 
   /**
-   * `hermes -q … --image …`: attaches the launcher's image to session `sid` (the first one): on the
-   * shared gateway to the startup query at the queue's head, else by path to the session itself.
-   * A failure is a warning, and the queue goes on without it.
+   * `hermes -q … --image …`: uploads the launcher's image to session `sid` (the first one) and puts
+   * it on the startup query at the queue's head. A failure is a warning, and the queue goes on
+   * without it.
    */
   async attachStartup(sid: string) {
     const path = this.#startup
 
     try {
-      if (this.#host.gw.isCanonical) {
-        const image = this.#image(await uploadImage(this.#host.gw, sid, path, this.#host.launchCwd), basename(path))
+      const image = this.#image(await uploadImage(this.#host.gw, sid, path, this.#host.launchCwd), basename(path))
 
-        if (!this.#host.attachToHead(image)) {
-          this.#items.push(image)
-        }
-      } else {
-        await rpc(this.#host.gw, 'image.attach', { path, session_id: sid })
+      if (!this.#host.attachToHead(image)) {
+        this.#items.push(image)
       }
     } catch (error) {
       this.#host.note(`Could not attach ${path}: ${errorText(error)}`, 'warning')

@@ -17,7 +17,7 @@ const READ_MS = 400
 
 /** What the title reaches of the app. */
 export type TitleHost = Pick<ChatPorts, 'changed' | 'notice' | 'session'> & {
-  readonly gw: Pick<GatewayClient, 'isCanonical' | 'request'>
+  readonly gw: Pick<GatewayClient, 'request'>
 }
 
 /** The open session's title, as Hermes names it (`session.title`). */
@@ -66,14 +66,12 @@ export class SessionTitle {
     this.#timer = setTimeout(() => void this.#fetch(), READ_MS)
   }
 
-  /** Names session `sid` (`/new <title>`): the shared gateway's rename mutation, a private one's `session.title`. */
+  /** Names session `sid` (`/new <title>`) with the gateway's rename mutation. */
   async rename(sid: LiveSessionId, title: string) {
     const host = this.#host
 
     try {
-      const r = host.gw.isCanonical
-        ? await mutateSession(host.gw, sid, 'rename', { title })
-        : await rpc(host.gw, 'session.title', { session_id: sid, title })
+      const r = await mutateSession(host.gw, sid, 'rename', { title })
 
       if (sid === host.session.ref.live && this.set(String(r?.title ?? title))) {
         host.changed()

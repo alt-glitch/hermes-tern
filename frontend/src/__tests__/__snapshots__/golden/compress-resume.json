@@ -3877,7 +3877,6 @@
   {
    "method": "session.resume",
    "params": {
-    "cols": 100,
     "session_id": "s1"
    }
   },
@@ -3927,7 +3926,6 @@
   {
    "method": "session.resume",
    "params": {
-    "cols": 100,
     "session_id": "old"
    }
   },

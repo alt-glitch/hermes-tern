@@ -60,8 +60,8 @@ export type EffortSetter = Pick<ChatPorts, 'changed' | 'gw' | 'session' | 'trans
 /**
  * Sets the reasoning effort: `session` for this session only (the pill, ⇧⇥), `global` also as
  * config.yaml's `agent.reasoning_effort`, the default of every new session (Hermes' `/reasoning
- * <level> --global`). On the shared gateway the session level is its revision-fenced `reasoning`
- * mutation, as Ink and desktop send it: stored with the session, and session.info to every viewer.
+ * <level> --global`). The session level is the gateway's revision-fenced `reasoning` mutation,
+ * as Ink and desktop send it: stored with the session, and session.info to every viewer.
  */
 export async function applyEffort(host: EffortSetter, value: string, scope: 'global' | 'session') {
   const session = host.session
@@ -77,7 +77,7 @@ export async function applyEffort(host: EffortSetter, value: string, scope: 'glo
   host.changed()
 
   try {
-    if (scope === 'session' && host.gw.isCanonical) {
+    if (scope === 'session') {
       await mutateSession(host.gw, sid, 'reasoning', { effort: value })
     } else {
       await rpc(host.gw, 'config.set', { key: 'reasoning', scope, session_id: sid, value })

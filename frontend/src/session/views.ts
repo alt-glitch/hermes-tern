@@ -1,6 +1,5 @@
-// This pane's views of sessions on the gateway. On the shared gateway a view is a subscription:
-// leaving a session detaches it, and the session keeps running for its other viewers; a private
-// gateway closes the session instead. Switches that a later switch superseded may have attached a
+// This pane's views of sessions on the gateway. A view is a subscription: leaving a session
+// detaches it, and the session keeps running for its other viewers. Switches that a later switch superseded may have attached a
 // session nobody will show; they are released once the switches settle.
 
 import type { GatewayClient } from '@hermes/shared/gateway-client'
@@ -12,7 +11,7 @@ import { rpc, snapshotIds, type SnapshotIdFields } from '../wire/rpc.js'
 export type EndReason = 'tui_close' | 'tui_shutdown'
 
 /** The gateway as the views use it. */
-export type ViewsGateway = Pick<GatewayClient, 'isCanonical' | 'request'>
+export type ViewsGateway = Pick<GatewayClient, 'request'>
 
 /** The subscriptions this pane holds, the detaches in flight, and what superseded switches attached. */
 export class SessionViews {
@@ -58,15 +57,9 @@ export class SessionViews {
     return Promise.all([...this.#subscriptions.keys()].map(sid => this.leave(sid, endReason)))
   }
 
-  /** Stops showing session `sid`: a shared-gateway view detaches (the session keeps running for its other viewers); a private gateway closes it. */
+  /** Stops showing session `sid`: the view detaches, and the session keeps running for its other viewers. */
   async leave(sid: LiveSessionId, endReason: EndReason) {
     const subscription = this.#subscriptions.get(sid)
-
-    if (!this.#gw.isCanonical) {
-      await rpc(this.#gw, 'session.close', { session_id: sid }).catch(() => undefined)
-
-      return
-    }
 
     if (!subscription) {
       return
@@ -92,9 +85,7 @@ export class SessionViews {
         continue
       }
 
-      if (!this.#gw.isCanonical) {
-        void rpc(this.#gw, 'session.close', { session_id: ref.live }).catch(() => undefined)
-      } else if (subscription) {
+      if (subscription) {
         void this.#detach(ref.live, subscription)
       }
     }

@@ -277,7 +277,6 @@ export class AppActions {
     return {
       awaitingStartup: this.#cx.attachments.awaitingStartup,
       busy: activity.busy !== null,
-      canonical: this.#cx.gw.isCanonical,
       compacting: activity.compacting !== undefined,
       sid: this.#cx.state.ref.live,
       switching: this.#cx.life.switching

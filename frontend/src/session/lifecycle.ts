@@ -11,9 +11,9 @@ import type { GatewayClient } from '@hermes/shared/gateway-client'
 import type { AnyGatewayEvent } from '@hermes/shared/gateway-types'
 
 import type { LaunchEnv } from '../config/env.js'
+import { optional } from '../core/assert.js'
 import { errorText } from '../core/errors.js'
 import { durable, type DurableSessionId, isLive, type LiveSessionId, type StoredSessionId, storedSessionId } from '../core/ids.js'
-import { createParams } from '../hermes/create.js'
 import { missingCapabilities, tooOldNotice } from '../hermes/requirements.js'
 import type { PromptSheets } from '../prompts/sheets.js'
 import type { Transcript } from '../transcript/store.js'
@@ -27,7 +27,7 @@ import { type EndReason, SessionViews } from './views.js'
 
 /** What the session lifecycle reaches of the app. */
 export interface LifecycleHost {
-  readonly gw: Pick<GatewayClient, 'holdAttach' | 'hydrateSharedPrompts' | 'isCanonical' | 'request' | 'settleAttach'>
+  readonly gw: Pick<GatewayClient, 'holdAttach' | 'hydrateSharedPrompts' | 'request' | 'settleAttach'>
   readonly state: SessionState
   readonly transcript: Pick<Transcript, 'notice'>
   readonly sheets: Pick<PromptSheets, 'dropShared'>
@@ -35,8 +35,6 @@ export interface LifecycleHost {
   readonly launch: Pick<LaunchEnv, 'create' | 'paneCwd' | 'restored' | 'resume' | 'sessionCwd'>
   /** Whether another live pane shows conversation `id` (the plugin knows: viewers.py). */
   shownElsewhere(id: StoredSessionId): Promise<boolean>
-  /** The pane's width, which a private gateway lays its output out for. */
-  cols(): number
   /** Whether the view may move to another session now (not while a turn or a compaction runs). */
   canSwitch(): SwitchGate
   /** The launcher's --image still waits for the first session. */
@@ -301,11 +299,8 @@ export class SessionLifecycle {
         return
       }
 
-      const r: Snapshot = await rpc(
-        host.gw,
-        'session.create',
-        createParams({ canonical: host.gw.isCanonical, cols: host.cols(), create: host.launch.create, cwd })
-      )
+      // The launch flags (`hermes tern -m … --yolo -s …`, HERMES_TERN_CREATE) are the session's creation policy.
+      const r: Snapshot = await rpc(host.gw, 'session.create', { ...host.launch.create, ...optional('cwd', cwd || undefined) })
 
       if (!this.#switches.current(token)) {
         // A later switch won; nothing will ever show this session.
@@ -375,7 +370,7 @@ export class SessionLifecycle {
         }
       }
 
-      const r: Snapshot = await rpc(host.gw, 'session.resume', { cols: host.cols(), session_id: id })
+      const r: Snapshot = await rpc(host.gw, 'session.resume', { session_id: id })
 
       if (!this.#switches.current(token)) {
         this.#views.superseded(r)

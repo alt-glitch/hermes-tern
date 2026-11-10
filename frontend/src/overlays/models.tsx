@@ -1,10 +1,9 @@
 // The model picker (`/model`, the composer's model chip): every configured
 // provider's models in one `picker` sheet like omp's (search, a provider
 // scope column, facts, a preview pane, the current model checked), switching
-// the session's model through `config.set` as the Ink TUI's picker does. The effort strip picks the
-// reasoning effort to go with it (Ctrl+E steps it) and, for a model with a fast tier, Fast (Ctrl+F);
-// Save as default keeps the model and effort for new sessions where the gateway can write the
-// default (a private one: the shared gateway switches the session only).
+// the session's model with the gateway's `model` mutation as Ink's and Desktop's pickers do. It
+// switches this session only. The effort strip picks the reasoning effort to go with it (Ctrl+E
+// steps it) and, for a model with a fast tier, Fast (Ctrl+F).
 
 import type { ConfigSetResult, ModelOptionProvider } from '@hermes/shared/gateway-events'
 import { modelSearchText } from '@hermes/shared/model-search-text'
@@ -44,7 +43,7 @@ interface Confirm {
 /** The shared gateway's one-time tokens for guarded model targets the user was asked about, by `sid value`. */
 const confirmTokens = new Map<string, string>()
 
-/** A model switch on the shared gateway: a revision-fenced `session.mutate operation=model`, shaped like `config.set`'s reply. */
+/** A model switch: a revision-fenced `session.mutate operation=model`, shaped like `config.set`'s reply. */
 async function mutateModel(host: ModelsHost, value: string, confirmed: boolean): Promise<ConfigSetResult> {
   const sid = host.session.ref.live
   const key = `${sid} ${value}`
@@ -69,16 +68,9 @@ async function mutateModel(host: ModelsHost, value: string, confirmed: boolean):
   return { key: 'model', value: result.model ?? '' } satisfies ConfigSetResult
 }
 
-/** Switches the session's model to `value` (`<model> [--provider <slug>] [--session|--global]`); reports the switch in the transcript unless it needs a confirmation. */
+/** Switches the session's model to `value` (`<model> [--provider <slug>] [--session]`); reports the switch in the transcript unless it needs a confirmation. */
 export async function switchModel(host: ModelsHost, value: string, confirmed = false): Promise<ConfigSetResult> {
-  const r = host.gw.isCanonical
-    ? await mutateModel(host, value, confirmed)
-    : await rpc(host.gw, 'config.set', {
-        confirm_expensive_model: confirmed,
-        key: 'model',
-        session_id: host.session.ref.live,
-        value
-      })
+  const r = await mutateModel(host, value, confirmed)
 
   if (r.confirm_required) {
     return r
@@ -100,9 +92,9 @@ export async function switchModel(host: ModelsHost, value: string, confirmed = f
   return r
 }
 
-/** The switch the picker sends for a model row: this session's, or (`global`) also the default. */
-export function pickerValue(model: string, provider: string, global: boolean): string {
-  return `${model} --provider ${provider} ${global ? '--global' : '--session'}`
+/** The switch the picker sends for a model row: this session's. */
+export function pickerValue(model: string, provider: string): string {
+  return `${model} --provider ${provider} --session`
 }
 
 /** Opens the model picker over the session. */
@@ -115,9 +107,6 @@ export function openModelPicker(host: ModelsHost) {
   let query = ''
   let scope = ALL
   let selected: string | undefined
-  let global = false
-  // The shared gateway's model mutation switches this session only (as Desktop's and Ink's pickers there).
-  const canSave = !host.gw.isCanonical
   /** The session's effort when the picker opened, and the one picked on the strip. */
   const startEffort = host.session.info?.reasoning_effort || ''
   let effort = startEffort || 'medium'
@@ -173,16 +162,16 @@ export function openModelPicker(host: ModelsHost) {
     busy = true
 
     try {
-      const r = await switchModel(host, pickerValue(row.model, row.provider.slug, canSave && global), confirmed)
+      const r = await switchModel(host, pickerValue(row.model, row.provider.slug), confirmed)
 
       if (r.confirm_required) {
         confirm = { row, text: r.confirm_message || r.warning || `${row.model} is expensive. Switch anyway?` }
       } else {
         host.close(overlay)
 
-        // The effort goes with the model: saved with it as the default, or set when it changed.
-        if (levelsFor(caps(row)).some(l => l.id === effort) && ((canSave && global) || effort !== startEffort)) {
-          await host.setEffort(effort, canSave && global ? 'global' : 'session')
+        // The effort goes with the model when it changed.
+        if (levelsFor(caps(row)).some(l => l.id === effort) && effort !== startEffort) {
+          await host.setEffort(effort, 'session')
         }
 
         // After the switch: the gateway checks the tier against the session's new route.
@@ -266,7 +255,6 @@ export function openModelPicker(host: ModelsHost) {
         <picker
           actions={[
             ...(row && fastable(row) ? [{ id: 'fast', keys: ['ctrl+f'], label: '⚡ Fast', on: fast }] : []),
-            ...(canSave ? [{ id: 'global', keys: ['ctrl+g'], label: 'Save as default', on: global }] : []),
             { end: true, id: 'close', keys: ['esc'], label: 'Close' },
             { id: 'use', keys: ['enter'], label: 'Switch', primary: true }
           ]}
@@ -295,10 +283,6 @@ export function openModelPicker(host: ModelsHost) {
             fast: () => {
               fast = !fast
               fastTouched = true
-              host.changed()
-            },
-            global: () => {
-              global = !global
               host.changed()
             },
             retry: () => void load(),
@@ -362,12 +346,6 @@ export function openModelPicker(host: ModelsHost) {
 
       if (k.name === 'enter') {
         void choose(selected)
-
-        return true
-      }
-
-      if (canSave && k.ctrl && k.name === 'g') {
-        global = !global
 
         return true
       }

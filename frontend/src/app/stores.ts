@@ -3,7 +3,6 @@
 // The actions are made last, over these stores, so a store reaches them through `act()` when it
 // calls back; each closure here reads what it calls when it runs, never while the stores are made.
 
-import type { Session } from '@stencil-hq/tern'
 import type { GatewayClient } from '@hermes/shared/gateway-client'
 
 import { Agents } from '../agents/store.js'
@@ -28,6 +27,7 @@ import { OverlayStack } from '../overlays/overlay.js'
 import { openUrl } from '../overlays/pullRequests.js'
 import { Cron } from '../processes/cron.js'
 import { Processes } from '../processes/store.js'
+import { withClipboardImage } from '../hermes/clipboardImage.js'
 import { Viewer } from '../hermes/viewer.js'
 import { gatewayAuthor } from '../processes/widgets/author.js'
 import { chartMemory } from '../processes/widgets/memory.js'
@@ -53,7 +53,6 @@ import type { ChatPorts } from './ports.js'
 
 /** What the stores are made over: the outside parties, what entry.ts read at startup, the app's later parts. */
 export interface StoresDeps {
-  readonly tern: Session
   readonly gw: GatewayClient
   readonly version: string
   readonly launch: LaunchEnv
@@ -71,7 +70,7 @@ export interface StoresDeps {
 export type ChatStores = ReturnType<typeof chatStores>
 
 /** Makes every store of the chat pane over `chat`'s ports, in the order they depend on each other. */
-export function chatStores(chat: ChatPorts, { act, gw, launch, settings, surface, tern, version }: StoresDeps) {
+export function chatStores(chat: ChatPorts, { act, gw, launch, settings, surface, version }: StoresDeps) {
   const changed = () => chat.changed()
   const saved = settings.load()
   const jobCharts = saved.jobCharts !== false
@@ -161,7 +160,7 @@ export function chatStores(chat: ChatPorts, { act, gw, launch, settings, surface
       note: (text, tone) => transcript.notice(text, tone),
       sid: () => session.ref.live
     },
-    { startup: launch.image }
+    { clipboard: use => withClipboardImage(use, launch.hermes), startup: launch.image }
   )
   /** The prompts waiting behind the turn: held here, and the shared gateway's queue for this session. */
   const queue: PromptQueue = new PromptQueue({
@@ -183,7 +182,6 @@ export function chatStores(chat: ChatPorts, { act, gw, launch, settings, surface
     gw,
     queue,
     restore: prompt => act().restore(prompt),
-    session,
     ticket: () => session.ticket(),
     transcript
   })
@@ -219,7 +217,6 @@ export function chatStores(chat: ChatPorts, { act, gw, launch, settings, surface
       awaitingStartup: () => attachments.awaitingStartup,
       canSwitch: () => canSwitch(act().gates()),
       changed,
-      cols: () => tern.caps.cols,
       drain: () => queue.drain(),
       gw,
       launch,
