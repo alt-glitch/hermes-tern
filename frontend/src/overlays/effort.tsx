@@ -1,5 +1,5 @@
 // The reasoning effort picker (`/effort`, the effort pill's menu): every level the session's model
-// takes, the session's checked, with the model picker's "Save as default" so a pick can become
+// takes, the session's checked, with "Save as default" so a pick can become
 // config.yaml's `agent.reasoning_effort` for every new session (`config.set reasoning` with `scope: global`).
 
 import type { Key, PickerItem } from '@stencil-hq/tern'

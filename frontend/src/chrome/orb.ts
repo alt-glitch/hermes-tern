@@ -4,7 +4,7 @@
 // animates, never the transcript.
 import type { ImageProps, Session, Surface } from '@stencil-hq/tern'
 import { MODE_FRAMES, type OrbState as LibraryState, resolvePreset } from 'thinking-orbs/engine'
-import type { AnyGatewayEvent } from '@tui/gatewayTypes.js'
+import type { AnyGatewayEvent } from '@hermes/shared/gateway-types'
 
 export type OrbState = 'idle' | 'working' | 'thinking' | 'composing' | 'listening' | 'speaking' | 'waiting' | 'error'
 

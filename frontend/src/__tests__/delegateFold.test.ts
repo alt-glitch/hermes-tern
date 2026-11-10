@@ -16,7 +16,7 @@ const delegate = (result: unknown, more: Partial<ToolCall> = {}) => call('delega
 const tool = (id: string, c: ToolCall): Extract<Block, { kind: 'tool' }> => ({ kind: 'tool', id: entryId(id), call: c })
 const text = (id: string): Block => ({ kind: 'text', id: entryId(id), text: id })
 const turn = (blocks: Block[]): TurnEntry => ({ kind: 'turn', id: entryId('turn'), rev: 0, startedAt: 0, end: { status: 'done', endedAt: 1000 }, blocks })
-const cx: TranscriptContext = { copy: () => undefined, now: 1000, welcome: { tip: '', version: '' } }
+const cx: TranscriptContext = { copy: () => undefined, now: 1000, welcome: { version: '' } }
 const nodes = (root: NodeJson): NodeJson[] => [root, ...(root.c ?? []).flatMap(nodes)]
 
 describe('retained delegate iteration limits in work folds', () => {
@@ -77,7 +77,7 @@ describe('retained delegate iteration limits in work folds', () => {
   })
 
   it('only reveals a replayed result if the result itself is retained', () => {
-    const replay = (content?: string) => history({ kept: [], compactions: [], id: entryId, messages: [
+    const replay = (content?: string) => history({ kept: [], id: entryId, messages: [
       { role: 'tool', name: 'delegate_task', tool_call_id: 'd', args: { goal: 'audit' }, ...(content ? { content } : {}) },
       { role: 'assistant', text: 'answer' }
     ] }).find(e => e.kind === 'turn')

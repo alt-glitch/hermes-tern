@@ -2,28 +2,32 @@
 // with (a session to resume, a first prompt, an image, a folder) as variables, and nothing changes
 // them while the pane runs. Read once, they are plain fields.
 //
-// Not here: modules that take an `env` parameter (HERMES_HOME's paths, GitHub tokens, the Python
-// launcher) keep it, so tests hand them their own; and chrome/palette.ts pins HERMES_TUI_LIGHT around a
-// Hermes call that reads it, which is a write, not a launch setting.
+// Not here: modules that take an `env` parameter (HERMES_HOME's paths, GitHub tokens, the command a
+// sidebar runs) keep it, so tests hand them their own.
+
+import { type HermesCommand, readHermesCommand } from '../hermes/connect.js'
+import { parseJson } from '../wire/json.js'
 
 /** What the launcher said at startup. Every string is '' when its variable is unset. */
 export interface LaunchEnv {
-  /** HERMES_VERSION: the Hermes version that launched the pane. */
-  readonly version: string
-  /** HERMES_TUI_RESUME, trimmed: the session to resume first ('' starts a new one). */
+  /** HERMES_TERN_HERMES: how to run this Hermes (the gateway attach, a sidebar); undefined outside `hermes tern`. */
+  readonly hermes: HermesCommand | undefined
+  /** HERMES_TERN_CREATE: the launch flags as `session.create` fields (model, provider, skills, yolo, …). */
+  readonly create: Readonly<Record<string, unknown>>
+  /** HERMES_TERN_TOOL_PROGRESS: `-v` / `-Q`, pinned on each new session ('' for the profile's). */
+  readonly toolProgress: string
+  /** HERMES_TERN_RESUME, trimmed: the session to resume first ('' starts a new one). */
   readonly resume: string
-  /** HERMES_TUI_QUERY, trimmed: `hermes -q …`, the first prompt. */
+  /** HERMES_TERN_QUERY, trimmed: `hermes tern -q …`, the first prompt. */
   readonly query: string
-  /** HERMES_TUI_IMAGE, trimmed: `--image`, attached to the first session. */
+  /** HERMES_TERN_IMAGE, trimmed: `--image`, attached to the first session. */
   readonly image: string
-  /** HERMES_TUI_CWD, trimmed: the folder new sessions start in ('' lets the gateway choose). */
+  /** HERMES_TERN_SESSION_CWD, trimmed: the folder new sessions start in ('' lets the gateway choose). */
   readonly sessionCwd: string
-  /** HERMES_CWD, else the process's folder: where the user launched Hermes, for relative paths. */
+  /** HERMES_TERN_CWD, else the process's folder: where the user launched Hermes, for relative paths. */
   readonly cwd: string
   /** HOME as set: undefined when unset, kept as given otherwise. */
   readonly home: string | undefined
-  /** HERMES_PYTHON_SRC_ROOT: the Hermes checkout, where the welcome tips come from. */
-  readonly pythonSrcRoot: string
   /** HERMES_TERN_EVENT_LOG: the development tap's file ('' for none). */
   readonly eventLog: string
   /** TERN_PANE: the Tern pane this runs in, whose conversation the plugin keeps ('' outside Tern). */
@@ -35,26 +39,34 @@ export interface LaunchEnv {
 }
 
 /**
- * Parses `env` (the process's by default); `cwd` stands in when HERMES_CWD is unset or empty.
+ * Parses `env` (the process's by default); `cwd` stands in when HERMES_TERN_CWD is unset or empty.
  * Bracket reads: the environment is an index signature, and each name here is a launcher's.
  */
 export function readLaunchEnv(env: NodeJS.ProcessEnv = process.env, cwd: string = process.cwd()): LaunchEnv {
-  const launchCwd = env['HERMES_CWD'] || cwd
+  const launchCwd = env['HERMES_TERN_CWD'] || cwd
 
   return Object.freeze({
+    create: Object.freeze(createOptions(env['HERMES_TERN_CREATE'])),
     cwd: launchCwd,
     eventLog: env['HERMES_TERN_EVENT_LOG'] ?? '',
+    hermes: readHermesCommand(env['HERMES_TERN_HERMES']),
     home: env['HOME'],
-    image: env['HERMES_TUI_IMAGE']?.trim() ?? '',
+    image: env['HERMES_TERN_IMAGE']?.trim() ?? '',
     pane: env['TERN_PANE']?.trim() ?? '',
     paneCwd: env['HERMES_TERN_LAUNCH_CWD'] || launchCwd,
-    pythonSrcRoot: env['HERMES_PYTHON_SRC_ROOT'] ?? '',
-    query: env['HERMES_TUI_QUERY']?.trim() ?? '',
+    query: env['HERMES_TERN_QUERY']?.trim() ?? '',
     restored: Boolean(env['HERMES_TERN_RESTORED']?.trim()),
-    resume: env['HERMES_TUI_RESUME']?.trim() ?? '',
-    sessionCwd: env['HERMES_TUI_CWD']?.trim() ?? '',
-    version: env['HERMES_VERSION'] ?? ''
+    resume: env['HERMES_TERN_RESUME']?.trim() ?? '',
+    sessionCwd: env['HERMES_TERN_SESSION_CWD']?.trim() ?? '',
+    toolProgress: env['HERMES_TERN_TOOL_PROGRESS']?.trim() ?? ''
   })
+}
+
+/** The JSON object `raw` holds; {} for anything else. */
+function createOptions(raw: string | undefined): Record<string, unknown> {
+  const value = raw ? parseJson(raw) : undefined
+
+  return typeof value === 'object' && value !== null && !Array.isArray(value) ? { ...value } : {}
 }
 
 let launch: LaunchEnv | undefined

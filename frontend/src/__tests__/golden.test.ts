@@ -8,6 +8,8 @@ import { join } from 'node:path'
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { TERN_PANE_VARS } from '../hermes/viewer.js'
+
 import { must } from './fakes.js'
 import { fixture, logLines, replay, replays } from './replays.js'
 
@@ -17,22 +19,22 @@ vi.mock('node:crypto', async importOriginal => ({
   ...(await importOriginal<typeof import('node:crypto')>()),
   randomUUID: () => `00000000-0000-4000-8000-${String(++ids.n).padStart(12, '0')}`
 }))
-vi.mock('@tui/lib/history.js', () => ({ append: () => undefined, load: () => [] }))
-vi.mock('../hermes/sessionIndex.js', async importOriginal => ({
-  ...(await importOriginal<typeof import('../hermes/sessionIndex.js')>()),
-  lastReply: () => '',
-  storedSessions: () => []
-}))
-
+vi.mock('@hermes/shared/prompt-history', () => ({ append: () => undefined, load: () => [] }))
 const home = mkdtempSync(join(tmpdir(), 'hermes-tern-golden-'))
 process.env['HERMES_HOME'] = home
 
-/** `text` with this machine's paths replaced, so the snapshot reads the same anywhere. */
+// The replays record the pane's Tern variables (viewer.set): the same snapshot inside and outside a Tern pane.
+const ternVars = Object.fromEntries(TERN_PANE_VARS.map(k => [k, process.env[k]]))
+beforeEach(() => TERN_PANE_VARS.forEach(k => delete process.env[k]))
+afterEach(() => TERN_PANE_VARS.forEach(k => (ternVars[k] === undefined ? delete process.env[k] : (process.env[k] = ternVars[k]))))
+
+/** `text` with this machine's paths and this process's id replaced, so the snapshot reads the same anywhere. */
 function scrub(text: string): string {
   const paths: [string, string][] = [
     [home, '<HERMES_HOME>'],
     [process.cwd(), '<CWD>'],
-    [homedir(), '<HOME>']
+    [homedir(), '<HOME>'],
+    [`"pid": ${process.pid}`, '"pid": "<PID>"']
   ]
 
   return paths.reduce((out, [path, name]) => out.split(path).join(name), text)

@@ -1,9 +1,11 @@
-// Table planning through the existing Hermes Python helper seam (see processes/widgets/author.ts).
+// Table planning through the launcher's Hermes interpreter and environment.
 // The pinned shared gateway has no table_chart.plan RPC. Only the table goes on stdin;
 // Hermes redacts it before calling its configured auxiliary.table_charts route.
 import { spawn } from 'node:child_process'
-import { join } from 'node:path'
+import { existsSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 
+import { readHermesCommand } from '../hermes/connect.js'
 import { decodeJson } from '../wire/json.js'
 import type { ChartKind, ChartPlanner } from './tableCharts.js'
 
@@ -12,8 +14,7 @@ const MAX_REPLY_BYTES = 4096
 
 /** Reject any prose, SVG, tool output or unknown kind from the auxiliary subprocess. */
 export function readTableChartReply(stdout: string): ChartKind {
-  // Match widget_author.py's transport: Python dependency activation may
-  // print diagnostics before the one final JSON line.
+  // Python dependency activation may print diagnostics before the final JSON line.
   const data: unknown = decodeJson(stdout.trim().split('\n').at(-1) ?? '')
 
   if (typeof data === 'object' && data !== null && !Array.isArray(data) &&
@@ -26,17 +27,14 @@ export function readTableChartReply(stdout: string): ChartKind {
 }
 
 /**
- * A single provider attempt. The launcher's exact Hermes interpreter/checkout and
- * installed plugin path are the same ones that run widget_author.py. An absent
- * launcher seam rejects (TableCharts retains its local bar).
+ * A single provider attempt through the launcher's interpreter and environment.
+ * A missing or invalid command rejects; TableCharts retains its local bar.
  */
 export function hermesTableChartPlanner(env: NodeJS.ProcessEnv = process.env): ChartPlanner['plan'] {
-  const python = env['HERMES_PYTHON']?.trim()
-  const root = env['HERMES_PYTHON_SRC_ROOT']?.trim()
-  const ui = env['HERMES_TUI_DIR']?.trim()
+  const hermes = readHermesCommand(env['HERMES_TERN_HERMES'])
 
   return async (_session, table, signal) => {
-    if (!python || !root || !ui) {
+    if (!hermes) {
       throw new Error('Hermes Python auxiliary route is unavailable')
     }
 
@@ -44,7 +42,9 @@ export function hermesTableChartPlanner(env: NodeJS.ProcessEnv = process.env): C
       throw new Error('Table chart request cancelled')
     }
 
-    const script = join(ui, '..', 'table_chart_planner.py')
+    const [python] = hermes.argv
+    const bundled = new URL('../../table_chart_planner.py', import.meta.url)
+    const script = fileURLToPath(existsSync(bundled) ? bundled : new URL('../../../table_chart_planner.py', import.meta.url))
     const deadline = AbortSignal.timeout(TABLE_CHART_DEADLINE_MS)
     const combined = AbortSignal.any([signal, deadline])
 
@@ -52,8 +52,7 @@ export function hermesTableChartPlanner(env: NodeJS.ProcessEnv = process.env): C
       // Absolute wall-time cap, including interpreter startup. SIGKILL prevents
       // a non-cooperative child from lingering after the deadline or session loss.
       const child = spawn(python, [script], {
-        cwd: root,
-        env: { ...env, PYTHONPATH: root },
+        env: { ...env, ...hermes.env },
         signal: combined,
         stdio: ['pipe', 'pipe', 'ignore'],
         timeout: TABLE_CHART_DEADLINE_MS,

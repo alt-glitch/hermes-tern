@@ -1,6 +1,6 @@
 import type { CompletionItem } from '@hermes/shared/gateway-events'
 import { Node, Surface, type Key } from '@stencil-hq/tern'
-import type { GatewayClient } from '@tui/gatewayClient.js'
+import type { GatewayClient } from '@hermes/shared/gateway-client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Composer } from '../draft/composer.js'
@@ -11,7 +11,7 @@ import { stub, tree } from './fakes.js'
 
 const history: string[] = []
 
-vi.mock('@tui/lib/history.js', () => ({ append: () => undefined, load: () => history }))
+vi.mock('@hermes/shared/prompt-history', () => ({ append: () => undefined, load: () => history }))
 
 interface Reply {
   items?: CompletionItem[]

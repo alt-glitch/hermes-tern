@@ -5,7 +5,6 @@
 import type { Usage } from '@hermes/shared/gateway-events'
 
 import type { TurnEntry } from '../model.js'
-import { withoutTernEnv } from '../tools/terminal.js'
 
 /** When `turn` ended: undefined while it is live, and for a stored turn whose rows carry no time. */
 export function turnEndedAt(turn: Pick<TurnEntry, 'end'>): number | undefined {
@@ -61,11 +60,4 @@ export function usageSince(now: Usage, before: Usage | undefined): Usage {
   }
 
   return out
-}
-
-/** A call's args as views show them: a shell command as the agent wrote it, without the pane prefix the plugin's middleware adds (completion events carry the args that ran). */
-export function shownArgs(args: Record<string, unknown>): Record<string, unknown> {
-  const command = args['command']
-
-  return typeof command === 'string' ? { ...args, command: withoutTernEnv(command) } : args
 }

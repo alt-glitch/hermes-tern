@@ -11,7 +11,7 @@ import { FakeGateway, fakeTern, given, key, settle } from './fakes.js'
 
 const history: string[] = []
 
-vi.mock('@tui/lib/history.js', () => ({
+vi.mock('@hermes/shared/prompt-history', () => ({
   append: (text: string) => void history.push(text),
   load: () => history
 }))

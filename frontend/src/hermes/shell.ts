@@ -2,12 +2,13 @@
 // one captured command through the shared gateway's `shell.exec` (gateway/session_shell.py), which runs
 // it for a local session in its launch cwd and refuses sandboxed backends and dangerous commands.
 import type { ShellExecResult } from '@hermes/shared/gateway-events'
-import type { GatewayClient } from '@tui/gatewayClient.js'
-import { describeRpcError } from '@tui/app/userMessages.js'
-import { INTERPOLATION_RE } from '@tui/protocol/interpolation.js'
+import type { GatewayClient } from '@hermes/shared/gateway-client'
+import { INTERPOLATION_RE } from '@hermes/shared/interpolation'
 
 import { errorText } from '../core/errors.js'
 import { rpc } from '../wire/rpc.js'
+
+import { describeRpcError } from './rpcErrors.js'
 
 /** The owner's refusals (its reason codes), in words. */
 const REFUSALS: [string, string][] = [

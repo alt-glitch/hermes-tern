@@ -32,7 +32,7 @@ function intent(text: string): string {
 export function agentProgress(a: Subagent): string[] {
   const lines: string[] = []
 
-  for (const e of a.log?.entries ?? []) {
+  for (const e of a.steps ?? []) {
     const line = e.kind === 'assistant' ? compact(e.text) : e.kind === 'tool' ? intent(e.args || e.name) : ''
 
     if (line && lines.at(-1) !== line) {

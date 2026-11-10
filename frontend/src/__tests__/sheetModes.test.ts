@@ -15,9 +15,9 @@ function agent(id: string, status: Subagent['status'], steps = 0): Subagent {
     id,
     index: 0,
     key: subagentKey(id),
-    log: { entries: Array.from({ length: steps }, (_, i) => ({ at: '10:00:00', kind: 'note' as const, text: `step ${i}` })) },
     startedAt: 0,
     status,
+    steps: Array.from({ length: steps }, (_, i) => ({ at: 0, kind: 'note' as const, text: `step ${i}` })),
     tokens: 0,
     toolCount: 0
   }
@@ -94,7 +94,7 @@ describe('the agents hub reducer', () => {
   it('opens a timeline that follows the newest step, and Esc goes back to its agent', () => {
     const { effect, state } = hub({ ...start, selected: 'a1' }, { type: 'watch' })
 
-    expect(effect).toBe('refresh')
+    expect(effect).toBeUndefined()
     expect(state.view).toEqual({ agent: 'a1', kind: 'timeline', step: undefined })
     expect(hubKey(state, key('up'), AGENTS)).toEqual({ id: 'e1', type: 'step' })
 

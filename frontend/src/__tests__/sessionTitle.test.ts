@@ -104,18 +104,19 @@ describe('SessionTitle', () => {
     expect(vi.getTimerCount()).toBe(0)
   })
 
-  it('renames through session.title on a private gateway, and says so when it fails', async () => {
-    const gw = new FakeGateway({ canonical: false })
-    gw.handlers.set('session.title', () => ({ title: 'Named' }))
+  it('renames through the rename mutation, takes the stored title, and says so when it fails', async () => {
+    const gw = new FakeGateway()
+    gw.handlers.set('session.resume', () => ({ execution_generation: 1, revision: 4 }))
+    gw.handlers.set('session.mutate', () => ({ title: 'Named' }))
     const h = host(gw)
     const title = new SessionTitle(h)
 
     await title.rename(live, 'Asked')
-    expect(gw.sent('session.title')).toEqual([{ session_id: 's1', title: 'Asked' }])
+    expect(gw.sent('session.mutate')).toEqual([expect.objectContaining({ operation: 'rename', payload: { title: 'Asked' }, session_id: 's1' })])
     expect(title.text).toBe('Named')
     expect(h.changed).toHaveBeenCalledTimes(1)
 
-    gw.handlers.set('session.title', () => {
+    gw.handlers.set('session.mutate', () => {
       throw new Error('no such session')
     })
     await title.rename(live, 'Again')

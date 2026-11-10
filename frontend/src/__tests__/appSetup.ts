@@ -1,6 +1,6 @@
 // The app on the fakes, for the App tests: a fake Tern session and gateway, keys in and requests
-// out (see fakes.ts). A test file using it mocks '@tui/lib/history.js' itself, as vi.mock is
-// hoisted per file, and resets HERMES_TUI_QUERY and HERMES_TUI_IMAGE before each test.
+// out (see fakes.ts). A test file using it mocks '@hermes/shared/prompt-history' itself, as vi.mock is
+// hoisted per file, and resets HERMES_TERN_QUERY and HERMES_TERN_IMAGE before each test.
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -24,12 +24,12 @@ writeFileSync(png, Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 0]))
 /** The gateway of the app the running test set up. */
 let gateway: FakeGateway
 
-/** The app on a fake Tern and gateway: keys go in, gateway requests come out (`canonical`: the shared gateway). */
+/** The app on a fake Tern and gateway: keys go in, gateway requests come out. */
 export function setup(
   replies: Record<string, Reply> = {},
-  { canonical = true, features = [], recorder }: { canonical?: boolean; features?: string[]; recorder?: Recorder } = {}
+  { features = [], recorder }: { features?: string[]; recorder?: Recorder } = {}
 ) {
-  const gw = (gateway = new FakeGateway({ canonical, replies }))
+  const gw = (gateway = new FakeGateway({ replies }))
   let uploads = 0
 
   if (!replies['image.attach_bytes']) {

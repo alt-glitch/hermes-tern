@@ -44,22 +44,11 @@ describe('commands the shared gateway refuses, routed here', () => {
   })
 
   it('/browser reads browser.manage status for this session', async () => {
-    const a = app(() => ({ browser_use: true, connected: true, url: 'http://127.0.0.1:9222' }))
+    const a = app(() => ({ connected: true, url: 'http://127.0.0.1:9222' }))
 
     await run(a, 'browser')
     expect(a.request).toHaveBeenCalledWith('browser.manage', { action: 'status', session_id: 'sid-1' })
-    expect(a.transcript.notice).toHaveBeenCalledWith(
-      'Browser connected: http://127.0.0.1:9222\nBrowser Use mode: browser_exec runs through the Browser Use CLI.',
-      undefined
-    )
-  })
-
-  it('/browser use off sends enabled: false and says it applies to new sessions', async () => {
-    const a = app(() => ({ connected: false }))
-
-    await run(a, 'browser', 'use off')
-    expect(a.request).toHaveBeenCalledWith('browser.manage', { action: 'use', enabled: false, session_id: 'sid-1' })
-    expect(must(a.transcript.notice.mock.calls[0])[0]).toMatch(/^Browser Use mode off.*New sessions get it/)
+    expect(a.transcript.notice).toHaveBeenCalledWith('Browser connected: http://127.0.0.1:9222', undefined)
   })
 
   it("/browser connect shows the shared gateway's refusal, with the default CDP url sent", async () => {
@@ -82,11 +71,11 @@ describe('commands the shared gateway refuses, routed here', () => {
     const a = app()
 
     await run(a, 'browser', 'open')
-    await run(a, 'browser', 'use maybe')
+    await run(a, 'browser', 'use on')
     expect(a.request).not.toHaveBeenCalled()
     expect(a.transcript.notice.mock.calls.map(c => c[0])).toEqual([
-      'Usage: /browser [status|use [on|off]|connect [url]|disconnect]',
-      'Usage: /browser use [on|off]'
+      'Usage: /browser [status|connect [url]|disconnect]',
+      'Usage: /browser [status|connect [url]|disconnect]'
     ])
   })
 

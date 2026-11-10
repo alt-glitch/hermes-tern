@@ -53,12 +53,6 @@ export async function forkSession(host: ForkHost, raw = '', open: PaneLauncher =
     return
   }
 
-  if (!control.canonical) {
-    host.notice('/fork requires the shared Hermes session gateway.', 'warning')
-
-    return
-  }
-
   if (control.busy || host.busy) {
     host.notice('Wait for the current turn to finish before forking.', 'warning')
 

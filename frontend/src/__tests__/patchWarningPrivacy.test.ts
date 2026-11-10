@@ -46,13 +46,13 @@ it('keeps warned validation failure and no-write disclosure on replay without th
   const sample = scenarios[1]
   if (!sample) throw new Error('missing validation scenario')
   let n = 0
-  const entries = history({ kept: [], compactions: [], id: p => entryId(`${p}${++n}`), messages: [
+  const entries = history({ kept: [], id: p => entryId(`${p}${++n}`), messages: [
     { role: 'tool', name: 'patch', tool_call_id: 'patch-warning', args: sample.args, content: JSON.stringify(sample.result), is_error: true },
     { role: 'assistant', text: 'answer' }
   ] })
   const turn = entries.find(entry => entry.kind === 'turn')
   if (!turn || turn.kind !== 'turn') throw new Error('missing replay turn')
-  const view = JSON.stringify(tree(entryNode(turn, 'main.patch-warning-privacy', { copy: () => undefined, now: 1000, welcome: { tip: '', version: '' } })))
+  const view = JSON.stringify(tree(entryNode(turn, 'main.patch-warning-privacy', { copy: () => undefined, now: 1000, welcome: { version: '' } })))
   expect(view).toContain('Patch validation failed (no files were modified)')
   expect(view).toContain(PATCH_CONTEXT_WARNING)
   expect(view).not.toContain(secret)

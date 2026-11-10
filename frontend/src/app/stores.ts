@@ -3,8 +3,8 @@
 // The actions are made last, over these stores, so a store reaches them through `act()` when it
 // calls back; each closure here reads what it calls when it runs, never while the stores are made.
 
+import type { GatewayClient } from '@hermes/shared/gateway-client'
 import type { Session } from '@stencil-hq/tern'
-import type { GatewayClient } from '@tui/gatewayClient.js'
 
 import { Agents } from '../agents/store.js'
 import { BtwThreads } from '../btw.js'
@@ -16,18 +16,16 @@ import { Theme } from '../chrome/theme.js'
 import { TodoHud } from '../todo-hud.js'
 import { dispatched } from '../commands/slash.js'
 import type { LaunchEnv } from '../config/env.js'
-import { markViewer } from '../connections/cards.js'
 import { ConnectWatcher } from '../connections/watcher.js'
 import { Disposables } from '../core/disposables.js'
-import { durable } from '../core/ids.js'
 import { Attachments } from '../draft/attachments.js'
 import { Composer } from '../draft/composer.js'
 import { Dictation } from '../draft/dictation.js'
 import { VimPreference } from '../draft/vim-preference.js'
 import type { Presses } from '../draft/keys.js'
 import type { Warned } from '../gateway/handlers/chrome.js'
+import { linkedPullRequests, LINKS_CHANGED } from '../github/links.js'
 import { PullRequests } from '../github/store.js'
-import { writeActiveSessionFile } from '../hermes/activeSessionFile.js'
 import type { Recorder } from '../hermes/dictation.js'
 import { MediaDelivery } from '../media-delivery.js'
 import { Media } from '../media.js'
@@ -37,7 +35,9 @@ import { OverlayStack } from '../overlays/overlay.js'
 import { openUrl } from '../overlays/pullRequests.js'
 import { Cron } from '../processes/cron.js'
 import { Processes } from '../processes/store.js'
-import { hermesAuthor } from '../processes/widgets/author.js'
+import { withClipboardImage } from '../hermes/clipboardImage.js'
+import { Viewer } from '../hermes/viewer.js'
+import { gatewayAuthor } from '../processes/widgets/author.js'
 import { chartMemory } from '../processes/widgets/memory.js'
 import { PromptSheets } from '../prompts/sheets.js'
 import { PrAside } from '../prs/aside.js'
@@ -54,7 +54,7 @@ import { Transcript } from '../transcript/store.js'
 import { Activity } from '../turn/activity.js'
 import { PromptQueue } from '../turn/queue.js'
 import { canDrain, canSwitch, PromptRouter } from '../turn/router.js'
-import { randomTip, type WelcomeContext } from '../view/welcome.js'
+import type { WelcomeContext } from '../view/welcome.js'
 import { LiveVoice } from '../voice/live.js'
 import { TalkGateway } from '../voice/talk-gateway.js'
 
@@ -63,7 +63,8 @@ import type { ChatPorts } from './ports.js'
 
 /** What the stores are made over: the outside parties, what entry.ts read at startup, the app's later parts. */
 export interface StoresDeps {
-  readonly tern: Session
+  /** The fork's host-aware media previews still use Tern's blob and capability ports. */
+  readonly tern: Pick<Session, 'blob' | 'caps'>
   readonly gw: GatewayClient
   readonly version: string
   readonly launch: LaunchEnv
@@ -89,13 +90,13 @@ export function chatStores(chat: ChatPorts, { act, gw, launch, recorder, setting
   const jobCharts = saved.jobCharts !== false
   /** The open session: its ids, info, usage and busy-input mode; every write renders. */
   const session = new SessionState(changed)
+  /** Tells the plugin which session this pane shows (hermes/viewer.ts). */
+  const viewer = new Viewer(gw)
   const transcript = new Transcript()
   /** The working line's busy state and the compaction phase: their one owner. */
   const activity = new Activity()
   /** What the subagent, process and automation stores read of the app: the shown runtime id on each use. */
   const live = {
-    // A subagent ended: the PRs it linked are filed under this conversation (pull_requests.py).
-    agentEnded: () => prs.relink(),
     changed,
     gw,
     // A command's dispatch envelope from outside a typed command (a goal or loop sheet's button).
@@ -121,7 +122,7 @@ export function chatStores(chat: ChatPorts, { act, gw, launch, recorder, setting
    * The session's background processes (the shells pill, the Background sheet, background cards),
    * with live charts unless settings.json's `jobCharts` is false.
    */
-  const processes = new Processes(live, { author: hermesAuthor(), enabled: () => jobCharts, memory: chartMemory() })
+  const processes = new Processes(live, { author: gatewayAuthor(gw, () => session.ref.live), enabled: () => jobCharts, memory: chartMemory() })
   const cron = new Cron(chat)
   const sidebar = new Sidebar(chat)
   /** The session's standing /goal and /loop (the dock line above the pills and its sheets). */
@@ -132,7 +133,13 @@ export function chatStores(chat: ChatPorts, { act, gw, launch, recorder, setting
   const hud = new Hud({ changed, open: pill => act().openPill(pill) })
   const todoHud = new TodoHud()
   /** The conversation's PRs; links are stored under the stored session id the tools see. */
-  const prs = new PullRequests({ changed, cwd: () => session.info?.cwd || null, sid: () => durable(session.ref) })
+  const prs = new PullRequests({ changed, cwd: () => session.info?.cwd || null, links: sid => linkedPullRequests(gw, sid), sid: () => session.ref.live })
+  // A link tool changed this conversation's links (a subagent's, which this transcript never sees).
+  gw.on('event', (ev: { type: string }) => {
+    if (ev.type === LINKS_CHANGED) {
+      prs.relink()
+    }
+  })
   /** The pull request docked at the pane's right edge (the PR aside). */
   const prAside = new PrAside({
     changed,
@@ -169,8 +176,8 @@ export function chatStores(chat: ChatPorts, { act, gw, launch, recorder, setting
   const presses: Presses = { esc: 0, exit: 0 }
   /** The prompt sheets the gateway's questions opened, and their approval-queue ids. */
   const sheets = new PromptSheets(chat)
-  /** The connect cards, kept current from the plugin's files. */
-  const connect = new ConnectWatcher({ changed, openUrl, tell: text => act().submit(text, false), transcript })
+  /** The connect cards the gateway opens, answered through it. */
+  const connect = new ConnectWatcher({ changed, gw, openUrl, sid: () => session.ref.live, transcript })
   /** The gateway connection: down until the next gateway.ready, and its redial line. */
   const reconnect = new Reconnect(chat)
   /** The backend warnings shown already (stray output, the last status warning), so each stays one line. */
@@ -189,7 +196,7 @@ export function chatStores(chat: ChatPorts, { act, gw, launch, recorder, setting
       note: (text, tone) => transcript.notice(text, tone),
       owner: () => session.ref
     },
-    { startup: launch.image }
+    { clipboard: use => withClipboardImage(use, launch.hermes), startup: launch.image }
   )
   /** The prompts waiting behind the turn: held here, and the shared gateway's queue for this session. */
   const queue: PromptQueue = new PromptQueue({
@@ -213,7 +220,6 @@ export function chatStores(chat: ChatPorts, { act, gw, launch, recorder, setting
     queue,
     ownsImages: (sid, images) => attachments.ownsForSend(sid, images),
     restore: prompt => act().restore(prompt),
-    session,
     ticket: () => session.ticket(),
     transcript
   })
@@ -254,12 +260,12 @@ export function chatStores(chat: ChatPorts, { act, gw, launch, recorder, setting
       awaitingStartup: () => attachments.awaitingStartup,
       canSwitch: () => canSwitch(act().gates()),
       changed,
-      cols: () => tern.caps.cols,
       drain: () => queue.drain(),
       gw,
       launch,
       operations,
       rename: (sid, text) => title.rename(sid, text),
+      shownElsewhere: id => viewer.shown(id),
       request: req => act().onRequest(req),
       sheets,
       state: session,
@@ -272,13 +278,13 @@ export function chatStores(chat: ChatPorts, { act, gw, launch, recorder, setting
       },
       imageLanded: call => act().imageLanded(call),
       markPane: id => markPane(launch, id),
-      markViewer,
+      markViewer: (now, before) => viewer.show(now, before),
       readBusyMode: () => void act().readBusyMode(),
       readShortcuts: () => void act().bindings.refresh(),
       readVimPreference: () => void vimPreference.refresh(),
       reportCwd: () => act().reportCwd(),
-      showThoughts: sid => showThoughts({ gw, notice: (text, tone) => chat.notice(text, tone), settings }, sid),
-      writeActiveSession: writeActiveSessionFile
+      restoreCompactions: () => void act().restoreCompactions(),
+      showThoughts: sid => showThoughts({ gw, notice: (text, tone) => chat.notice(text, tone), settings }, sid)
     })
   )
   /** Per-connection duplex Hermes Talk call, not the legacy STT/TTS loop. */
@@ -293,9 +299,9 @@ export function chatStores(chat: ChatPorts, { act, gw, launch, recorder, setting
   /** Whose colors the surface wears, and the gateway's skin. */
   const theme = new Theme({ palette: palette => surface().palette(palette), settings }, saved.theme ?? 'tern')
   const completion = new Completion(chat, gw, () => session.ref.live, () => session.ref)
-  const welcome: WelcomeContext = { tip: randomTip(launch.pythonSrcRoot), version: version && version !== 'unknown' ? `v${version}` : '' }
+  const welcome: WelcomeContext = { version: version && version !== 'unknown' ? `v${version}` : '' }
 
-  return { ...shared, attachments, completion, cron, dictation, life, liveVoice, talkGateway, router, stack, theme, warned, welcome }
+  return { ...shared, attachments, completion, cron, dictation, life, liveVoice, talkGateway, router, stack, theme, viewer, warned, welcome }
 }
 
 /** Stops what the stores run on their own: every timer, the polls and the sidebar's reads. */

@@ -70,7 +70,7 @@ describe('artifact links survive cached transcript revisions', () => {
     copy: () => undefined,
     links: { cwd, hostLocal: true, media: false },
     now: 12,
-    welcome: { tip: '', version: '' }
+    welcome: { version: '' }
   }
 
   it('uses the session folder, and invalidates a cached node when the host changes', () => {

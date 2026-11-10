@@ -1,7 +1,7 @@
 import { Node, type NodeJson } from '@stencil-hq/tern'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import * as z from 'zod/mini'
 
-import type { StoredSession } from '../hermes/sessionIndex.js'
 import type { PreviewRow, TranscriptReader } from '../hermes/sessionTranscript.js'
 import type { Overlay } from '../overlays/overlay.js'
 
@@ -12,14 +12,14 @@ const copied: string[] = []
 
 vi.mock('../clipboard.js', () => ({ copyToClipboard: (text: string) => copied.push(text) }))
 
-const row = (id: string, title: string): StoredSession => ({
-  branch: '', cwd: '/w/app', id, lastActive: Date.now(), messages: 4, model: '', pinned: false,
-  preview: `${title} prompt`, repoRoot: '/w/app', source: 'tui', startedAt: Date.now(), title
+/** A `session.list` row with its picker fields. */
+const row = (id: string, title: string, at: number) => ({
+  cwd: '/w/app', id, last_active_at: at, message_count: 4, preview: `${title} prompt`, running: false,
+  session_id: id, source: 'tui', started_at: at, title, workspace: '/w/app'
 })
 
-vi.mock('../hermes/sessionIndex.js', async importOriginal => ({
-  ...(await importOriginal<typeof import('../hermes/sessionIndex.js')>()),
-  storedSessions: () => [row('a', 'First'), row('b', 'Second')],
+vi.mock('../hermes/sessionList.js', async importOriginal => ({
+  ...(await importOriginal<typeof import('../hermes/sessionList.js')>()),
   workspaceOf: () => Promise.resolve('/w/app')
 }))
 
@@ -27,22 +27,27 @@ const { openSessionPicker } = await import('../overlays/sessions.js')
 
 const user = (text: string): PreviewRow => ({ key: text, kind: 'user', steer: false, text })
 
-function setup(canonical = true) {
+function setup() {
   const reads: string[] = []
   const reader: TranscriptReader = {
-    ends: id => {
-      reads.push(`ends ${id}`)
+    page: (id, cursor) => {
+      reads.push(`page ${id} ${cursor ?? 'first'}`)
 
-      return Promise.resolve({ firstPrompt: `${id} first`, lastReply: `${id} last` })
-    },
-    page: (id, after) => {
-      reads.push(`page ${id} ${after}`)
-
-      return Promise.resolve(after === 0 ? { next: 5, rows: [user('one'), user('two'), user('three')] } : { next: null, rows: [user('four')] })
+      return Promise.resolve(
+        cursor === null ? { next: 'p5', reset: true, rows: [user('one'), user('two'), user('three')] } : { next: null, reset: false, rows: [user('four')] }
+      )
     }
   }
   let overlay: Overlay | undefined
-  const gateway = new FakeGateway({ canonical, replies: { 'session.list': () => ({ sessions: [] }) } })
+  const gateway = new FakeGateway({
+    replies: {
+      'session.resume': () => ({ revision: 3, execution_generation: 7 }),
+      'session.mutate': () => ({ status: 'ok' }),
+      // One live session and one from history; the stored scope also repeats the live one.
+      'session.list': p =>
+        p['scope'] === 'stored' ? { sessions: [row('b', 'Second', 100), row('a', 'First', 200)] } : { sessions: [row('a', 'First', 200)] }
+    }
+  })
   const host = {
     changed: vi.fn(),
     close: vi.fn(),
@@ -81,6 +86,18 @@ describe('the session picker', () => {
     vi.useRealTimers()
   })
 
+  it('lists the live and the stored scope once each, newest activity first', async () => {
+    const { draw, gateway } = setup()
+    await vi.advanceTimersByTimeAsync(0)
+    const items = draw().p?.['items']
+
+    expect(gateway.sent('session.list')).toEqual([
+      { limit: 200, picker: true, scope: 'live' },
+      { limit: 200, picker: true, scope: 'stored' }
+    ])
+    expect(z.array(z.object({ id: z.string() })).parse(items).map(i => i.id)).toEqual(['a', 'b'])
+  })
+
   it('reads the selected preview only once the selection rests, and keeps it', async () => {
     const { draw, press, reads } = setup()
     await vi.advanceTimersByTimeAsync(0)
@@ -96,14 +113,14 @@ describe('the session picker', () => {
 
     await vi.advanceTimersByTimeAsync(1)
 
-    expect(reads).toEqual(['ends a', 'page a 0'])
+    expect(reads).toEqual(['page a first'])
 
     press('down')
     await vi.advanceTimersByTimeAsync(200)
     press('up')
     await vi.advanceTimersByTimeAsync(200)
 
-    expect(reads).toEqual(['ends a', 'page a 0', 'ends b', 'page b 0'])
+    expect(reads).toEqual(['page a first', 'page b first'])
   })
 
   it('→ focuses the preview, ↓ steps through it, and stepping near the end reads the next page', async () => {
@@ -120,12 +137,12 @@ describe('the session picker', () => {
     press('down')
 
     expect(host.reveal).toHaveBeenLastCalledWith('layer.overlay-1.m0')
-    expect(reads).not.toContain('page a 5')
+    expect(reads).not.toContain('page a p5')
 
     press('down')
 
     expect(host.reveal).toHaveBeenLastCalledWith('layer.overlay-1.m1')
-    expect(reads).toContain('page a 5')
+    expect(reads).toContain('page a p5')
 
     press('page_down')
 
@@ -172,11 +189,7 @@ describe('the session picker', () => {
 
   it.each(['y', 'enter'])('does not delete on modified %s, but honors bare confirmation once', async name => {
     const { draw, host, press } = setup()
-    const request = vi.spyOn(host.gw, 'request').mockImplementation(async method => {
-      if (method === 'session.list') { return { sessions: [] } }
-      if (method === 'session.resume') { return { revision: 3, execution_generation: 7 } }
-      return { status: 'ok' }
-    })
+    const request = vi.spyOn(host.gw, 'request')
     await vi.advanceTimersByTimeAsync(0)
     draw()
     press('backspace')
@@ -207,8 +220,8 @@ describe('the session picker', () => {
     expect(request.mock.calls.filter(([method]) => method === 'session.mutate')).toEqual([])
   })
 
-  it('preserves explicit native confirmation and the private gateway delete path', async () => {
-    const { draw, gateway, press, sheet, root } = setup(false)
+  it('preserves explicit native confirmation and deletes through the gateway once', async () => {
+    const { draw, gateway, press, sheet, root } = setup()
     await vi.advanceTimersByTimeAsync(0)
     draw()
     press('backspace')
@@ -219,6 +232,11 @@ describe('the session picker', () => {
     click(event)
     click(event)
     await vi.advanceTimersByTimeAsync(0)
-    expect(gateway.sent('session.delete')).toEqual([{ session_id: 'a' }])
+    expect(gateway.sent('session.resume')).toEqual([{ session_id: 'a' }])
+    expect(gateway.sent('session.mutate')).toEqual([expect.objectContaining({
+      session_id: 'a', operation: 'delete', expected_revision: 3, expected_generation: 7, payload: {}
+    })])
+    expect(gateway.sent('session.delete')).toEqual([])
+    expect(z.array(z.object({ id: z.string() })).parse(draw().p?.['items']).map(i => i.id)).toEqual(['b'])
   })
 })

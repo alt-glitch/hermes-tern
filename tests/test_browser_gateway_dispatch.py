@@ -19,7 +19,7 @@ import pytest
 
 from hermes_tern_plugin import browser_backend as backend
 from hermes_tern_plugin import browser_native as native
-from hermes_tern_plugin import tern_env, connections
+from hermes_tern_plugin import tern_env, viewers
 from hermes_tern_plugin.browser_transport import NativeBrowserError
 
 _REAL_PANE_ENV = tern_env.pane_env
@@ -91,6 +91,8 @@ def green(tmp_path, monkeypatch):
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     monkeypatch.setattr(server, "_hermes_home", home)
     monkeypatch.setattr(server, "_sessions", {})
+    monkeypatch.setattr(viewers, "_viewers", {})
+    monkeypatch.setattr(tern_env, "_ids", {})
     plugins._reset_plugin_managers_for_tests()
     monkeypatch.setattr(plugins, "discover_plugins", lambda force=False: None)
 
@@ -924,16 +926,14 @@ def test_real_revoked_unload_keeps_late_open_and_unknown_quarantine(
     assert cli.calls == before
 
 
-def test_real_create_resume_marker_and_model_tool_original_driver(green, monkeypatch):
-    """Real session factory/owner/dispatcher and REAL filesystem marker reader."""
+def test_real_create_resume_viewer_and_model_tool_original_driver(green, monkeypatch):
+    """Real session factory, viewer API, owner fences and model-tool dispatcher."""
     from tools.registry import registry
 
     server, manager, plugins, home = green
     _reload_granted(manager, plugins, home, monkeypatch)
     monkeypatch.setattr(tern_env, "pane_env", _REAL_PANE_ENV)
     monkeypatch.setattr(backend, "_viewer", _REAL_VIEWER)
-    tern_env._ids.clear()
-    tern_env._panes.clear()
     bin_dir = home / "bin"
     bin_dir.mkdir()
     binary = bin_dir / "tern"
@@ -957,11 +957,14 @@ def test_real_create_resume_marker_and_model_tool_original_driver(green, monkeyp
     assert agent is not None, server._sessions[sid]
     assert isinstance(agent.session_id, str) and agent.session_id
 
-    (connections._dir("viewers") / f"{durable}.json").write_text(json.dumps({
-        "pid": os.getpid(),
-        "tern": {"TERN_PANE": "3", "TERN_WINDOW_KEY": "owned-isolated-window",
-                 "TERN_DAEMON_SOCKET": "isolated.sock"},
-    }), encoding="utf-8")
+    pane = {"TERN_PANE": "3", "TERN_WINDOW_KEY": "owned-isolated-window",
+            "TERN_DAEMON_SOCKET": "isolated.sock"}
+    # The public RPC handler receives its session_id from the gateway context.
+    # Claim the durable conversation, not its separate legacy RPC-slot id.
+    assert viewers.set_viewer({"pid": os.getpid(), "tern": pane}, session_id=durable) == {"ids": [durable]}
+    viewer = viewers.viewer_of([durable])
+    assert viewer is not None and viewer.pid == os.getpid() and viewer.tern == pane
+    assert viewers.viewer_of([sid]) is None
     assert tern_env.pane_env(durable)["TERN_PANE"] == "3"
     assert tern_env.pane_env(sid) == {}
 
@@ -1010,3 +1013,13 @@ def test_real_create_resume_marker_and_model_tool_original_driver(green, monkeyp
     assert native.get_driver_for_tool("default", agent.session_id, durable) is driver
     assert json.loads(selected.handler({"full": False}, session_id=sid,
                                       task_id=durable))["error_kind"] == "ownership"
+
+    before = list(driver.scope.cli.calls)
+    assert viewers.clear_viewer({"pid": os.getpid()}, session_id=durable) == {"ids": [durable]}
+    assert viewers.viewer_of([durable]) is None
+    assert tern_env.pane_env(durable) == {}
+    denied = rpc(server, second, "hermes-tern.browser.focus",
+                 rid=407, session_id=sid, target_id="7")
+    assert denied["error"]["code"] == -32000, denied
+    assert driver.scope.cli.calls == before
+    assert driver.scope.lease is lease

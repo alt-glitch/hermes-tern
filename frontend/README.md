@@ -3,15 +3,19 @@
 The chat UI that `hermes tern` runs. It describes the UI to [Tern](https://stencil.so/tern) over
 the Tern Surface Protocol (TSP) instead of painting terminal cells: the transcript, tool calls,
 thinking, the composer and every sheet are semantic nodes that the terminal lays out, draws and
-animates natively. It is a sibling of Hermes' Ink TUI (`ui-tui/`), and it talks to the same
-backend, `tui_gateway`, over the same JSON-RPC contract.
+animates natively. It talks to the profile's shared Hermes gateway over its public JSON-RPC
+contract (`hermes-gateway-v1`), as Hermes' own TUI and desktop app do. It opens none of Hermes'
+files: sessions, transcripts, subagents and connect cards all come from the gateway.
 
 ## Running
 
-The plugin's `hermes tern` command (`../__init__.py`) runs `hermes chat --tui` with
-`HERMES_TUI_DIR` pointing here, so Hermes' launcher starts `dist/entry.js`. The frontend asks the
-terminal for TSP first. A terminal that does not answer makes it exit with code 75, and
-`hermes tern` runs the Ink TUI in its place.
+The plugin's `hermes tern` command (`../launcher.py`) runs `node dist/entry.js` with its own
+`HERMES_TERN_*` variables: the session to open, the first prompt, the launch flags as
+`session.create` fields, and the command that runs this Hermes. The frontend asks the terminal for
+TSP first. A terminal that does not answer makes it exit with code 75, and `hermes tern` says
+that it needs a Tern pane. Otherwise it attaches to the profile's gateway with
+`hermes gateway attach --json` (`src/hermes/connect.ts`) and dials it with Hermes' shared Node
+client (`@hermes/shared/gateway-client`).
 
 ```mermaid
 flowchart LR
@@ -24,7 +28,7 @@ flowchart LR
 
 | Path | What |
 | --- | --- |
-| `src/entry.ts` | Handshake (`@stencil-hq/tern`), gateway start, `App` |
+| `src/entry.ts` | Handshake (`@stencil-hq/tern`), gateway attach, `App` |
 | `src/app/` | The composition root: `chat.ts` (`App`: one inline surface, gateway events → transcript, keys → overlay → completion → composer; its ports, run and quit), `stores.ts` (every store, made in dependency order and wired together), `actions.ts` (what the user starts, bound once), `frame.ts` (one coalesced render per change), `ports.ts` (what App lends the modules it drives) |
 | `src/chrome/` | The pane's chrome around the chat: the pills above the composer and their keys, the status strip's notices, the backend's own failures, the connection's lost and redial lines, the session sidebar (`sidebar.tsx`: branch, PRs, changes), and the theme with its Tern program palette (`t`) |
 | `src/session/` | The open session: its state (ids, info, usage, busy-input mode, and the tickets awaited work checks), its lifecycle (the first session, new, resume, reattach, switches and the requests held across one), the ordered steps of an adopt, the views this pane holds on the gateway, which gateway traffic belongs to it (`flow.ts`), its standing /goal and /loop, and its settings and name: reasoning effort, fast mode, title, thoughts |
@@ -40,8 +44,8 @@ flowchart LR
 | `src/view/ui/` | The parts the views share: pills, buttons and the action row, the shimmer and working row, sections headed by a child, facts lists |
 | `src/overlays/` | Floating sheets (`overlay.ts` is their contract): approvals, clarify, masked prompts, completions, pickers |
 | `src/prompts/` | The prompt sheets on the overlay stack: their keys, and closing them when the gateway withdraws their questions |
-| `src/connections/` | Connect cards: the card files the plugin writes (`cards.ts`), and the watcher that keeps each card current and tells the agent |
-| `src/hermes/` | Hermes' own runtime and files: the gateway client, its `state.db` (the session index, the compaction boundaries), paths, shell, history, and the dictation helper's process (`dictation.ts`, running `../dictation.py`) |
+| `src/connections/` | Connect cards: the gateway's `connection.request` operation, which the card answers (`live.ts`), the card's model (`cards.ts`), and the watcher that keeps each card current |
+| `src/hermes/` | What the frontend asks of Hermes: the gateway client and the attach (`connect.ts`), the capabilities it needs (`requirements.ts`), the session list and stored transcripts (`sessionList.ts`, `sessionTranscript.ts`, `compactions.ts`), the plugin's own RPC methods (`viewer.ts`), the clipboard image, shell, history |
 
 The views speak omp's chat vocabulary (`omp.session`, `omp.user`, `omp.assistant`,
 `omp.thinking`, `omp.editor`, `tool` names like `bash`/`read`/`edit`): Tern's chat styles
@@ -56,8 +60,9 @@ keeps omp's role and so its look. `a11y.test.ts` walks what the pane draws and f
 target that is not a named button. The composer's model and effort chips are the exception: Tern's
 composer lays them out by role, and the test says why.
 
-`@tui/*` imports reach the renderer-free modules of `ui-tui/src` (the gateway transport, skins,
-history, completion requests); nothing here imports React or Ink.
+Everything it takes from Hermes comes through `@hermes/shared` (`apps/shared` in the Hermes
+checkout): the gateway client and its types, skins, prompt history, slash completion helpers.
+Nothing here imports Ink's source, React or Ink.
 
 ## LSP source links
 

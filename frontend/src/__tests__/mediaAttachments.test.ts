@@ -25,40 +25,84 @@ describe('gateway-owned prompt attachments with absent terminal_backend', () => 
   function draw(delivery: MediaDelivery) {
     return tree(entryNode(entry, 'main.owned-upload', {
       copy: () => undefined, media: delivery, mediaRev: delivery.token(),
-      now: 0, welcome: { tip: '', version: '' }
+      now: 0, welcome: { version: '' }
     }))
   }
 
-  it('shows unsupported for legacy sessions, never a Load or Retry preview control', async () => {
-    const { delivery, gw, blob } = setup({ attached: true, canonical: false, backend: undefined, native: true })
-    const source = attachmentImagePath(attachedImage, delivery)
-    expect(source).toMatchObject({ host: 'gateway', scope: 'attachment' })
-    if (!source) {
-      throw new Error('missing gateway attachment source')
-    }
-
-    const state = delivery.preview(source)
-    expect(state).toEqual({ status: 'unsupported', label: 'Image preview unsupported for legacy sessions' })
-    const legacy = JSON.stringify(draw(delivery))
-    expect(legacy).toContain('unsupported for legacy sessions')
-    expect(legacy).not.toMatch(/Load image preview|Retry preview/)
+  it('shows no Load or Retry while disconnected and never reuses blobs across reconnects', async () => {
+    const { delivery, gw, blob } = setup({ attached: false, backend: undefined, native: true })
+    const source: MediaPath = { kind: 'path', host: 'gateway', path: attachedImage, id: attachedImage, scope: 'attachment' }
+    expect(attachmentImagePath(attachedImage, delivery)).toBeUndefined()
+    expect(delivery.preview(source)).toEqual({ status: 'unsupported', label: 'Image path does not belong to the active host.' })
+    expect(JSON.stringify(draw(delivery))).not.toMatch(/Load image preview|Retry preview/)
     await delivery.load(source)
     expect(gw.sent('gateway.capabilities')).toEqual([])
     expect(gw.sent('hermes-tern.media.image')).toEqual([])
     expect(blob).not.toHaveBeenCalled()
 
-    // An attached canonical transport can still explicitly load, but cached
-    // canonical bytes never survive a transition back to legacy on this pane.
-    gw.isCanonical = true
+    // Reattaching permits an explicit load; disconnecting revokes its blob.
+    gw.attached = true
     expect(delivery.preview(source).status).toBe('available')
     await delivery.load(source)
     expect(delivery.preview(source).status).toBe('ready')
     expect(blob).toHaveBeenCalledOnce()
-    gw.isCanonical = false
+    gw.attached = false
     expect(delivery.preview(source).status).toBe('unsupported')
     expect(JSON.stringify(draw(delivery))).not.toMatch(/Load image preview|Retry preview/)
     await delivery.load(source)
     expect(gw.sent('hermes-tern.media.image')).toHaveLength(1)
+    gw.attached = true
+    expect(delivery.preview(source).status).toBe('available')
+    await delivery.load(source)
+    expect(gw.sent('hermes-tern.media.image')).toHaveLength(2)
+    expect(blob).toHaveBeenCalledTimes(2)
+  })
+
+  it.each(['unadvertised', 'discovery error'])('a gateway capability %s never fetches image bytes or uploads a blob', async mode => {
+    const { delivery, gw, blob } = setup({ backend: undefined, native: true })
+    const source = attachmentImagePath(attachedImage, delivery)
+    if (!source) throw new Error('missing gateway attachment source')
+    gw.handlers.set('gateway.capabilities', () => {
+      if (mode === 'discovery error') throw new Error('gateway capability discovery failed')
+      return { plugin_methods: [] }
+    })
+
+    expect(delivery.preview(source).status).toBe('available')
+    await delivery.load(source)
+
+    expect(gw.sent('gateway.capabilities')).toEqual([{ session_id: 'session-1' }])
+    expect(gw.sent('hermes-tern.media.image')).toEqual([])
+    expect(delivery.preview(source)).toMatchObject({
+      status: 'failed', error: mode === 'discovery error'
+        ? 'gateway capability discovery failed'
+        : 'Image preview requires Hermes plugin gateway methods; upgrade Hermes and enable hermes-tern.'
+    })
+    expect(blob).not.toHaveBeenCalled()
+    expect(nodes(draw(delivery)).some(n => n.k === 'image' && n.p?.['blob'])).toBe(false)
+  })
+
+  it('a gateway owner refusal cannot reuse a previous session blob or grant path authority', async () => {
+    const { delivery, gw, session, blob } = setup({ backend: undefined })
+    const source = attachmentImagePath(attachedImage, delivery)
+    if (!source) throw new Error('missing gateway attachment source')
+    await delivery.load(source)
+    expect(delivery.preview(source).status).toBe('ready')
+    expect(blob).toHaveBeenCalledOnce()
+    session('not-owner')
+    gw.handlers.set('hermes-tern.media.image', () => { throw new Error('attachment_not_owned') })
+    expect(delivery.preview(source).status).toBe('available')
+    await delivery.load(source)
+
+    expect(gw.sent('hermes-tern.media.image').at(-1)).toEqual({ session_id: 'not-owner', path: attachedImage })
+    expect(delivery.preview(source)).toMatchObject({ status: 'failed', error: 'attachment_not_owned' })
+    expect(blob).toHaveBeenCalledOnce()
+    expect(nodes(draw(delivery)).some(n => n.k === 'image' && n.p?.['blob'])).toBe(false)
+    session('session-1')
+    gw.handlers.set('hermes-tern.media.image', response)
+    expect(delivery.preview(source).status).toBe('available')
+    await delivery.load(source)
+    expect(blob).toHaveBeenCalledTimes(2)
+    expect(gw.sent('hermes-tern.media.image')).toHaveLength(3)
   })
 
   it('routes only canonical committed native-input paths to the explicit backend proof', async () => {

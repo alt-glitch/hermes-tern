@@ -166,7 +166,7 @@ describe('retained web extraction pages', () => {
       cwd: resolve('.hermes-src'), encoding: 'utf8', env: { ...process.env, PYTHONPATH: resolve('.hermes-src') }
     })
     let n = 0
-    const replay = history({ kept: [], compactions: [], id: p => entryId(`${p}${++n}`), messages: [
+    const replay = history({ kept: [], id: p => entryId(`${p}${++n}`), messages: [
       { role: 'user', text: 'fetch' }, { role: 'tool', name: 'web_extract', tool_call_id: 'web', args: {}, content: payload }
     ] })
     const turn = replay.find(e => e.kind === 'turn')

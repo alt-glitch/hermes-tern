@@ -5,7 +5,7 @@ import { INPUT_ID } from '../surface/host.js'
 import { App, png } from './appSetup.js'
 import { FakeGateway, fakeTern, given, key, settle, stubOverlay, topNodes } from './fakes.js'
 
-vi.mock('@tui/lib/history.js', () => ({ append: () => undefined, load: () => [] }))
+vi.mock('@hermes/shared/prompt-history', () => ({ append: () => undefined, load: () => [] }))
 
 /** The actual dock tree, not a mock copy of the orb model. */
 function flattened(items: Node[]): Node[] {

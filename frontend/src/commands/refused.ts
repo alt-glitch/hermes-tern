@@ -50,22 +50,16 @@ async function cliPanel(host: RefusedHost, title: string, argv: string[]) {
   }
 }
 
-const isBrowserAction = oneOf(['connect', 'disconnect', 'status', 'use'])
+const isBrowserAction = oneOf(['connect', 'disconnect', 'status'])
 
-/** `/browser [status|use [on|off]|connect [url]|disconnect]`, as Ink's ops.ts sends it. */
+/** `/browser [status|connect [url]|disconnect]`, as Ink's ops.ts sends it. */
 async function browser(host: RefusedHost, arg: string) {
   const [first = 'status', ...rest] = words(arg)
   const action = first.toLowerCase()
   const note = (text: string, tone?: NoticeEntry['tone']) => host.transcript.notice(text, tone)
 
   if (!isBrowserAction(action)) {
-    return note('Usage: /browser [status|use [on|off]|connect [url]|disconnect]', 'warning')
-  }
-
-  const mode = action === 'use' ? (rest[0] ?? 'on').toLowerCase() : undefined
-
-  if (mode && mode !== 'on' && mode !== 'off') {
-    return note('Usage: /browser use [on|off]', 'warning')
+    return note('Usage: /browser [status|connect [url]|disconnect]', 'warning')
   }
 
   const url = action === 'connect' ? rest.join(' ').trim() || 'http://127.0.0.1:9222' : undefined
@@ -75,18 +69,11 @@ async function browser(host: RefusedHost, arg: string) {
     r = await rpc(host.gw, 'browser.manage', {
       action,
       session_id: host.session.ref.live,
-      ...(url ? { url } : {}),
-      ...(mode ? { enabled: mode === 'on' } : {})
+      ...(url ? { url } : {})
     })
   } catch (e) {
     // The shared gateway refuses connect/disconnect (they would switch every chat's browser) and says what to do instead.
     return note(errorText(e), 'warning')
-  }
-
-  if (action === 'use') {
-    return note(
-      `${mode === 'on' ? 'Browser Use mode on: browser_exec runs through the Browser Use CLI.' : 'Browser Use mode off: the built-in browser tools are back.'} New sessions get it; this one keeps its tools (/new starts one).`
-    )
   }
 
   if (action === 'disconnect') {
@@ -103,14 +90,7 @@ async function browser(host: RefusedHost, arg: string) {
     return note(said ? `${said}\n${done}` : done, r?.connected ? 'info' : 'warning')
   }
 
-  note(
-    [
-      r?.connected
-        ? `Browser connected: ${r.url || '(url unavailable)'}`
-        : 'Browser not connected (set browser.cdp_url in config.yaml to attach one).',
-      ...(r?.browser_use ? ['Browser Use mode: browser_exec runs through the Browser Use CLI.'] : [])
-    ].join('\n')
-  )
+  note(r?.connected ? `Browser connected: ${r.url || '(url unavailable)'}` : 'Browser not connected (set browser.cdp_url in config.yaml to attach one).')
 }
 
 /** What a plugin's line reads of its `plugins.manage` row. */

@@ -135,69 +135,6 @@ const SOURCE_ID = /^(?:\*|[A-Za-z0-9_:.-]{1,64}\*?)$/
 /** Named groups in both spellings: `(?P<name>…)` (Python, Rust) and `(?<name>…)`. */
 const NAMED_GROUP = /\(\?P?<([A-Za-z_][A-Za-z0-9_]*)>/g
 
-const STRING = { type: 'string' } as const
-const NUMBER = { type: 'number' } as const
-const BETTER = { enum: ['higher', 'lower'] } as const
-const VALUE_REF_SCHEMA = {
-  properties: {
-    agg: { enum: AGGS },
-    better: BETTER,
-    digits: { type: 'integer' },
-    field: STRING,
-    key: STRING,
-    label: STRING,
-    unit: STRING
-  },
-  required: ['field', 'agg'],
-  type: 'object'
-} as const
-
-/**
- * JSON schema of a {@link Spec}, the parameters of the `respond` tool the author calls. Bare on
- * purpose (shapes and enums): the system prompt documents every property. Nothing is required
- * at the top, since a `{"skip": …}` answer declines to chart; validation enforces the rest.
- */
-export const SPEC_SCHEMA: Record<string, unknown> = {
-  properties: {
-    blocks: {
-      items: {
-        properties: {
-          agg: { enum: AGGS },
-          better: BETTER,
-          field: STRING,
-          items: { items: VALUE_REF_SCHEMA, type: 'array' },
-          key: STRING,
-          kind: { enum: ['spark', 'bars', 'meter', 'stat', 'grid', 'text'] },
-          label: STRING,
-          max: NUMBER,
-          min: NUMBER,
-          target: NUMBER,
-          targetLabel: STRING,
-          tones: { additionalProperties: { enum: TONES }, type: 'object' },
-          total: { anyOf: [NUMBER, VALUE_REF_SCHEMA] },
-          unit: STRING
-        },
-        required: ['kind'],
-        type: 'object'
-      },
-      type: 'array'
-    },
-    headline: VALUE_REF_SCHEMA,
-    rules: {
-      items: {
-        properties: { count: STRING, from: STRING, key: STRING, match: STRING, scale: NUMBER, text: STRING },
-        required: ['from', 'match'],
-        type: 'object'
-      },
-      type: 'array'
-    },
-    skip: STRING,
-    stage: STRING,
-    title: STRING
-  },
-  type: 'object'
-}
-
 // ── Patterns ───────────────────────────────────────────────────────────────────────────────
 
 let linear: boolean | undefined

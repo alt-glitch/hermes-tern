@@ -45,7 +45,7 @@ function rendered(t: TurnEntry, charts: TableCharts): string {
     charts,
     copy: () => undefined,
     now: 100,
-    welcome: { tip: '', version: '' }
+    welcome: { version: '' }
   }
 
   return JSON.stringify(tree(entryNode(t, 'main.turn', cx)))

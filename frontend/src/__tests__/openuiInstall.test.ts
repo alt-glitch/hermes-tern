@@ -1,7 +1,7 @@
 // Frozen-install regression: the real packaged suite must work without nested npm ci.
 // Expected versions and integrity values come from the unchanged donor lock.
 import { readFile } from 'node:fs/promises'
-import { createRequire } from 'node:module'
+import { createRequire, findPackageJSON } from 'node:module'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 import * as z from 'zod/mini'
@@ -14,7 +14,8 @@ const frontendManifest = z.object({
   workspaces: z.object({
     packages: z.array(z.string()),
     selfContained: z.array(z.string())
-  })
+  }),
+  trustedDependencies: z.optional(z.array(z.string()))
 })
 const generationManifest = z.object({
   name: z.string(),
@@ -33,9 +34,17 @@ const npmLock = z.object({ packages: z.record(z.string(), z.unknown()) })
 const npmPackage = z.object({ version: z.string(), integrity: z.string() })
 const bunPackage = z.tuple([z.string(), z.string(), z.unknown(), z.string()])
 const parserMetadata = z.object({
-  hasInstallScript: z.boolean(),
   optionalPeers: z.array(z.string()),
+  peerDependencies: dependencies,
   dependencies
+})
+const installedParser = z.object({
+  name: z.literal('@openuidev/lang-core'),
+  version: z.string(),
+  scripts: dependencies,
+  dependencies,
+  peerDependencies: dependencies,
+  peerDependenciesMeta: z.record(z.string(), z.object({ optional: z.boolean() }))
 })
 
 const root = new URL('../../', import.meta.url)
@@ -76,11 +85,25 @@ describe('OpenUI dependencies in the standard frozen Bun install', () => {
       expect(resolved[3]).toBe(original.integrity)
     }
     const parser = bunPackage.parse(lock.packages['@openuidev/lang-core'])
-    expect(parserMetadata.parse(parser[2])).toMatchObject({
-      hasInstallScript: true,
+    const metadata = parserMetadata.parse(parser[2])
+    expect(metadata).toEqual({
       optionalPeers: ['@modelcontextprotocol/sdk'],
+      peerDependencies: { '@modelcontextprotocol/sdk': '>=1.0.0', zod: '^3.25.0 || ^4.0.0' },
       dependencies: { 'ci-info': '^4.4.0' }
     })
+    // Bun 1.4 omits hasInstallScript; the installed package still declares its lifecycle scripts.
+    const manifest = findPackageJSON('@openuidev/lang-core', new URL('package.json', generator))
+    if (!manifest) throw new Error('Missing installed OpenUI parser manifest')
+    const installed = installedParser.parse(await loadJson(pathToFileURL(manifest)))
+    const original = z.object({ version: z.string(), hasInstallScript: z.literal(true) }).parse(donor.packages['node_modules/@openuidev/lang-core'])
+    expect(installed.version).toBe(original.version)
+    expect(parser[0]).toBe(`${installed.name}@${installed.version}`)
+    expect(['preinstall', 'install', 'postinstall'].some(name => Boolean(installed.scripts[name]?.trim()))).toBe(true)
+    expect(installed.dependencies).toEqual(metadata.dependencies)
+    expect(installed.peerDependencies).toEqual(metadata.peerDependencies)
+    expect(installed.peerDependenciesMeta).toEqual({ '@modelcontextprotocol/sdk': { optional: true } })
+    expect(await readFile(new URL('.npmrc', generator), 'utf8')).toMatch(/^ignore-scripts=true$/m)
+    expect(frontend.trustedDependencies ?? []).not.toContain('@openuidev/lang-core')
     expect(bunPackage.parse(lock.packages['zod'])[0]).toBe('zod@4.4.3')
   })
 

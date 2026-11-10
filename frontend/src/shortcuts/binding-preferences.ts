@@ -3,7 +3,7 @@
 
 import type { ConfigGetResult } from '@hermes/shared/gateway-events'
 import type { Key } from '@stencil-hq/tern'
-import type { GatewayClient } from '@tui/gatewayClient.js'
+import type { GatewayClient } from '@hermes/shared/gateway-client'
 
 import type { SessionView } from '../app/ports.js'
 import { rpc } from '../wire/rpc.js'

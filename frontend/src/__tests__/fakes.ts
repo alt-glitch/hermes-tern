@@ -4,20 +4,21 @@
 // arranges what a test starts from through the stores' own APIs.
 import { EventEmitter } from 'node:events'
 
+import type { GatewayClient } from '@hermes/shared/gateway-client'
+import type { SessionInfo } from '@hermes/shared/gateway-types'
 import { type JSX, type Key, node, Node, type NodeJson, type OpenOptions, type Region, type RegionName, type Renderable, type Session, Span, Surface, type SurfaceLink, type TspEvent, type ViewInput } from '@stencil-hq/tern'
 import { vi } from 'vitest'
-import type { GatewayClient } from '@tui/gatewayClient.js'
-import type { SessionInfo } from '@tui/types.js'
 
 import type { SessionView } from '../app/ports.js'
-import { SurfaceView } from '../surface/lifecycle.js'
-
-const pinnedPaint = SurfaceView.prototype.paint
 import { liveSessionId } from '../core/ids.js'
 import { nativeOverlayKey } from '../overlays/identity.js'
+import { REQUIRED_CAPABILITIES } from '../hermes/requirements.js'
 import type { Overlay } from '../overlays/overlay.js'
 import type { SessionState } from '../session/state.js'
 import type { Activity, Busy } from '../turn/activity.js'
+import { SurfaceView } from '../surface/lifecycle.js'
+
+const pinnedPaint = SurfaceView.prototype.paint
 
 /** One gateway answer: `request` resolves to what it returns and rejects with what it throws. */
 export type Reply = (params: Record<string, unknown>) => unknown
@@ -35,15 +36,14 @@ export function key(name: string, mods: Partial<Key> = {}): Key {
 
 /** Gateway stand-in: explicit handlers win; absent full-config reads return a valid empty profile. */
 export class FakeGateway extends EventEmitter {
-  isCanonical: boolean
   attached = true
   readonly calls: Call[] = []
   readonly handlers: Map<string, Reply>
 
-  constructor({ canonical = true, replies = {} }: { canonical?: boolean; replies?: Record<string, Reply> } = {}) {
+  constructor({ replies = {} }: { replies?: Record<string, Reply> } = {}) {
     super()
-    this.isCanonical = canonical
-    this.handlers = new Map(Object.entries(replies))
+    // A current gateway: it lists what the frontend needs (hermes/requirements.ts).
+    this.handlers = new Map(Object.entries({ 'runtime.describe': () => ({ capabilities: REQUIRED_CAPABILITIES }), ...replies }))
   }
 
   /** This fake as the gateway type App takes. */

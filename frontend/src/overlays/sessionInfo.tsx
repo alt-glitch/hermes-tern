@@ -1,7 +1,7 @@
 // Read-only /info sheet: current gateway session identity, inventory and usage, plus context estimates.
 import type { SessionContextBreakdownResult, Usage } from '@hermes/shared/gateway-events'
 import type { KvItem } from '@stencil-hq/tern'
-import type { SessionInfo } from '@tui/types.js'
+import type { SessionInfo } from '@hermes/shared/gateway-types'
 
 import type { ChatPorts } from '../app/ports.js'
 import { errorText } from '../core/errors.js'

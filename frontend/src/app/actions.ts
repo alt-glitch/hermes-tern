@@ -6,7 +6,7 @@
 
 import type { ServerRequest } from '@hermes/shared/json-rpc-channel'
 import type { Key, Session } from '@stencil-hq/tern'
-import type { GatewayClient } from '@tui/gatewayClient.js'
+import type { GatewayClient } from '@hermes/shared/gateway-client'
 
 import { Artifacts } from '../artifacts.js'
 import type { BtwThreads } from '../btw.js'
@@ -72,6 +72,7 @@ import {
   onRequest as onActionRequest,
   readBusyMode as readActionBusyMode,
   restore as restoreAction,
+  restoreCompactions as restoreActionCompactions,
   setCompacting as setActionCompacting,
   summarize as summarizeAction
 } from './actions-session.js'
@@ -365,7 +366,9 @@ export class AppActions {
       return
     }
 
-    // The draft's images go with this prompt, whenever it is sent; a message the app writes leaves them.
+    // A connect card the tool waits on would hold the typed message until its deadline: it continues.
+    this.#cx.connect.yieldOpen()
+    // The draft's images go with this prompt, whenever it is sent.
     this.#cx.router.route({ images: draft ? attachments.take() : [], kind: 'typed', pasted, text }, busy)
   }
 
@@ -421,9 +424,14 @@ export class AppActions {
     setActionCompacting(this.#cx, on, options)
   }
 
-  /** Gives the compactions seen here their summaries from the store, `delay` ms from now. */
+  /** Gives the compactions seen here their summaries from the transcript's newest page, `delay` ms from now. */
   summarize(delay = 0) {
     summarizeAction(this.#cx, delay)
+  }
+
+  /** Reads every compaction of the shown conversation and shows each where it happened; the transcript is up before. */
+  async restoreCompactions() {
+    return restoreActionCompactions(this.#cx)
   }
 
   /** Reads the shown session's busy_input_mode; an older gateway without it leaves Enter queueing (the TUI default). */

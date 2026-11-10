@@ -22,19 +22,8 @@ down; ``cancel``, or the frontend closing stdin, discards it. It exits once the 
 from __future__ import annotations
 
 import json
-import os
 import sys
 import threading
-from pathlib import Path
-
-
-def _activate() -> None:
-    """Hermes' dependencies on the path, as widget_author.py boots them."""
-    try:
-        from pm.environments import activate_dependencies
-    except ImportError:
-        return
-    activate_dependencies(Path(os.environ.get("HERMES_PYTHON_SRC_ROOT") or "."))
 
 
 def _number(value, default: float) -> float:
@@ -109,7 +98,6 @@ def main(argv: list[str]) -> None:
             print(json.dumps(event), flush=True)
 
     try:
-        _activate()
         if "--check" in argv:
             write(check())
         else:

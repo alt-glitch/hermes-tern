@@ -15,7 +15,7 @@ import { call } from './toolFixtures.js'
 
 const tool = (id: string, c: ToolCall): Extract<Block, { kind: 'tool' }> => ({ kind: 'tool', id: entryId(id), call: c })
 const nodes = (root: NodeJson): NodeJson[] => [root, ...(root.c ?? []).flatMap(nodes)]
-const cx: TranscriptContext = { copy: () => undefined, now: 1000, welcome: { tip: '', version: '' } }
+const cx: TranscriptContext = { copy: () => undefined, now: 1000, welcome: { version: '' } }
 
 function fixture(name: string, ...args: string[]): unknown {
   return parseJson(execFileSync('python3', [resolve(`src/__tests__/fixtures/${name}`), ...args], {

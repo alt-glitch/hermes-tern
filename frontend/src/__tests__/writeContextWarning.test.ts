@@ -59,13 +59,13 @@ describe('write context warning', () => {
   it('retains the notice in replay when the producer result survives', () => {
     const payload = fixture('write-context-core.py', 'success')
     let n = 0
-    const entries = history({ kept: [], compactions: [], id: p => entryId(`${p}${++n}`), messages: [
+    const entries = history({ kept: [], id: p => entryId(`${p}${++n}`), messages: [
       { role: 'tool', name: 'write_file', tool_call_id: 'write-warning', args, content: String(payload['result']) },
       { role: 'assistant', text: 'answer' }
     ] })
     const turn = entries.find(e => e.kind === 'turn')
     if (!turn || turn.kind !== 'turn') throw new Error('missing turn')
-    const view = JSON.stringify(tree(entryNode(turn, 'main.replay', { copy: () => undefined, now: 1000, welcome: { tip: '', version: '' } })))
+    const view = JSON.stringify(tree(entryNode(turn, 'main.replay', { copy: () => undefined, now: 1000, welcome: { version: '' } })))
     expect(view).toContain(WRITE_CONTEXT_WARNING)
     expect(view).not.toContain('/synthetic/workspace')
   })

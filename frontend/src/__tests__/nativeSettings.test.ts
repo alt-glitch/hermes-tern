@@ -5,7 +5,7 @@ import { promisify } from 'node:util'
 import { Surface, View, type NodeJson } from '@stencil-hq/tern'
 import { describe, expect, it, vi } from 'vitest'
 
-import type { SessionInfo } from '@tui/types.js'
+import type { SessionInfo } from '@hermes/shared/gateway-types'
 import { localCommand } from '../commands/local.js'
 import { preference, preferenceValue, PROFILE_PREFERENCES } from '../preferences/contracts.js'
 import { readProfile, writeProfile } from '../preferences/transactions.js'
@@ -16,7 +16,7 @@ import { record } from '../wire/json.js'
 
 import { settle, setup } from './appSetup.js'
 import { key, must, stub, tree } from './fakes.js'
-import type { GatewayClient } from '@tui/gatewayClient.js'
+import type { GatewayClient } from '@hermes/shared/gateway-client'
 
 const exec = promisify(execFile)
 const coreFixture = fileURLToPath(new URL('./fixtures/native-settings-profile-core.py', import.meta.url))
@@ -40,7 +40,7 @@ function renderWithSdk(overlay: Overlay): View {
   return View.from({ layer })
 }
 
-vi.mock('@tui/lib/history.js', () => ({ append: () => undefined, load: () => [] }))
+vi.mock('@hermes/shared/prompt-history', () => ({ append: () => undefined, load: () => [] }))
 
 const starting = () => new Map<string, string>(PROFILE_PREFERENCES.map(field => [field.key, field.options?.[0] ?? 'default'] satisfies [string, string]))
 

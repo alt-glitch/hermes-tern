@@ -3,7 +3,7 @@
 // pre_llm_call hook). Every step that writes waits for a tap on a host-owned approve card.
 
 import type { EuiCards } from '../eui/cards.js'
-import type { GatewayClient } from '@tui/gatewayClient.js'
+import type { GatewayClient } from '@hermes/shared/gateway-client'
 
 import type { SessionView } from '../app/ports.js'
 import type { Transcript } from '../transcript/store.js'

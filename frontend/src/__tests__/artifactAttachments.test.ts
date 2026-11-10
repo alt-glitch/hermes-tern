@@ -13,7 +13,7 @@ import { onTernEvent, type ActionCx } from '../surface/actions.js'
 import { App, setup } from './appSetup.js'
 import { FakeGateway, fakeTern, given, key, must, settle } from './fakes.js'
 
-vi.mock('@tui/lib/history.js', () => ({ append: () => undefined, load: () => [] }))
+vi.mock('@hermes/shared/prompt-history', () => ({ append: () => undefined, load: () => [] }))
 
 const png = Buffer.from([
   137, 80, 78, 71, 13, 10, 26, 10,
@@ -65,7 +65,7 @@ describe('Tern image-paste payloads', () => {
     const received = vi.fn()
     const cx: ActionCx = {
       attachNativeImage: received,
-      connect: { continue: () => undefined, open: () => undefined },
+      connect: { approve: () => undefined, continue: () => undefined, open: () => undefined, retry: () => undefined, skip: () => undefined },
       focusComposer: () => undefined,
       modal: () => false,
       openAgent: () => undefined,
@@ -125,7 +125,7 @@ function host({ sid = 'session-a', stored = 'canonical-a', startup, head }: {
     note: text => void notes.push(text),
     owner: () => state.ref
   }
-  const a = new Attachments(deps, { ...(startup ? { startup } : {}) })
+  const a = new Attachments(deps, { clipboard: async () => undefined, ...(startup ? { startup } : {}) })
   const changeSession = (live: string | null, saved = 'canonical-' + live) => {
     state.ref = { live: live === null ? null : liveSessionId(live), stored: live === null ? null : storedSessionId(saved) }
   }
@@ -166,8 +166,8 @@ describe('the session-owned image controller', () => {
   })
 
   it('uses actual App key submission to send B text without A images', async () => {
-    delete process.env['HERMES_TUI_QUERY']
-    delete process.env['HERMES_TUI_IMAGE']
+    delete process.env['HERMES_TERN_QUERY']
+    delete process.env['HERMES_TERN_IMAGE']
     const { app, press, sent, type } = setup({
       'prompt.submit': () => ({ admission_id: 'admission-b', status: 'started' })
     })

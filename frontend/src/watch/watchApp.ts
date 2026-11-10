@@ -1,17 +1,18 @@
 // One subagent in a pane of its own (the sidebar): its transcript drawn like the main chat's,
-// live while it runs, with a composer that steers it. The transcript is the child's stored
-// session (watch/child.ts); the live state is the owner's `subagent.list` row and the child's
-// live log, as in the agents hub. Steering and stopping go through the delegating session.
-
-import { readFile } from 'node:fs/promises'
+// live while it runs, with a composer that steers it. This pane has its own gateway connection and
+// does not attach the delegating session, so it hears none of its events. The transcript is the
+// child's stored rows (`session.transcript` with its `subagent_id`, agents/transcript.ts), read
+// every second until the child ended and the reads caught up; the live state (model, tool count,
+// the tool it runs, steerability) is the owner's `subagent.list` row. Steering and stopping go
+// through the delegating session.
 
 import type { Key, Session, TspEvent } from '@stencil-hq/tern'
-import type { GatewayClient } from '@tui/gatewayClient.js'
-import type { AnyGatewayEvent } from '@tui/gatewayTypes.js'
+import type { GatewayClient } from '@hermes/shared/gateway-client'
+import type { AnyGatewayEvent } from '@hermes/shared/gateway-types'
 
 import { agentNode } from '../agents/agentRow.js'
-import { parseLiveLog } from '../agents/liveLog.js'
-import { applyLog, isRunning } from '../agents/rows.js'
+import { isRunning } from '../agents/rows.js'
+import { SubagentTranscript } from '../agents/transcript.js'
 import { paletteFor } from '../chrome/palette.js'
 import { errorText } from '../core/errors.js'
 import { subagentKey } from '../core/ids.js'
@@ -30,7 +31,6 @@ import { noticeSink, onCardFault } from '../view/tools/faults.js'
 import { entryNode } from '../view/transcript.js'
 import { rpc } from '../wire/rpc.js'
 
-import { ChildStore } from './child.js'
 import type { WatchSpec } from './spec.js'
 
 const POLL_MS = 1000
@@ -48,16 +48,14 @@ export class WatchApp {
   readonly #spec: WatchSpec
   readonly #agent: Subagent
   readonly #settings: SettingsSource
-  #store: ChildStore | undefined
-  #child: string | undefined
-  #lastMessage = 0
-  #logSize = -1
-  #listed = false
+  readonly #stored: SubagentTranscript
+  /** A read of the transcript failed and the pane said so. */
+  #readFailed = false
   #ready = false
   #surface!: SurfaceHost
   /** The poll: every second until the agent ended and its stored transcript caught up. */
   readonly #poller: Poller = new Poller({
-    cadence: () => (!isRunning(this.#agent) && this.#child ? 'off' : POLL_MS),
+    cadence: () => (this.#stored.finished ? 'off' : POLL_MS),
     run: () => this.#tick()
   })
   readonly #renders = new RenderScheduler(() => this.#render())
@@ -111,13 +109,13 @@ export class WatchApp {
       id: spec.subagent,
       index: spec.index,
       key: subagentKey(spec.subagent),
-      logPath: spec.log,
       name: spec.name,
       startedAt: spec.startedAt,
       status: 'running',
       tokens: 0,
       toolCount: 0
     }
+    this.#stored = new SubagentTranscript(gw, spec.sid, spec.subagent)
   }
 
   async run(): Promise<number> {
@@ -153,12 +151,6 @@ export class WatchApp {
     })
     this.#gw.drain()
 
-    try {
-      this.#store = new ChildStore()
-    } catch (error) {
-      this.transcript.notice(`The session database is not readable here: ${String(error)}`, 'warning')
-    }
-
     // A card that throws draws as the generic one, and the pane says so once per tool name.
     onCardFault(
       noticeSink(text => {
@@ -174,7 +166,6 @@ export class WatchApp {
     const code = await this.#done.promise
     this.#surface.dispose()
     this.#poller.dispose()
-    this.#store?.close()
     await this.#tern.close()
     this.#gw.kill('exit')
 
@@ -186,21 +177,24 @@ export class WatchApp {
   }
 
   async #tick() {
-    const a = this.#agent
+    if (!this.#ready) {
+      return
+    }
+
     let changed = false
 
-    if (this.#ready && isRunning(a)) {
+    if (isRunning(this.#agent)) {
       changed = (await this.#poll()) || changed
     }
 
-    changed = (await this.#readLog()) || changed
-    changed = this.#readTranscript() || changed
+    changed = (await this.#readTranscript()) || changed
 
     if (changed) {
       this.changed()
     }
   }
 
+  /** Folds the owner's `subagent.list` row into the agent row; true when there is one. */
   async #poll(): Promise<boolean> {
     const a = this.#agent
 
@@ -209,22 +203,22 @@ export class WatchApp {
       const row = r?.subagents?.find(x => x.subagent_id === a.id)
 
       if (!row) {
-        // Gone from the owner's registry: it ended; the log (when there is one) says how.
-        if (this.#listed && !a.logPath) {
-          a.status = 'done'
-          a.duration = Date.now() - a.startedAt
-
-          return true
-        }
-
         return false
       }
 
-      this.#listed = true
       a.model = row.model ?? a.model
       a.toolCount = Math.max(a.toolCount, row.tool_count ?? 0)
       a.steerable = row.accepting_steer ?? a.steerable
       a.startedAt = typeof row.started_at === 'number' ? row.started_at * 1000 : a.startedAt
+      a.status = 'running'
+
+      // The owner names the last tool started; while the stored rows lack its result, it runs.
+      const tool = (row.tool_count ?? 0) > this.#storedTools() ? (row.last_tool ?? undefined) : undefined
+
+      if (tool !== a.tool) {
+        a.tool = tool
+        a.toolSince = { at: Date.now() }
+      }
 
       return true
     } catch {
@@ -232,60 +226,47 @@ export class WatchApp {
     }
   }
 
-  async #readLog(): Promise<boolean> {
-    const path = this.#agent.logPath
-
-    if (!path) {
-      return false
-    }
+  /** Reads the rows the child stored since the last read; at its end, the row says it ended. */
+  async #readTranscript(): Promise<boolean> {
+    const a = this.#agent
+    let changed = false
 
     try {
-      const text = await readFile(path, 'utf8')
-
-      if (text.length === this.#logSize) {
+      changed = await this.#stored.read()
+    } catch (error) {
+      // The next tick tries again; the pane says so once.
+      if (this.#readFailed) {
         return false
       }
 
-      this.#logSize = text.length
-      applyLog(this.#agent, parseLiveLog(text))
+      this.#readFailed = true
+      this.transcript.notice(`Could not read ${a.name}'s transcript: ${errorText(error)}`, 'warning')
 
       return true
-    } catch {
-      return false
-    }
-  }
-
-  #readTranscript(): boolean {
-    const store = this.#store
-
-    if (!store) {
-      return false
     }
 
-    try {
-      this.#child ??= store.find([this.#spec.sid, this.#spec.stored ?? ''], this.#spec.goal, this.#spec.startedAt)
-
-      if (!this.#child) {
-        return false
-      }
-
-      const last = store.last(this.#child)
-
-      if (last === this.#lastMessage) {
-        return false
-      }
-
-      this.#lastMessage = last
-      this.transcript.load(store.messages(this.#child))
+    if (changed) {
+      this.transcript.load(this.#stored.rows)
       this.#media.showAll(this.transcript.entries, call => {
         this.transcript.touchCall(call)
         this.changed()
       })
-
-      return true
-    } catch {
-      return false
     }
+
+    // Nothing public says how a child ended to a pane that did not attach its parent: ended is done.
+    if (this.#stored.running === false && isRunning(a)) {
+      a.status = 'done'
+      a.duration = Date.now() - a.startedAt
+      a.tool = undefined
+      changed = true
+    }
+
+    return changed
+  }
+
+  /** The tool calls the child's stored rows hold (each is stored with its result). */
+  #storedTools(): number {
+    return this.#stored.rows.filter(r => r.role === 'tool').length
   }
 
   async #readInput() {
@@ -416,7 +397,7 @@ export class WatchApp {
     const now = Date.now()
     const a = this.#agent
     const running = isRunning(a)
-    const cx = { copy: () => undefined, hour12: this.#tern.caps.hour12, now, welcome: { tip: '', version: '' } }
+    const cx = { copy: () => undefined, hour12: this.#tern.caps.hour12, now, welcome: { version: '' } }
 
     this.#surface.render({
       dock: dockNodes(

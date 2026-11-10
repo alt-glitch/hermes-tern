@@ -59,14 +59,14 @@ describe('unavailable terminal async notifications', () => {
     expect(notice(tree(toolNode(block.call, 5000)))).toBe(true)
 
     let n = 0
-    const entries = history({ kept: [], compactions: [], id: p => entryId(`${p}${++n}`), messages: [
+    const entries = history({ kept: [], id: p => entryId(`${p}${++n}`), messages: [
       { role: 'user', text: 'run' },
       { role: 'tool', name: 'terminal', tool_call_id: 'term', args: row.args, content: JSON.stringify(row.result) },
       { role: 'assistant', text: 'answer' }
     ] })
     const replay = entries.find(e => e.kind === 'turn')
     if (!replay) throw new Error('missing replay turn')
-    const cx: TranscriptContext = { copy: () => undefined, now: 1000, welcome: { tip: '', version: '' } }
+    const cx: TranscriptContext = { copy: () => undefined, now: 1000, welcome: { version: '' } }
     const full = tree(entryNode(replay, 'main.notify', cx))
     const card = nodes(full).find(n => n.k === 'tool' && n.p?.['name'] === 'bash')
     if (!card) throw new Error('missing terminal card')

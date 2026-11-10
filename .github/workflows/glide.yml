@@ -27,6 +27,8 @@ jobs:
         run: git fetch --no-tags https://github.com/alt-glitch/hermes-tern.git main:refs/remotes/upstream/main
       - name: Downstream code stays in glide/
         run: python3 glide/tools/check_layout.py --upstream upstream/main
+      - name: Removed Hermes integrations stay removed
+        run: python3 glide/tools/check_upstream_sync.py
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.12"

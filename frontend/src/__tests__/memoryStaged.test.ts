@@ -53,7 +53,7 @@ describe('historical memory staging report', () => {
     if (!payload) throw new Error('missing payload')
     const args = record(payload['args'])
     if (!args) throw new Error('missing args')
-    const replay = (content?: string) => history({ kept: [], compactions: [], id: entryId, messages: [
+    const replay = (content?: string) => history({ kept: [], id: entryId, messages: [
       { role: 'tool', name: 'memory', tool_call_id: 'memory', args, ...(content ? { content } : {}) }
     ] }).find(e => e.kind === 'turn')?.blocks.find(b => b.kind === 'tool')
     const saved = replay(String(payload['result']))

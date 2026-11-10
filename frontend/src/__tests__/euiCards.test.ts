@@ -179,7 +179,7 @@ describe('ephemeral-ui cards in an answer', () => {
     const sheets = new Map<string, string>()
     const eui = new EuiCards(changed, { blob: (_b, mime) => { blobs.push(mime); return `blob${blobs.length}` }, stylesheet: (name, css) => { sheets.set(name, css) } })
     const t = turn(`Merged:\n\n${FENCE}ephemeral-ui\n{"kind":"merge","app":"github"}\n${FENCE}\n\nAll green.`)
-    const cx: TranscriptContext = { copy: () => undefined, eui, now: 100, welcome: { tip: '', version: '' } }
+    const cx: TranscriptContext = { copy: () => undefined, eui, now: 100, welcome: { version: '' } }
     const first = JSON.stringify(tree(entryNode(t, 'main.turn', cx)))
 
     expect(first).toContain('eui.card.pending')

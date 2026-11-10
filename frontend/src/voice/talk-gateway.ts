@@ -1,7 +1,7 @@
 // Bridge the existing live-voice lease/UI to hermes-talk's owned terminal call.
 // Canonical gateways do not expose the donor voice.live.* RPCs.
 import { EventEmitter } from 'node:events'
-import type { GatewayClient } from '@tui/gatewayClient.js'
+import type { GatewayClient } from '@hermes/shared/gateway-client'
 import { record } from '../wire/json.js'
 
 const PHASES = new Set(['idle', 'starting', 'listening', 'thinking', 'speaking', 'stopping', 'error'])

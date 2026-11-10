@@ -3,7 +3,7 @@
 // `sid` is the session it was made for (stale() says when the view left it); the
 // rest, `busy` and `queued` among them, reads the stores live, so a command that awaited sees now.
 
-import type { GatewayClient } from '@tui/gatewayClient.js'
+import type { GatewayClient } from '@hermes/shared/gateway-client'
 
 import { durable, type StoredSessionId } from '../core/ids.js'
 import type { Compaction } from '../model.js'
@@ -51,7 +51,6 @@ export function sessionHost(cx: SessionHostCx, literal = false): SessionHost {
       cx.changed()
     },
     // A steer that fell back to the queue: steering carries no images.
-    canonical: cx.gw.isCanonical,
     enqueue: text => cx.router.behind({ images: [], kind: 'app', text }),
     gw: cx.gw,
     notice: (text, tone) => {

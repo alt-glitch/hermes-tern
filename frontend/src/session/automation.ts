@@ -6,7 +6,7 @@
 // the `session.control` verbs desktop's status stack sends.
 
 import type { GoalSnapshot, LoopSnapshot, SessionControlSnapshot } from '@hermes/shared/gateway-events'
-import type { GatewayClient } from '@tui/gatewayClient.js'
+import type { GatewayClient } from '@hermes/shared/gateway-client'
 
 import { Epoch } from '../core/epoch.js'
 import { errorText } from '../core/errors.js'

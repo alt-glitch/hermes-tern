@@ -1,8 +1,10 @@
 """Opt-in real-process exit-75 qualification, not a Tern-window simulation.
 
-The real plugin _run -> _chat -> pinned Hermes _launch_tui -> Node path runs
-against independently built Tern and Ink entries. The Node recorder only writes
-lossless JSON argv/environment receipts, then execs the actual Node interpreter.
+The real launcher.setup/run -> Node path runs the built Tern entry against
+an isolated pinned Hermes checkout. The Node recorder writes lossless JSON
+argv/environment receipts, then execs the actual Node interpreter. A Python
+audit hook records real process launches without changing them. No TSP means
+exit 1 with a diagnostic, not an Ink retry or an interactive fallback.
 Every subprocess owns a new process group and cleans up the whole group, even
 if the Python driver has exited. Native PTY/pipe output retains a 2,000,000-byte
 cap; immutable Git verification metadata alone has a distinct 16,000,000-byte
@@ -44,10 +46,11 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 FRONTEND = ROOT / "frontend"
 ENTRY = FRONTEND / "dist" / "entry.js"
-PIN = "22063fc099ec9ad8357d7f8f6e6248a0400680d3"
-BANNER = b"starting the regular TUI"
-TSP_FRAME = b"\x1b_"  # TSP is carried in APC; Ink must never emit another frame.
-INK_HELP_MARKER = b"/quit"  # The real pinned Ink HelpHint, opened with '?'.
+PIN = "b3746e35ddd32079697728e2df57a9d78f1e9e32"
+BANNER = b"starting the regular TUI"  # Forbidden legacy fallback diagnostic.
+NATIVE_FAILURE = b"hermes tern: this terminal did not answer the Tern Surface Protocol"
+TSP_FRAME = b"\x1b_"  # Initial TSP probes are allowed; none may follow the failure.
+INK_HELP_MARKER = b"/quit"  # Forbidden interactive Ink HelpHint.
 OUTPUT_LIMIT = 2_000_000
 GIT_METADATA_LIMIT = 16_000_000  # Complete pinned Git verification metadata only.
 
@@ -57,6 +60,7 @@ GIT_METADATA_LIMIT = 16_000_000  # Complete pinned Git verification metadata onl
 DRIVER = """
 import argparse
 import importlib.util
+import json
 import os
 from pathlib import Path
 import sys
@@ -76,6 +80,20 @@ if resume_id:
     finally:
         db.close()
 
+def process_receipt(event, values):
+    if event == 'subprocess.Popen':
+        executable, argv, cwd, _env = values
+    elif event in ('os.exec', 'os.posix_spawn'):
+        executable, argv, _env = values
+        cwd = None
+    else:
+        return
+    record = {'event': event, 'executable': executable, 'argv': argv,
+              'cwd': os.getcwd() if cwd is None else cwd}
+    with open(os.environ['HERMES_FALLBACK_PROCESSES'], 'a', encoding='utf-8') as stream:
+        stream.write(json.dumps(record, default=os.fsdecode) + '\\n')
+
+sys.addaudithook(process_receipt)
 spec = importlib.util.spec_from_file_location(
     'hermes_tern_fallback_native', root / '__init__.py',
     submodule_search_locations=[str(root)])
@@ -83,10 +101,12 @@ assert spec is not None and spec.loader is not None
 plugin = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = plugin
 spec.loader.exec_module(plugin)
-args = ['--', '--pass-session-id']  # Pinned Hermes CLI supports this safe no-request flag.
+flags = ['--pass-session-id']  # Safe creation policy, with no prompt/provider request.
 if resume_id:
-    args.extend(['--resume', resume_id])
-plugin._run(argparse.Namespace(tui_args=args, worktree=False))
+    flags.extend(['--resume', resume_id])
+parser = argparse.ArgumentParser(prog='hermes tern')
+plugin.launcher.setup(parser)
+plugin.launcher.run(parser.parse_args(flags))
 """
 
 
@@ -101,7 +121,7 @@ def _group_exists(pgid: int) -> bool:
 def _cleanup_owned_group(child: subprocess.Popen) -> None:
     """Reap driver and terminate ONLY its fresh session, including orphaned Node.
 
-    The driver invokes pinned Hermes subprocess.call(Node). Waiting/killing only
+    The driver invokes launcher.run's subprocess.call(Node). Waiting/killing only
     the driver is insufficient: Node (or its gateway) can retain our PTY/pipes
     after that parent exits. The child PID is the owned new-session PGID.
     """
@@ -361,8 +381,7 @@ def _capture_driver(source: Path, env: dict[str, str]) -> tuple[int, bytes, byte
 
 def _pty_driver(source: Path, env: dict[str, str]) -> tuple[int, bytes]:
     return _with_gateway_cleanup(
-        lambda: _pty_process(_hermes_driver(source), cwd=ROOT, env=env,
-                             timeout=65, close_ink=True),
+        lambda: _pty_process(_hermes_driver(source), cwd=ROOT, env=env, timeout=65),
         source, env,
     )
 
@@ -466,27 +485,21 @@ def native_source() -> tuple[Path, str]:
     )
     _assert_clean_pinned_tree(source)
     assert not _git_read(ROOT, "status", "--porcelain=v1", "--untracked-files=no",
-                         "--", "__init__.py", "frontend/src", "frontend/hermes-src.lock"), (
+                         "--", "__init__.py", "launcher.py", "channels.py", "panes.py",
+                         "plugin_data.py", "sessions.py", "processes.py", "pull_requests.py",
+                         "tests/test_fallback_native.py", "frontend/src", "frontend/hermes-src.lock"), (
         "The plugin tracked launch/source inputs differ from this checkout"
     )
 
     assert ENTRY.is_file() and ENTRY.stat().st_size > 100_000, (
         "Build the real frontend/dist/entry.js with bun run bundle"
     )
-    built_ink = source / "ui-tui" / "dist" / "entry.js"
-    installed_ink = source / "hermes_cli" / "tui_dist" / "entry.js"
-    assert built_ink.is_file() and installed_ink.is_file(), (
-        "Build the pinned ui-tui and copy its actual dist/entry.js to "
-        "hermes_cli/tui_dist/entry.js in the isolated checkout"
-    )
-    assert built_ink.stat().st_size > 100_000 and installed_ink.stat().st_size > 100_000
-    assert _digest(built_ink) == _digest(installed_ink), (
-        "The pinned Ink bundle and its copied runtime entry differ"
-    )
-    # Content receipts establish identity of the observed binaries, NOT proof
-    # that a build was performed in this test process. OMP must record the
-    # source pin, fresh build commands and these SHA-256 digests separately.
-    print(f"native fallback artifact SHA-256 Tern={_digest(ENTRY)} Ink={_digest(installed_ink)}")
+    # Only Tern is launched. Requiring an Ink build would preserve a deleted
+    # architecture, not qualify the native-only failure. Receipts below require
+    # exactly one real Tern entry and reject every additional Python child.
+    # A digest establishes artifact identity, not that this process built it.
+    # The parent must record the fresh bundle command and digest separately.
+    print(f"native-only artifact SHA-256 Tern={_digest(ENTRY)} Hermes={PIN}")
     return source, str(Path(node).resolve())
 
 
@@ -507,6 +520,7 @@ def _environment(tmp_path: Path, source: Path, node: str) -> dict[str, str]:
         "HERMES_DISABLE_LAZY_INSTALLS": "1",
         "HERMES_DISABLE_FAST_CHAT_LAUNCH": "1",
         "HERMES_NODE": node,
+        "HERMES_TERN_CHANNELS": str(home / "empty-channels.json"),
         "TERM": "xterm-256color",
         "TERM_PROGRAM": "xterm",
         "HERMES_TERN": "1",
@@ -519,7 +533,7 @@ def _environment(tmp_path: Path, source: Path, node: str) -> dict[str, str]:
 
 def _pty_process(
     argv: list[str], *, cwd: Path, env: dict[str, str],
-    timeout: float = 45, close_ink: bool = False,
+    timeout: float = 45,
 ) -> tuple[int, bytes]:
     """Real raw slave PTY; one owned session and finite capture/cleanup."""
     master, slave = pty.openpty()
@@ -528,9 +542,6 @@ def _pty_process(
     output = bytearray()
     start = time.monotonic()
     last_read = start
-    help_sent_at = None
-    help_cleared_at = None
-    quit_sent = False
     try:
         child = subprocess.Popen(
             argv, cwd=cwd, env=env, stdin=slave, stdout=slave, stderr=slave,
@@ -552,25 +563,13 @@ def _pty_process(
                         raise AssertionError(f"Native PTY output exceeded {OUTPUT_LIMIT} bytes")
                     output.extend(chunk)
                     last_read = time.monotonic()
-            if close_ink and BANNER in output:
-                after_ink = bytes(output).split(BANNER, 1)[1]
-                # Exercise real Ink key dispatch, not terminal escape codes
-                # mistaken for paint. '?' opens pinned HelpHint with '/quit'.
-                if help_sent_at is None and time.monotonic() - start > 1:
-                    os.write(master, b"?")
-                    help_sent_at = time.monotonic()
-                if help_sent_at is not None and help_cleared_at is None and INK_HELP_MARKER in after_ink:
-                    os.write(master, b"\x7f")  # Backspace the '?' draft.
-                    help_cleared_at = time.monotonic()
-                if help_cleared_at is not None and not quit_sent and time.monotonic() - help_cleared_at > 0.5:
-                    os.write(master, b"\x04")  # Ordinary idle Ctrl+D; never Ctrl+C for success.
-                    quit_sent = True
             if child.poll() is not None and time.monotonic() - last_read > 0.3:
                 break
         if child.poll() is None:
             raise TimeoutError(
                 f"Native PTY did not exit normally in {timeout}s; "
-                f"Ink help rendered={INK_HELP_MARKER in output}, Ctrl+D sent={quit_sent}, "
+                f"native failure reported={NATIVE_FAILURE in output}, "
+                "no quit/interrupt keys were sent; "
                 f"last bytes={bytes(output)[-1200:]!r}"
             )
         return child.wait(timeout=2), bytes(output)
@@ -589,17 +588,17 @@ def _node_shim(tmp_path: Path, node: str, env: dict[str, str]) -> Path:
         "import json\n"
         "import os\n"
         "import sys\n"
-        "from pathlib import Path\n"
         "argv = sys.argv[1:]\n"
-        "if any(Path(arg).name == 'entry.js' for arg in argv):\n"
-        "    keys = ('HERMES_TUI_DIR', 'HERMES_HOME', 'TERM_PROGRAM', 'TERN_PANE',\n"
-        "            'HERMES_TERN_LAUNCH_CWD', 'HERMES_TERN_RESTORED',\n"
-        "            'HERMES_TUI_RESUME', 'HERMES_TUI_PASS_SESSION_ID',\n"
-        "            'HERMES_CWD', 'HERMES_TUI_CWD', 'TERMINAL_CWD')\n"
-        "    record = {key: os.environ.get(key, '') for key in keys}\n"
-        "    record.update(argv=argv, node_cwd=os.getcwd())\n"
-        "    with open(os.environ['HERMES_FALLBACK_CALLS'], 'a', encoding='utf-8') as stream:\n"
-        "        stream.write(json.dumps(record, ensure_ascii=False) + '\\n')\n"
+        "keys = ('HERMES_TUI_DIR', 'HERMES_HOME', 'TERM_PROGRAM', 'TERN_PANE',\n"
+        "        'HERMES_TERN_LAUNCH_CWD', 'HERMES_TERN_RESTORED',\n"
+        "        'HERMES_TERN_RESUME', 'HERMES_TERN_CREATE', 'HERMES_TERN_HERMES',\n"
+        "        'HERMES_TERN_CWD', 'HERMES_TERN_SESSION_CWD', 'NODE_OPTIONS',\n"
+        "        'HERMES_TUI_RESUME', 'HERMES_TUI_PASS_SESSION_ID',\n"
+        "        'HERMES_CWD', 'HERMES_TUI_CWD', 'TERMINAL_CWD')\n"
+        "record = {key: os.environ.get(key, '') for key in keys}\n"
+        "record.update(argv=argv, node_cwd=os.getcwd())\n"
+        "with open(os.environ['HERMES_FALLBACK_CALLS'], 'a', encoding='utf-8') as stream:\n"
+        "    stream.write(json.dumps(record, ensure_ascii=False) + '\\n')\n"
         "os.execv(os.environ['HERMES_FALLBACK_REAL_NODE'],\n"
         "         [os.environ['HERMES_FALLBACK_REAL_NODE'], *argv])\n"
     )
@@ -614,6 +613,7 @@ def _node_shim(tmp_path: Path, node: str, env: dict[str, str]) -> Path:
         "HERMES_FALLBACK_RECORDER": str(recorder),
         "HERMES_FALLBACK_REAL_NODE": node,
         "HERMES_FALLBACK_CALLS": str(tmp_path / "calls.jsonl"),
+        "HERMES_FALLBACK_PROCESSES": str(tmp_path / "processes.jsonl"),
         "HERMES_NODE": str(shim),
     })
     return shim
@@ -646,30 +646,56 @@ def _owned_resume_fixture(tmp_path: Path, env: dict[str, str]) -> str:
 
 
 def _assert_real_entries(
-    calls: list[dict], source: Path, env: dict[str, str], *,
-    retry: bool, resume: str = "",
+    calls: list[dict], source: Path, env: dict[str, str], *, resume: str = "",
 ) -> None:
-    ink = source / "hermes_cli" / "tui_dist" / "entry.js"
-    expected_entries = [([ "--expose-gc", str(ENTRY)], FRONTEND)] if retry else []
-    expected_entries.append((["--expose-gc", str(ink)], ink.parent))
-    assert len(calls) == len(expected_entries), (
-        f"Expected {'one Tern + exactly one Ink' if retry else 'only Ink'}: {calls}"
+    assert len(calls) == 1, f"Expected exactly one Tern Node entry, no Ink or retry: {calls}"
+    call = calls[0]
+    assert call["argv"] == ["--expose-gc", str(ENTRY)], calls
+    expected_cwd = Path(env.get("HERMES_FALLBACK_RESUME_CWD", str(ROOT))).resolve()
+    assert Path(call["node_cwd"]).resolve() == expected_cwd, calls
+    assert call["HERMES_HOME"] == env["HERMES_HOME"], calls
+    assert call["TERM_PROGRAM"] == env["TERM_PROGRAM"], calls
+    assert call["TERN_PANE"] == "", "No real Tern pane exists in this fixture"
+    assert call["HERMES_TERN_LAUNCH_CWD"] == str(ROOT), calls
+    assert call["HERMES_TERN_RESTORED"] == "", "No fabricated pane restoration"
+    assert call["HERMES_TERN_RESUME"] == resume, calls
+    assert json.loads(call["HERMES_TERN_CREATE"])["pass_session_id"] is True, calls
+    command = json.loads(call["HERMES_TERN_HERMES"])
+    assert command == {
+        "argv": [sys.executable, "-m", "hermes_cli.main"],
+        "env": {"PYTHONPATH": str(source)},
+    }, calls
+    assert Path(call["HERMES_TERN_CWD"]).resolve() == expected_cwd, calls
+    assert Path(call["HERMES_TERN_SESSION_CWD"]).resolve() == expected_cwd, calls
+    assert "--max-old-space-size=8192" in call["NODE_OPTIONS"].split(), calls
+    for key in ("HERMES_TUI_DIR", "HERMES_TUI_RESUME", "HERMES_TUI_PASS_SESSION_ID",
+                "HERMES_CWD", "HERMES_TUI_CWD", "TERMINAL_CWD"):
+        assert call[key] == "", f"Legacy Ink launch state leaked into the native entry: {key}={call[key]!r}"
+
+    receipts = Path(env["HERMES_FALLBACK_PROCESSES"])
+    assert receipts.exists(), f"No Python process-launch audit receipt: {calls}"
+    processes = [json.loads(line) for line in receipts.read_text().splitlines()]
+    expected = {
+        "event": "subprocess.Popen", "executable": env["HERMES_NODE"],
+        "argv": [env["HERMES_NODE"], "--expose-gc", str(ENTRY)],
+        "cwd": str(expected_cwd),
+    }
+    # Newer Python may report both Popen and its posix_spawn implementation for
+    # the same child. The independent Node receipts still require one exec.
+    assert processes in ([expected], [expected, {**expected, "event": "os.posix_spawn"}]), (
+        "The launcher started another program instead of failing native-only", processes,
     )
-    expected_cwd = env.get("HERMES_FALLBACK_RESUME_CWD", str(ROOT))
-    for call, (expected_argv, node_cwd) in zip(calls, expected_entries):
-        assert call["argv"] == expected_argv, calls
-        assert Path(call["node_cwd"]).resolve() == node_cwd.resolve(), calls
-        assert call["HERMES_TUI_DIR"] == (str(FRONTEND) if node_cwd == FRONTEND else ""), calls
-        assert call["HERMES_HOME"] == env["HERMES_HOME"], calls
-        assert call["TERM_PROGRAM"] == env["TERM_PROGRAM"], calls
-        assert call["TERN_PANE"] == "", "No real Tern pane exists in this PTY fixture"
-        assert call["HERMES_TERN_LAUNCH_CWD"] == str(ROOT), calls
-        assert call["HERMES_TERN_RESTORED"] == "", "No fabricated pane restoration"
-        assert call["HERMES_TUI_RESUME"] == resume, calls
-        assert call["HERMES_TUI_PASS_SESSION_ID"] == "1", calls
-        assert Path(call["HERMES_CWD"]).resolve() == Path(expected_cwd).resolve(), calls
-        assert Path(call["HERMES_TUI_CWD"]).resolve() == Path(expected_cwd).resolve(), calls
-        assert Path(call["TERMINAL_CWD"]).resolve() == Path(expected_cwd).resolve(), calls
+
+
+def _assert_native_failure(code: int, output: bytes) -> None:
+    assert code == 1, ("Expected native-only exit 1, not 0, 75 or interrupted 130", code, output[-2000:])
+    assert output.count(NATIVE_FAILURE) == 1, (code, output[-2000:])
+    assert b"not a Tern pane" in output and b"hermes chat" in output, output[-2000:]
+    assert BANNER not in output, "The launcher promised the deleted Ink fallback"
+    assert INK_HELP_MARKER not in output, "Interactive Ink HelpHint appeared after native failure"
+    after_failure = output.split(NATIVE_FAILURE, 1)[1]
+    assert TSP_FRAME not in after_failure, "TSP continued after the launcher reported native failure"
+    assert b"\x1b[" not in after_failure, "A terminal UI painted after native failure"
 
 
 @pytest.mark.native_fallback
@@ -703,52 +729,52 @@ def test_actual_compiled_entry_fails_closed_in_non_tern_pty(native_source, tmp_p
 
 
 @pytest.mark.native_fallback
-def test_actual_launcher_retries_ink_once_without_tty(native_source, tmp_path):
+def test_actual_launcher_fails_native_only_without_tty_and_keeps_owned_resume(native_source, tmp_path):
     source, node = native_source
     env = _environment(tmp_path, source, node)
     resume_id = _owned_resume_fixture(tmp_path, env)
     _node_shim(tmp_path, node, env)
     code, stdout, stderr = _capture_driver(source, env)
     calls = _calls(tmp_path / "calls.jsonl", (code, stdout[-1200:], stderr[-1500:]))
-    _assert_real_entries(calls, source, env, retry=True, resume=resume_id)
-    assert stderr.count(BANNER) == 1, (code, stderr[-1500:])
-    assert code == 0, (code, stdout[-1200:], stderr[-1500:])
-    assert TSP_FRAME not in stderr.split(BANNER, 1)[1], "TSP APC after Ink handoff"
+    _assert_real_entries(calls, source, env, resume=resume_id)
+    assert stderr.count(NATIVE_FAILURE) == 1, (code, stderr[-1500:])
+    _assert_native_failure(code, stdout + stderr)
 
 
+@pytest.mark.parametrize("markers", [
+    {},
+    {"SSH_CONNECTION": "fixture-only", "TERM_PROGRAM": "xterm"},
+    {"TMUX": "/fixture/tmux,0,0", "TERM_PROGRAM": "tern"},
+    {"STY": "fixture-screen", "TERM_PROGRAM": "tern"},
+    {"ZELLIJ": "fixture-only", "TERM_PROGRAM": "tern"},
+], ids=["ordinary-local-pty", "ssh-marker-only", "tmux-marker-only",
+        "screen-marker-only", "zellij-marker-only"])
 @pytest.mark.native_fallback
-def test_actual_launcher_ink_paints_and_quits_cleanly_in_real_pty(native_source, tmp_path):
+def test_actual_launcher_fails_native_only_without_ink_or_quit_keys_in_real_pty(native_source, tmp_path, markers):
     source, node = native_source
     env = _environment(tmp_path, source, node)
+    env.update(markers)
+    resume_id = _owned_resume_fixture(tmp_path, env)
     _node_shim(tmp_path, node, env)
     code, output = _pty_driver(source, env)
-    _assert_real_entries(_calls(tmp_path / "calls.jsonl", (code, output[-2000:])), source, env, retry=True)
-    assert output.count(BANNER) == 1, (code, output[-1500:])
-    after_ink = output.split(BANNER, 1)[1]
-    assert INK_HELP_MARKER in after_ink, (
-        "Real Ink HelpHint did not render; qualify first-run setup in the "
-        "isolated profile rather than treating arbitrary ANSI paint as success"
-    )
-    assert b"\x1b[" in after_ink, "No real Ink terminal frame after fallback"
-    assert TSP_FRAME not in after_ink, "TSP APC escaped after Ink takeover"
-    assert code == 0, (
-        "Only ordinary Ctrl+D -> exit 0 qualifies clean exit; Ctrl+C/130 is "
-        "not a passing fallback", code, output[-2000:],
-    )
+    _assert_real_entries(_calls(tmp_path / "calls.jsonl", (code, output[-2000:])), source, env, resume=resume_id)
+    _assert_native_failure(code, output)
+    # The raw PTY driver sends no keys. An accidental Ink launch hangs and fails
+    # its deadline, rather than being mistaken for a clean native-only exit.
 
 
+@pytest.mark.parametrize("opt_out", ["0", "false", "off", "no", "FALSE"])
 @pytest.mark.native_fallback
-def test_explicit_ordinary_tui_uses_real_ink_without_a_tern_attempt(native_source, tmp_path):
+def test_old_ink_opt_out_still_launches_real_tern_and_fails_native_only(native_source, tmp_path, opt_out):
     source, node = native_source
     env = _environment(tmp_path, source, node)
-    env["HERMES_TERN"] = "0"
+    env["HERMES_TERN"] = opt_out
     _node_shim(tmp_path, node, env)
     code, stdout, stderr = _capture_driver(source, env)
     calls = _calls(tmp_path / "calls.jsonl", (code, stdout[-1200:], stderr[-1500:]))
-    _assert_real_entries(calls, source, env, retry=False)
-    assert BANNER not in stderr, stderr[-1500:]
-    assert code == 0, (code, stdout[-1200:], stderr[-1200:])
-    assert TSP_FRAME not in stdout + stderr, "No TSP entry was launched"
+    _assert_real_entries(calls, source, env)
+    assert stderr.count(NATIVE_FAILURE) == 1, (code, stderr[-1500:])
+    _assert_native_failure(code, stdout + stderr)
 
 
 # POLICY-ONLY capture checks: these inert Python children are not native

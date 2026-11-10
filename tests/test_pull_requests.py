@@ -1,14 +1,12 @@
 """pull_requests.py without Hermes: tools.registry is stubbed, storage goes to a temp dir."""
 
-import importlib.util
 import json
 import sys
 import types
-from pathlib import Path
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[1]
+from hermes_tern_plugin import pull_requests, sessions
 
 
 @pytest.fixture()
@@ -19,15 +17,11 @@ def prs(tmp_path, monkeypatch):
     monkeypatch.setitem(sys.modules, "tools", types.ModuleType("tools"))
     monkeypatch.setitem(sys.modules, "tools.registry", registry)
 
-    spec = importlib.util.spec_from_file_location("tern_pull_requests", ROOT / "pull_requests.py")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
     lineages = {"tip": ["root", "tip"]}
-    monkeypatch.setattr(module, "data_file", lambda: tmp_path / "pull-requests.json")
-    monkeypatch.setattr(module, "_lineage", lambda sid: lineages.get(sid, [sid]))
-    monkeypatch.setattr(module, "_cwd", lambda: "/work")
-    module.lineages = lineages
-    return module
+    monkeypatch.setattr(pull_requests, "data_file", lambda: tmp_path / "pull-requests.json")
+    monkeypatch.setattr(sessions, "lineage", lambda sid: lineages.get(sid, [sid]))
+    monkeypatch.setattr(pull_requests, "_cwd", lambda: "/work")
+    return pull_requests
 
 
 def test_parse_target_reads_urls_and_repository_number(prs):
@@ -99,6 +93,37 @@ def test_a_subagent_links_to_the_conversation_that_delegated_it(prs, monkeypatch
     assert [p["number"] for p in data["conversations"]["inherited"]] == [5]
     assert data["aliases"]["grandchild"] == "root"
     assert [p["number"] for p in json.loads(prs.list_pull_requests({}, session_id="child"))["linked"]] == [1, 2, 3]
+
+
+def test_the_rpc_method_reads_the_calling_sessions_conversation(prs):
+    prs.link_pull_request({"url": "https://github.com/a/b/pull/1"}, session_id="root")
+
+    assert prs.linked({}, session_id="tip") == {"linked": [
+        {"url": "https://github.com/a/b/pull/1", "repository": "a/b", "number": 1, "host": "github.com"}]}
+    assert prs.linked({}, session_id="other") == {"linked": []}
+    with pytest.raises(ValueError):
+        prs.linked({}, session_id=None)
+
+
+def test_a_change_tells_the_panes_of_the_conversation_once(prs, monkeypatch):
+    told = []
+
+    def emit(session_id, event, payload):
+        told.append((session_id, event, payload))
+        return session_id == "tip"  # the pane holds the conversation under its newer id
+
+    monkeypatch.setattr(prs, "_ctx", types.SimpleNamespace(emit_to_session=emit, get_config=lambda *a: None), raising=False)
+
+    prs.link_pull_request({"url": "https://github.com/a/b/pull/1"}, session_id="tip")
+    assert told == [("root", "pull_requests.changed", {}), ("tip", "pull_requests.changed", {})]
+
+    told.clear()
+    prs.link_pull_request({"url": "https://github.com/a/b/pull/1"}, session_id="tip")
+    prs.unlink_pull_request({"url": "https://github.com/a/b/pull/9"}, session_id="tip")
+    assert told == []
+
+    prs.unlink_pull_request({"url": "https://github.com/a/b/pull/1"}, session_id="tip")
+    assert [sid for sid, _, _ in told] == ["root", "tip"]
 
 
 # ── Which hosts a link may name (the enterprise token goes only to a host the user listed) ─────

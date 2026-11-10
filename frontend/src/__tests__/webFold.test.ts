@@ -18,7 +18,7 @@ const extract = (result: unknown, more: Partial<ToolCall> = {}) => call('web_ext
 const tool = (id: string, c: ToolCall): Extract<Block, { kind: 'tool' }> => ({ kind: 'tool', id: entryId(id), call: c })
 const text = (id: string): Block => ({ kind: 'text', id: entryId(id), text: id })
 const turn = (blocks: Block[]): TurnEntry => ({ kind: 'turn', id: entryId('turn'), rev: 0, startedAt: 0, end: { status: 'done', endedAt: 1000 }, blocks })
-const cx: TranscriptContext = { copy: () => undefined, now: 1000, welcome: { tip: '', version: '' } }
+const cx: TranscriptContext = { copy: () => undefined, now: 1000, welcome: { version: '' } }
 const nodes = (root: NodeJson): NodeJson[] => [root, ...(root.c ?? []).flatMap(nodes)]
 const mixed = { results: [{ url: 'https://a.example', content: 'page', error: null }, { url: '', content: '', error: 'failed' }] }
 
@@ -139,7 +139,7 @@ describe('web extraction attention in work folds', () => {
 
   it('preserves done and attention for a retained history result', () => {
     let n = 0
-    const entries = history({ kept: [], compactions: [], id: p => entryId(`${p}${++n}`), messages: [
+    const entries = history({ kept: [], id: p => entryId(`${p}${++n}`), messages: [
       { role: 'user', text: 'fetch' },
       { role: 'tool', name: 'web_extract', tool_call_id: 'f', args: {}, content: JSON.stringify(mixed) },
       { role: 'assistant', text: 'answer' }

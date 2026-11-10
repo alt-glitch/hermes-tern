@@ -2,7 +2,7 @@
 // session.interrupt, process.stop, tools.show, prompt.background, prompt.btw) instead of
 // `slash.exec`. Mirrors Hermes' ui-tui/src/app/slash/commands/core.ts (/steer, /queue, /stop,
 // /tools) and session.ts (/bg, /btw).
-import type { GatewayClient } from '@tui/gatewayClient.js'
+import type { GatewayClient } from '@hermes/shared/gateway-client'
 
 import { errorText } from '../core/errors.js'
 import type { LiveSessionId } from '../core/ids.js'

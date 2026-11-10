@@ -12,9 +12,10 @@ prove it.
 
 ## Rules
 
-- **Plugin only.** Nothing changes in Hermes core. Data the shared gateway does not serve comes
-  from what a local process may read (the profile's `state.db` read-only, the delegation live
-  logs), never from patches. No `HERMES_*` variables for settings: the plugin keeps its own in
+- **Plugin only, public surfaces only.** Nothing changes in Hermes core. The frontend reads
+  the gateway's JSON-RPC methods and events and opens none of Hermes' files. The Python half uses
+  the plugin context and the imports on Hermes' published plugin list. Data the gateway does not
+  serve is a gap to report to Hermes, not a file to read. No `HERMES_*` variables for settings: the plugin keeps its own in
   `<home>/hermes-tern/settings.json`.
 - **Tern draws.** Prefer Tern's elements and roles (omp's vocabulary) over hand-drawn layout, so
   Tern's chat styles, themes and motion apply.
@@ -64,9 +65,9 @@ Sid wants to watch a subagent the way he watches the main chat, and to talk to i
   split beside the chat: a second `hermes tern` process in agent mode (`tern split $TERN_PANE
   right -- hermes tern --agent <session> <subagent>`). It draws the child's transcript with the
   same transcript views as the main chat, live.
-- **Data.** Running: the child's live log (steps as they happen). Full transcript: the child's
-  session in `state.db` (`sessions.parent_session_id`, `source='subagent'`), read-only through
-  `node:sqlite`, rendered with `Transcript.load`. The shared gateway serves neither.
+- **Data.** The child's stored rows from the gateway: `session.transcript` with the parent's
+  session id and the child's `subagent_id`, polled from a cursor while the child runs, rendered
+  with `Transcript.load`. The rows hold no tool output.
 - **Steer from the sidebar.** The sidebar's composer sends `subagent.steer`; Esc-Esc or a Stop
   button sends `subagent.interrupt`. Finished agents get a read-only composer.
 - **Tool summaries.** Runs of tool calls fold into one line that says what happened ("Read 4
@@ -96,11 +97,10 @@ Sid wants to watch a subagent the way he watches the main chat, and to talk to i
 ### M4. Models and effort
 
 - `/model` shows Recent and Most used groups before providers. Recency comes from the plugin's
-  own record of switches plus `state.db` (`session_model_usage`) for history; subagent runs do
-  not count.
+  own record of switches; subagent runs do not count.
 - Effort is reachable at any width: a click on the effort chip (or Tern's effort glyph in the
   model chip) opens a level picker; the model picker carries an effort strip.
-  Set with `config.set` key `reasoning` (session scope; Ctrl+G for global).
+  Set with `session.mutate` for the session; the effort picker's Ctrl+G saves it as the default.
 - Check: recents order follows use; effort changes show in `session.info`.
 
 ### M5. Settings commands

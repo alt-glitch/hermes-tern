@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { busy, settle, setup } from './appSetup.js'
 import { given, key, stubOverlay } from './fakes.js'
 
-vi.mock('@tui/lib/history.js', () => ({ append: () => undefined, load: () => [] }))
+vi.mock('@hermes/shared/prompt-history', () => ({ append: () => undefined, load: () => [] }))
 afterEach(() => vi.useRealTimers())
 
 const altEnter = key('enter', { alt: true })

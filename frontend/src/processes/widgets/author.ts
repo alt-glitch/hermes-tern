@@ -1,17 +1,17 @@
 // The cheap-model side of job charts: one request to Hermes' auxiliary model (task `tern_charts`,
-// so `auxiliary.tern_charts` in config.yaml picks its model) with a `respond` tool carrying the
-// spec schema, fed the command and samples of its output. The request runs in Hermes' own
-// Python (`widget_author.py` at the plugin's root), which redacts secrets before anything leaves.
+// so `auxiliary.tern_charts` in config.yaml picks its model) for one JSON answer in the shape the
+// system prompt documents, fed the command and samples of its output. The plugin's Python half runs the
+// request (charts.py, the plugin RPC method `plugin.hermes-tern.charts.author`) and redacts
+// secrets before anything leaves; its reply comes back as a session event.
 // Ported from omp (packages/coding-agent/src/job-widgets/author.ts and its two prompts).
 
-import { spawn } from 'node:child_process'
-import { join } from 'node:path'
+import { randomUUID } from 'node:crypto'
 
 import { clip } from '../../core/text.js'
-import { readAuthorReply } from '../../wire/files.js'
+import { readChartReply } from '../../wire/charts.js'
 
 import type { SourceSample } from './runtime.js'
-import { SPEC_SCHEMA, type Spec } from './spec.js'
+import type { Spec } from './spec.js'
 
 /** What the author is asked to write a spec for. */
 export interface AuthorRequest {
@@ -26,7 +26,19 @@ export interface AuthorRequest {
   rejected?: { answer: string; errors: string[] }
 }
 
-/** Writes one candidate spec (unvalidated); undefined when no model can write specs at all. */
+/** An answer the author refused before validation: not one JSON object, or not the schema's shape. */
+export class RejectedAnswer {
+  constructor(
+    /** The model's text; empty when it was not kept. */
+    readonly answer: string,
+    readonly errors: string[]
+  ) {}
+}
+
+/**
+ * Writes one candidate spec (unvalidated), or a {@link RejectedAnswer} to ask again about;
+ * undefined when no model can write specs at all.
+ */
 export type Author = (request: AuthorRequest, signal: AbortSignal) => Promise<unknown>
 
 const MAX_BRIEF_CHARS = 1500
@@ -38,9 +50,9 @@ const REQUEST_TIMEOUT_MS = 120_000
 
 export const SYSTEM_PROMPT = `You design the live status widget of a coding agent's background process (benchmark, eval, CI, tests, build, training, server). From the command and samples of its output you write a spec once; plain code then runs its regexes on every new line and redraws the widget until the process ends. Nobody can fix it later: its rules MUST match the real lines.
 
-A widget charts a quantity that shows how the process is going: throughput, latency, loss, tests or trials passed, progress toward a total the process states. When the output has none, call \`respond\` with only \`{"skip":"<why>"}\`; no widget beats a meaningless one. Never chart activity: lines or matches seen, words like \`error\` inside file contents.
+A widget charts a quantity that shows how the process is going: throughput, latency, loss, tests or trials passed, progress toward a total the process states. When the output has none, answer with only \`{"skip":"<why>"}\`; no widget beats a meaningless one. Never chart activity: lines or matches seen, words like \`error\` inside file contents.
 
-Otherwise call \`respond\` with:
+Otherwise answer with one JSON object of:
 - \`title\` (≤ 48 chars): what is watched.
 - \`rules\` (1–12) \`{from, match, key?, text?, count?, scale?}\`:
   - \`from\`: the sample source id carrying the data (\`out\` for the process's output, \`file:1\` for a log file the command writes to), \`*\` for all.
@@ -177,58 +189,95 @@ export function renderPrompt(request: AuthorRequest): string {
     out.push(
       '',
       'Your previous answer was rejected:',
-      fence(clip(request.rejected.answer, { max: 4000 })),
+      ...(request.rejected.answer ? [fence(clip(request.rejected.answer, { max: 4000 }))] : []),
       'Problems:',
       ...request.rejected.errors.map(e => `- ${e}`),
-      'Fix every problem and call `respond` again.'
+      'Fix every problem and answer again.'
     )
   }
 
   return out.join('\n')
 }
 
+/** The plugin RPC method that starts a request, and the session event that answers it (charts.py). */
+export const AUTHOR_METHOD = 'plugin.hermes-tern.charts.author'
+export const AUTHOR_EVENT = 'plugin.hermes-tern.charts.authored'
+
+/** What the author reaches of the gateway client: its requests, and its events for the reply. */
+export interface AuthorGateway {
+  request(method: string, params?: Record<string, unknown>): Promise<unknown>
+  on(event: 'event', listener: (ev: { type: string; payload?: unknown }) => void): unknown
+}
+
+/** A JSON-RPC "method not found": a Hermes without plugin RPC methods, or a gateway without the plugin loaded. */
+const unknownMethod = (error: unknown) => typeof error === 'object' && error !== null && 'code' in error && error.code === -32601
+
 /**
- * An {@link Author} that runs `widget_author.py` in Hermes' interpreter: the request on stdin,
- * one JSON line back (`{"answer": …}`, `{"unavailable": true}` or `{"error": …}`). Undefined
- * when the launcher named no interpreter or checkout to run it with.
+ * An {@link Author} that asks the plugin's Python half over `gw`: the call starts the request and
+ * answers at once, and the reply arrives as the `plugin.hermes-tern.charts.authored` event of the
+ * session `sid()` names. It resolves undefined when the gateway does not serve the method.
  */
-export function hermesAuthor(env: NodeJS.ProcessEnv = process.env): Author | undefined {
-  const python = env['HERMES_PYTHON']?.trim()
-  const root = env['HERMES_PYTHON_SRC_ROOT']
-  const ui = env['HERMES_TUI_DIR']
+export function gatewayAuthor(gw: AuthorGateway, sid: () => null | string): Author {
+  const waiting = new Map<string, (reply: ReturnType<typeof readChartReply>) => void>()
 
-  if (!python || !root || !ui) {
-    return undefined
-  }
+  gw.on('event', ev => {
+    const reply = ev.type === AUTHOR_EVENT ? readChartReply(ev.payload) : undefined
 
-  const script = join(ui, '..', 'widget_author.py')
+    if (reply) {
+      waiting.get(reply.job)?.(reply)
+    }
+  })
 
-  return (request, signal) =>
-    new Promise((resolve, reject) => {
-      const child = spawn(python, [script], {
-        cwd: root,
-        env: { ...env, PYTHONPATH: root },
-        signal,
-        stdio: ['pipe', 'pipe', 'ignore'],
-        timeout: REQUEST_TIMEOUT_MS
-      })
+  return async (request, signal) => {
+    const session = sid()
 
-      let stdout = ''
-      child.stdout.setEncoding('utf8').on('data', (chunk: string) => (stdout += chunk))
-      child.on('error', reject)
-      // A script that dies before reading its request closes the pipe; `close` says how it ended.
-      child.stdin.on('error', () => undefined)
-      child.on('close', () => {
-        const reply = readAuthorReply(stdout)
+    if (!session) {
+      throw new Error('no session to send the chart request from')
+    }
 
-        if (!reply) {
-          reject(new Error('widget_author.py gave no answer'))
-        } else if (reply.kind === 'error') {
-          reject(new Error(reply.message))
-        } else {
-          resolve(reply.kind === 'answer' ? reply.answer : undefined)
-        }
-      })
-      child.stdin.end(JSON.stringify({ schema: SPEC_SCHEMA, system: SYSTEM_PROMPT, user: renderPrompt(request) }))
+    const job = randomUUID()
+    const reply = new Promise<ReturnType<typeof readChartReply>>((resolve, reject) => {
+      const done = () => {
+        waiting.delete(job)
+        clearTimeout(timer)
+        signal.removeEventListener('abort', abort)
+      }
+      const abort = () => (done(), reject(signal.reason))
+      const timer = setTimeout(() => (done(), reject(new Error('the chart request timed out'))), REQUEST_TIMEOUT_MS)
+
+      signal.addEventListener('abort', abort, { once: true })
+      waiting.set(job, r => (done(), resolve(r)))
     })
+
+    // A failed call ends the wait for its reply.
+    const ack = gw
+      .request(AUTHOR_METHOD, { job, session_id: session, system: SYSTEM_PROMPT, user: renderPrompt(request) })
+      .catch((error: unknown) => {
+        waiting.get(job)?.(undefined)
+        throw error
+      })
+    let answer: ReturnType<typeof readChartReply>
+
+    try {
+      // Both at once: an abort or a timeout while the call is still unanswered rejects right away.
+      ;[, answer] = await Promise.all([ack, reply])
+    } catch (error) {
+      if (unknownMethod(error)) {
+        return undefined
+      }
+
+      throw error
+    }
+
+    switch (answer?.kind) {
+      case 'answer':
+        return answer.answer
+      case 'rejected':
+        return new RejectedAnswer(answer.answer, answer.errors)
+      case 'error':
+        throw new Error(answer.message)
+      default:
+        return undefined
+    }
+  }
 }

@@ -32,7 +32,6 @@ function host(over: Partial<SessionHost> = {}, replies: Record<string, unknown> 
 
   const h = {
     busy: false,
-    canonical: true,
     draft: vi.fn(),
     enqueue: vi.fn(),
     gw: stub<SessionHost['gw']>({ request }),
@@ -123,14 +122,19 @@ describe('session commands', () => {
     expect(h.send).toHaveBeenCalledWith('fix the bug')
   })
 
-  it('leaves rewind, compress and branch to slash.exec on a private gateway', async () => {
-    const { h, request } = host({ canonical: false })
+  it('keeps rewind, compress and branch session-scoped without an active session', async () => {
+    const { h, request } = host({ sid: null })
 
     for (const name of ['undo', 'retry', 'compact', 'branch']) {
-      expect(await run(name, h)).toBe(false)
+      await run(name, h)
     }
 
     expect(request).not.toHaveBeenCalled()
+    expect(h.notice).toHaveBeenCalledWith('Nothing to undo.')
+    expect(h.notice).toHaveBeenCalledWith('Nothing to retry.')
+    expect(h.notice).toHaveBeenCalledWith('No active session.', 'warning')
+    expect(h.open).not.toHaveBeenCalled()
+    expect(h.send).not.toHaveBeenCalled()
   })
 
   it('/compress sends the raw argument as focus, runs the compaction rule, and reloads', async () => {
@@ -235,11 +239,14 @@ describe('session commands', () => {
     expect(h.notice).toHaveBeenCalledWith('Did not connect: linear.', 'warning')
   })
 
-  it('/reload-mcp on a private gateway is left to slash.exec', async () => {
-    const { h, request } = host({ canonical: false })
+  it('/reload-mcp reports an unsupported gateway operation without falling back to slash.exec', async () => {
+    const { h, request } = host({}, { 'reload.mcp': new Error('Method not found: reload.mcp') })
 
-    expect(await run('reload-mcp', h)).toBe(false)
-    expect(request).not.toHaveBeenCalled()
+    await run('reload-mcp', h)
+
+    expect(request).toHaveBeenCalledExactlyOnceWith('reload.mcp', { confirm: true, session_id: 'sid-1' })
+    expect(h.panel).not.toHaveBeenCalled()
+    expect(h.notice).toHaveBeenCalledWith('/reload-mcp failed: Method not found: reload.mcp', 'error')
   })
 
   it('/rollback lists, diffs and restores checkpoints', async () => {

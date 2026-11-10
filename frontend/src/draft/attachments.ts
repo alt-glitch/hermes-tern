@@ -6,15 +6,14 @@ import { open } from 'node:fs/promises'
 import { basename, isAbsolute } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import type { GatewayClient } from '@tui/gatewayClient.js'
+import type { GatewayClient } from '@hermes/shared/gateway-client'
 
 import { MAX_IMAGES, MAX_PASTED_IMAGE_BYTES, MAX_TOTAL_IMAGE_BYTES, decodePastedImage, encodedImageBytes } from '../artifacts/attachments.js'
 import { errorText } from '../core/errors.js'
 import type { SessionIds } from '../core/ids.js'
-import { imagePathOf, withClipboardImage } from '../hermes/clipboardImage.js'
+import { imagePathOf } from '../hermes/clipboardImage.js'
 import { stageImageBytes, type Attachment, imageFormat, imageSize } from '../hermes/images.js'
 import type { ImageSource, NoticeEntry } from '../model.js'
-import { rpc } from '../wire/rpc.js'
 
 /** A gateway path is the only submission identity; neither refs nor authorities go on the wire. */
 export type Image = Attachment & { name: string; preview?: ImageSource; caption?: string }
@@ -31,7 +30,6 @@ interface Owner {
   readonly ref: SessionIds
   readonly sid: string
   readonly stored: string | null
-  readonly canonical: boolean
 }
 
 interface Slot {
@@ -49,7 +47,9 @@ interface ImageOwner {
 export type ClipboardReader = (use: (path: string) => Promise<boolean>) => Promise<boolean | undefined>
 
 export interface AttachmentsHost {
-  readonly gw: Pick<GatewayClient, 'isCanonical' | 'request'>
+  /** Uploads go to it. */
+  readonly gw: Pick<GatewayClient, 'request'>
+  /** The folder the launcher ran in: an upload's path resolves against it. */
   readonly launchCwd: string
   /** Return the actual SessionState.ref object, never a copied {live, stored} value. */
   owner(): SessionIds
@@ -72,7 +72,8 @@ export class Attachments {
   readonly #identity = new WeakMap<Image, ImageOwner>()
   #startup: string
 
-  constructor(host: AttachmentsHost, { clipboard = use => withClipboardImage(use), startup = '' }: { clipboard?: ClipboardReader; startup?: string } = {}) {
+  /** `clipboard`: reads the clipboard's image; `startup`: the launcher's `--image` (''). */
+  constructor(host: AttachmentsHost, { clipboard, startup = '' }: { clipboard: ClipboardReader; startup?: string }) {
     this.#host = host
     this.#clipboard = clipboard
     this.#startup = startup
@@ -80,13 +81,12 @@ export class Attachments {
 
   #owner(): Owner | undefined {
     const ref = this.#host.owner()
-    return ref.live ? { ref, sid: ref.live, stored: ref.stored, canonical: this.#host.gw.isCanonical } : undefined
+    return ref.live ? { ref, sid: ref.live, stored: ref.stored } : undefined
   }
 
   #current(owner: Owner): boolean {
     const ref = this.#host.owner()
-    return ref === owner.ref && ref.live === owner.sid && ref.stored === owner.stored &&
-      this.#host.gw.isCanonical === owner.canonical
+    return ref === owner.ref && ref.live === owner.sid && ref.stored === owner.stored
   }
 
   /** A switch invalidates visible chips immediately, even for A -> B -> A with the same sid. */
@@ -326,14 +326,10 @@ export class Attachments {
       return
     }
     try {
-      if (slot.owner.canonical) {
-        const result = await this.#uploadPath(slot, imagePathOf(path, this.#host.launchCwd) ?? path)
-        if (this.#eligible(slot)) {
-          const image = this.#image(result, basename(path), owner)
-          if (!this.#host.attachToHead(image)) this.#items.push(image)
-        }
-      } else {
-        await rpc(this.#host.gw, 'image.attach', { path, session_id: sid })
+      const result = await this.#uploadPath(slot, imagePathOf(path, this.#host.launchCwd) ?? path)
+      if (this.#eligible(slot)) {
+        const image = this.#image(result, basename(path), owner)
+        if (!this.#host.attachToHead(image)) this.#items.push(image)
       }
     } catch (error) {
       if (this.#eligible(slot)) this.#host.note('Could not attach ' + path + ': ' + errorText(error), 'warning')

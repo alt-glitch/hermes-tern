@@ -247,7 +247,7 @@ describe('parts', () => {
 })
 
 describe('visible failure rendering', () => {
-  const cx: TranscriptContext = { copy: () => undefined, now: 54_000, welcome: { tip: '', version: '' } }
+  const cx: TranscriptContext = { copy: () => undefined, now: 54_000, welcome: { version: '' } }
 
   it('renders an error row outside collapsed work groups, before the answer', () => {
     const failed = tool('error', call('terminal', { command: 'false' }, { outcome: { duration: 1, kind: 'error', summary: 'failed' } }))

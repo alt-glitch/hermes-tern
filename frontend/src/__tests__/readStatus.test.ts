@@ -53,7 +53,7 @@ describe('read status projection', () => {
     const content = nodes(tree(toolNode(make(page), 0))).find(n => n.k === 'code')?.p?.['text']
     expect(content).toBe('abc')
     let n = 0
-    const entries = history({ kept: [], compactions: [], id: p => entryId(`${p}${++n}`), messages: [
+    const entries = history({ kept: [], id: p => entryId(`${p}${++n}`), messages: [
       { role: 'user', text: 'read' },
       { role: 'tool', name: 'read_file', tool_call_id: 'prior', args: { path: 'file.py' }, content: JSON.stringify({ content: '1|old text', total_lines: 1 }) },
       { role: 'tool', name: 'read_file', tool_call_id: 'stub', args: { path: 'file.py' }, content: JSON.stringify(stub) },

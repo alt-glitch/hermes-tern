@@ -4,7 +4,7 @@ import { EventEmitter } from 'node:events'
 import { Node, Session, type Op } from '@stencil-hq/tern'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { SessionInfo } from '@tui/types.js'
+import type { SessionInfo } from '@hermes/shared/gateway-types'
 import { copyToClipboard } from '../clipboard.js'
 import { storedSessionId } from '../core/ids.js'
 import { openSettings } from '../overlays/settings.js'
@@ -13,12 +13,12 @@ import { isReportCommand } from '../reports.js'
 import { App, setup, settle } from './appSetup.js'
 import { FakeGateway, given, key, must, stub, stubOverlay, tree } from './fakes.js'
 
-vi.mock('@tui/lib/history.js', () => ({ append: () => undefined, load: () => [] }))
+vi.mock('@hermes/shared/prompt-history', () => ({ append: () => undefined, load: () => [] }))
 vi.mock('../clipboard.js', () => ({ copyToClipboard: vi.fn() }))
 
 beforeEach(() => {
-  delete process.env['HERMES_TUI_QUERY']
-  delete process.env['HERMES_TUI_IMAGE']
+  delete process.env['HERMES_TERN_QUERY']
+  delete process.env['HERMES_TERN_IMAGE']
   vi.mocked(copyToClipboard).mockReset()
 })
 
@@ -119,11 +119,20 @@ describe('native general report sheets', () => {
     expect(f.app.transcript.entries).toEqual(before)
   })
 
-  it('nonreport compress keeps its old panel and report-shaped output grants no authority', async () => {
-    const f = setup({ 'slash.exec': () => ({ output: '# Report-ish' }) }, { canonical: false })
-    await command(f, '/compress')
+  it('nonreport session operations keep their output and report-shaped output grants no authority', async () => {
+    const f = setup({
+      'skills.reload': () => ({ output: '# Report-ish' }),
+      'session.resume': () => ({ revision: 3, execution_generation: 7 }),
+      'session.mutate': () => ({ status: 'preview', lines: ['# Report-ish'] })
+    })
+    await command(f, '/reload-skills')
     expect(sheetView(f.app).root).toBeUndefined()
-    expect(f.app.transcript.entries.at(-1)).toMatchObject({ kind: 'panel', title: '/compress' })
+    expect(f.app.transcript.entries.at(-1)).toMatchObject({ kind: 'panel', title: 'Reload Skills', text: '# Report-ish' })
+    await command(f, '/compress --preview')
+    expect(sheetView(f.app).root).toBeUndefined()
+    expect(f.app.transcript.entries.at(-1)).toMatchObject({ kind: 'notice', text: '# Report-ish' })
+    expect(f.sent('session.mutate')).toEqual([expect.objectContaining({ operation: 'compress', payload: { focus: '--preview' } })])
+    expect(f.sent('slash.exec')).toEqual([])
     for (const [name, arg] of [['status', 'set'], ['tools', 'disable'], ['mcp', 'reload'], ['ssh', 'remove'], ['unknown', '']]) {
       expect(isReportCommand(must(name), must(arg))).toBe(false)
     }

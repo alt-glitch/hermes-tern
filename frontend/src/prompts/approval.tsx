@@ -6,7 +6,6 @@ import type { ApprovalChoice, ApprovalResult } from '@hermes/shared/gateway-even
 import { unmodified } from '../core/keys.js'
 import { nativeOverlayKey } from '../overlays/identity.js'
 import type { Overlay, OverlayHost } from '../overlays/overlay.js'
-import { withoutTernEnv } from '../tools/terminal.js'
 import { actionsRow } from '../view/ui/button.js'
 
 import { answerWith, isCtrlC, type Option, type Sending, sendingLine } from './ask.js'
@@ -29,7 +28,8 @@ const APPROVALS = [
 
 export function approvalOverlay(host: OverlayHost, prompt: ApprovalPrompt): Overlay {
   const { description, req, smartDenied } = prompt
-  const command = prompt.command && withoutTernEnv(prompt.command)
+  // What runs, as it runs: nothing is cut from the front.
+  const command = prompt.command
   const choices = APPROVALS.filter(c => prompt.choices.includes(c.id))
   const key = promptKey(req.id)
   const sending: Sending = { busy: false, error: '' }

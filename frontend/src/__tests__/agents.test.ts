@@ -1,73 +1,20 @@
-import { chmod, mkdir, mkdtemp, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-
-import type { GatewayClient } from '@tui/gatewayClient.js'
+import type { GatewayClient } from '@hermes/shared/gateway-client'
+import { JsonRpcGatewayError } from '@hermes/shared/json-rpc-channel'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { parseLiveLog } from '../agents/liveLog.js'
-import { applyListRow, completionOutcomes, dispatchRows, endedStatus, mergeTail, OUTCOME_UNKNOWN } from '../agents/rows.js'
-import { Agents, readLogFile } from '../agents/store.js'
+import { applyListRow, completionOutcomes, dispatchRows, endedStatus, OUTCOME_UNKNOWN } from '../agents/rows.js'
+import { Agents } from '../agents/store.js'
+import { agentSteps } from '../agents/transcript.js'
 import { liveSessionId } from '../core/ids.js'
 import type { Subagent } from '../model.js'
 import { Transcript } from '../transcript/store.js'
 
 import { FakeGateway, must, stub } from './fakes.js'
 
-// A finished child's log as tools/delegation_live_log.py writes it (lab run, 2026-10-17).
-const DONE = `=== Hermes subagent live transcript ===
-delegation: deleg_0074627c   task: 0
-goal: Survey the repository layout
-started: 2026-10-17 12:50:35
-(append-only; streams while the subagent runs — tail -f me)
-========================================
-12:50:35 user     | kickoff: Survey the repository layout
-12:50:35 start    | Survey the repository layout
-12:50:35 tool     | -> terminal(sleep 3 + 1 command)
-12:50:38 result   | terminal ok 3.2s: {"output": "lab", "exit_code": 0, "error": null}
-12:50:38 tool     | -> terminal(sleep 4 + 2 commands)
-12:50:43 result   | terminal ERROR 4.2s: boom
-12:50:44 think    | Wrapping up.
-12:50:44 assistant| Finished the delegated task.
-12:50:44 final    | status=completed duration=8.87s summary: Finished the delegated task.
-12:50:44 final    | end status=completed exit_reason=completed
-`
-
-describe('parseLiveLog', () => {
-  it('pairs each tool line with its result and reads the outcome', () => {
-    const log = parseLiveLog(DONE)
-
-    expect(log.entries.map(e => e.kind)).toEqual(['kickoff', 'tool', 'tool', 'think', 'assistant'])
-    expect(log.entries[1]).toMatchObject({ args: 'sleep 3 + 1 command', name: 'terminal', status: 'ok', took: 3200 })
-    expect(log.entries[2]).toMatchObject({ result: 'boom', status: 'error', took: 4200 })
-    expect(log).toMatchObject({ duration: 8.87, exitReason: 'completed', status: 'completed', summary: 'Finished the delegated task.' })
-  })
-
-  it('reads a tail that starts mid-line and leaves the last call running', () => {
-    const log = parseLiveLog('ut | kickoff: cut\n12:00:01 tool     | -> read_file(a.md)\n')
-
-    expect(log.entries).toEqual([{ args: 'a.md', at: '12:00:01', kind: 'tool', name: 'read_file', status: 'running' }])
-    expect(log.status).toBeUndefined()
-  })
-})
-
-describe('mergeTail', () => {
-  const line = (n: number) => `12:00:${String(n).padStart(2, '0')} think    | step ${n}\n`
-  const log = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => line(from + i)).join('')
-
-  it('appends what a later tail adds past the overlap', () => {
-    expect(mergeTail(log(1, 5), `ep 3\n${log(4, 8)}`)).toBe(log(1, 8))
-  })
-
-  it('keeps a gap when the log outgrew a tail, dropping the cut first line', () => {
-    expect(mergeTail(log(1, 2), `ep 6\n${log(7, 8)}`)).toBe(log(1, 2) + log(7, 8))
-  })
-})
-
 describe('subagent rows', () => {
   it('keeps a placeholder row and its node key when the owner names the child', () => {
     const list: Subagent[] = []
-    dispatchRows(list, { delegationId: 'deleg_1', goals: ['Read the docs'], ids: [], paths: [] }, 0)
+    dispatchRows(list, { delegationId: 'deleg_1', goals: ['Read the docs'], ids: [] }, 0)
     const [row] = list
 
     expect(row).toMatchObject({ id: 'task-0', key: 'p0' })
@@ -123,10 +70,13 @@ describe('completionOutcomes', () => {
 describe('Agents', () => {
   let store: Agents | undefined
 
-  afterEach(() => store?.dispose())
+  afterEach(() => {
+    store?.dispose()
+    vi.useRealTimers()
+  })
 
-  /** A transcript holding one dispatched delegate_task call whose children log to `paths`. */
-  function dispatched(paths: string[]) {
+  /** A transcript holding one dispatched delegate_task call of `n` children. */
+  function dispatched(n: number) {
     const transcript = new Transcript()
     transcript.messageStart(0)
     transcript.toolStart(stub({ name: 'delegate_task', tool_id: 'c1' }), 0)
@@ -135,11 +85,10 @@ describe('Agents', () => {
         name: 'delegate_task',
         result: {
           delegation_id: 'deleg_1',
-          goals: paths.map((_, i) => `goal ${i}`),
-          live_transcripts: paths,
+          goals: Array.from({ length: n }, (_, i) => `goal ${i}`),
           mode: 'background',
           status: 'dispatched',
-          subagent_ids: paths.map((_, i) => `sa-${i}-abcd`)
+          subagent_ids: Array.from({ length: n }, (_, i) => `sa-${i}-abcd`)
         },
         tool_id: 'c1'
       }),
@@ -149,72 +98,117 @@ describe('Agents', () => {
     return transcript
   }
 
-  it('turns a dispatched call into rows that finish from their logs', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'hermes-tern-agents-'))
-    const path = join(dir, 'task-0.log')
-    await writeFile(path, DONE)
-    const transcript = dispatched([path])
-    const gw = stub<GatewayClient>({ request: async () => ({ subagents: [] }) })
-    let changes = 0
-    store = new Agents({ changed: () => changes++, gw, sid: liveSessionId('s1'), transcript })
+  /** A child's stored rows as `session.transcript` serves them. */
+  const ROWS = [
+    { role: 'user', row_kind: 'message', text: 'goal 0', timestamp: 100 },
+    { reasoning: 'Look first.', role: 'assistant', row_kind: 'message', text: '', timestamp: 101 },
+    { context: 'sleep 3 + 1 command', name: 'terminal', role: 'tool', row_kind: 'message', timestamp: 104.5 },
+    { role: 'assistant', row_kind: 'message', text: 'Finished.', timestamp: 105 }
+  ]
 
-    store.scan()
-    const [agent] = store.all()
-
-    expect(agent).toMatchObject({ delegationId: 'deleg_1', id: 'sa-0-abcd', logPath: path, status: 'queued' })
-
-    await store.refresh(must(agent))
-
-    expect(agent).toMatchObject({ duration: 8870, status: 'done', summary: 'Finished the delegated task.', toolCount: 2 })
-    expect(store.running()).toEqual([])
-    expect(changes).toBeGreaterThan(0)
-  })
-
-  it('counts a missing log against a child only while it runs, not while it is queued', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'hermes-tern-agents-'))
-    const path = join(dir, 'task-0.log')
-    const transcript = dispatched([path])
-    const gw = stub<GatewayClient>({ request: async () => ({ subagents: [] }) })
-    store = new Agents({ changed: () => undefined, gw, sid: liveSessionId('s1'), transcript })
+  it("reads the followed agent's stored transcript into its timeline, then stops once it ended and is caught up", async () => {
+    vi.useFakeTimers()
+    const pages = [
+      { available: true, next_cursor: 'c1', reset: true, rows: ROWS.slice(0, 2), running: true },
+      { available: true, next_cursor: 'c1', reset: false, rows: [], running: true },
+      { available: true, next_cursor: 'c2', reset: false, rows: ROWS.slice(2), running: false },
+      { available: true, next_cursor: 'c2', reset: false, rows: [], running: false }
+    ]
+    const gw = new FakeGateway({ replies: { 'session.transcript': () => pages.shift() } })
+    store = new Agents({ changed: () => undefined, gw: gw.client, sid: liveSessionId('s1'), transcript: dispatched(1) })
+    // An event-fed row: the store polls nothing but the followed transcript.
+    store.apply('subagent.start', { goal: 'goal 0', subagent_id: 'sa-0-abcd', task_count: 1, task_index: 0 })
     store.scan()
     const agent = must(store.all()[0])
 
-    // Behind the concurrency limit: no log yet, however many reads find none.
-    for (let i = 0; i < 5; i++) {
-      await store.refresh(agent)
-    }
+    store.follow(agent)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(agent.steps).toHaveLength(2)
+    expect(gw.sent('session.transcript')).toEqual([
+      { limit: 200, order: 'oldest', session_id: 's1', subagent_id: 'sa-0-abcd' },
+      { cursor: 'c1', limit: 200, order: 'oldest', session_id: 's1', subagent_id: 'sa-0-abcd' }
+    ])
 
-    await writeFile(path, DONE)
-    await store.refresh(agent)
-    expect(agent).toMatchObject({ logPath: path, status: 'done' })
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(agentSteps(agent)).toEqual([
+      { at: 100_000, kind: 'kickoff', text: 'goal 0' },
+      { at: 101_000, kind: 'think', text: 'Look first.' },
+      { args: 'sleep 3 + 1 command', at: 104_500, kind: 'tool', name: 'terminal', running: false },
+      { at: 105_000, kind: 'assistant', text: 'Finished.' }
+    ])
 
-    // A running child whose log never appears (written on another machine) is given up on.
-    const other = join(dir, 'task-1.log')
-    const ran = new Agents({ changed: () => undefined, gw, sid: liveSessionId('s1'), transcript: dispatched([other]) })
-    ran.scan()
-    const child = must(ran.all()[0])
-    child.status = 'running'
+    // Ended and caught up: no more reads.
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(gw.sent('session.transcript')).toHaveLength(4)
+  })
 
-    for (let i = 0; i < 3; i++) {
-      await ran.refresh(child)
-    }
+  it('reads progress for the four visible wait tiles without opening the hub', async () => {
+    vi.useFakeTimers()
+    const gw = new FakeGateway({ replies: {
+      'session.transcript': () => ({ available: true, next_cursor: null, reset: true, rows: ROWS, running: true })
+    } })
+    store = new Agents({ changed: () => undefined, gw: gw.client, sid: liveSessionId('s1'), transcript: dispatched(5) })
+    store.scan()
 
-    await writeFile(other, DONE)
-    await ran.refresh(child)
-    expect(child.status).toBe('running')
-    ran.dispose()
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(gw.sent('session.transcript').map(p => p['subagent_id'])).toEqual([
+      'sa-0-abcd', 'sa-1-abcd', 'sa-2-abcd', 'sa-3-abcd'
+    ])
+    expect(store.all().slice(0, 4).every(a => a.steps?.some(s => s.kind === 'assistant' && s.text === 'Finished.'))).toBe(true)
+    expect(store.all()[4]?.steps).toBeUndefined()
+  })
+
+  it('replaces the rows it holds on a reset, and shows the tool a running agent has not stored yet', async () => {
+    vi.useFakeTimers()
+    const pages = [
+      { available: true, next_cursor: 'c1', reset: true, rows: ROWS, running: true },
+      { available: true, next_cursor: 'c1', reset: false, rows: [], running: true },
+      { available: true, next_cursor: 'c9', reset: true, rows: ROWS.slice(0, 1), running: true }
+    ]
+    const gw = new FakeGateway({ replies: { 'session.transcript': () => pages.shift() ?? { available: true, next_cursor: 'c9', reset: false, rows: [], running: true } } })
+    store = new Agents({ changed: () => undefined, gw: gw.client, sid: liveSessionId('s1'), transcript: dispatched(1) })
+    store.apply('subagent.tool', { goal: 'goal 0', subagent_id: 'sa-0-abcd', task_count: 1, task_index: 0, tool_count: 2, tool_name: 'read_file', tool_preview: 'a.md' })
+    store.scan()
+    const agent = must(store.all()[0])
+
+    store.follow(agent)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(agent.steps).toHaveLength(4)
+    expect(agentSteps(agent).at(-1)).toMatchObject({ args: 'a.md', kind: 'tool', name: 'read_file', running: true })
+
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(agent.steps).toHaveLength(1)
+  })
+
+  it("publishes a parent the gateway does not hold live with one plain read, then reads the child", async () => {
+    let live = false
+    const gw = new FakeGateway({
+      replies: {
+        'session.transcript': params => {
+          if (!params['subagent_id']) {
+            live = true
+
+            return { next_cursor: null, reset: true, rows: [] }
+          }
+
+          if (!live) {
+            throw new JsonRpcGatewayError('not_found', { code: 4001, data: { reason: 'not_found' } })
+          }
+
+          return { available: true, next_cursor: 'c1', reset: true, rows: [], running: false }
+        }
+      }
+    })
+    store = new Agents({ changed: () => undefined, gw: gw.client, sid: liveSessionId('s1'), transcript: dispatched(1) })
+    store.scan()
+    store.follow(must(store.all()[0]))
+
+    await vi.waitFor(() => expect(gw.sent('session.transcript')).toHaveLength(3))
+    expect(gw.sent('session.transcript').map(p => p['subagent_id'] ?? null)).toEqual(['sa-0-abcd', null, 'sa-0-abcd'])
   })
 
   it('finds a resumed session\'s running children, whose dispatch result the history dropped', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'hermes-tern-home-'))
-    const dir = join(home, 'cache', 'delegation', 'live', 'deleg_9')
-    const path = join(dir, 'task-1.log')
-    await mkdir(dir, { recursive: true })
-    await writeFile(path, '12:00:01 tool     | -> read_file(a.md)\n')
-    await writeFile(join(dir, 'manifest.json'), JSON.stringify({ tasks: [{ index: 0 }, { index: 1, log: path }] }))
-    const before = process.env['HERMES_HOME']
-    process.env['HERMES_HOME'] = home
-
     // The display projection: a delegate_task row with its args and no result.
     const transcript = new Transcript()
     transcript.load(stub([
@@ -226,24 +220,19 @@ describe('Agents', () => {
         tool_call_id: 'c1'
       }
     ]))
-    const row = { delegation_id: 'deleg_9', depth: 0, goal: 'Survey the layout', status: 'running', subagent_id: 'sa-1-beef', tool_count: 2 }
+    const row = { delegation_id: 'deleg_9', depth: 0, goal: 'Survey the layout', last_tool: 'read_file', status: 'running', subagent_id: 'sa-1-beef', tool_count: 2 }
     const request = vi.fn(async (method: string) => (method === 'subagent.list' ? { subagents: [row] } : {}))
     let changes = 0
     store = new Agents({ changed: () => changes++, gw: stub<GatewayClient>({ request }), sid: liveSessionId('s1'), transcript })
 
-    try {
-      store.scan()
-      await vi.waitFor(() => expect(must(store).running()).toHaveLength(1))
-    } finally {
-      process.env['HERMES_HOME'] = before
-    }
+    store.scan()
+    await vi.waitFor(() => expect(must(store).running()).toHaveLength(1))
 
     const [agent] = store.running()
 
     expect(request).toHaveBeenCalledWith('subagent.list', { session_id: 's1' })
-    expect(agent).toMatchObject({ delegationId: 'deleg_9', depth: 0, id: 'sa-1-beef', index: 1, logPath: path, status: 'running' })
+    expect(agent).toMatchObject({ delegationId: 'deleg_9', depth: 0, id: 'sa-1-beef', index: 1, status: 'running', tool: 'read_file', toolCount: 2 })
     expect(must(transcript.delegations()[0]).subagents).toEqual([agent])
-    await vi.waitFor(() => expect(must(agent).tool).toBe('read_file'))
     expect(changes).toBeGreaterThan(0)
   })
 
@@ -401,51 +390,10 @@ describe('Agents', () => {
     })
   })
 
-  describe('reading a log file', () => {
-    it("reads a log that was not there yet once it is: a missing file is 'not yet'", async () => {
-      const dir = await mkdtemp(join(tmpdir(), 'hermes-tern-agents-'))
-      const path = join(dir, 'task-0.log')
-
-      expect(await readLogFile(path, undefined)).toEqual({ kind: 'notYet' })
-
-      const agents = new Agents({ changed: () => undefined, gw: new FakeGateway().client, sid: liveSessionId('s1'), transcript: dispatched([path]) })
-      store = agents
-      agents.scan()
-      const agent = must(agents.all()[0])
-
-      await agents.refresh(agent)
-      expect(agent.log).toBeUndefined()
-
-      await writeFile(path, DONE)
-      await agents.refresh(agent)
-      expect(agent).toMatchObject({ status: 'done', summary: 'Finished the delegated task.' })
-    })
-
-    it('tells a log this process may not read apart from one that is not there, and one that did not grow', async () => {
-      const dir = await mkdtemp(join(tmpdir(), 'hermes-tern-agents-'))
-      const path = join(dir, 'task-0.log')
-      await writeFile(path, DONE)
-
-      expect(await readLogFile(path, undefined)).toMatchObject({ kind: 'ok', size: Buffer.byteLength(DONE) })
-      expect(await readLogFile(path, Buffer.byteLength(DONE))).toEqual({ kind: 'same' })
-
-      await chmod(path, 0)
-
-      try {
-        // Root reads it anyway; any other user may not.
-        if (process.getuid?.() !== 0) {
-          expect(await readLogFile(path, undefined)).toMatchObject({ error: expect.objectContaining({ code: 'EACCES' }), kind: 'unreadable' })
-        }
-      } finally {
-        await chmod(path, 0o644)
-      }
-    })
-  })
-
-  describe('with no log this process can read (a remote gateway)', () => {
+  describe('rows no event reached', () => {
     afterEach(() => vi.useRealTimers())
 
-    /** A dispatched call of `n` background tasks whose logs are not on this machine. */
+    /** A dispatched call of `n` background tasks. */
     function remote(n: number) {
       const transcript = new Transcript()
       transcript.messageStart(0)
@@ -503,22 +451,18 @@ describe('Agents', () => {
       expect(agentEnded).toHaveBeenCalledTimes(2)
     })
 
-    it('does not call a child that left the list Done, and merges its log tails', async () => {
+    it('does not call a child that left the list Done: the completion says how it ended', async () => {
       vi.useFakeTimers()
       let listed = true
-      const tails = ['12:00:01 tool     | -> read_file(a.md)\n', 'md)\n12:00:01 tool     | -> read_file(a.md)\n12:00:02 think    | next\n']
-      const request = vi.fn(async (method: string) =>
-        method === 'subagent.list'
-          ? { subagents: listed ? [{ delegation_id: 'deleg_1', depth: 0, status: 'running', subagent_id: 'sa-0-abcd' }] : [] }
-          : { available: true, text: tails.shift() ?? '', truncated: true }
-      )
+      const request = vi.fn(async () => ({
+        subagents: listed ? [{ delegation_id: 'deleg_1', depth: 0, last_tool: 'read_file', status: 'running', subagent_id: 'sa-0-abcd' }] : []
+      }))
       store = new Agents({ changed: () => undefined, gw: stub<GatewayClient>({ request }), sid: liveSessionId('s1'), transcript: remote(1) })
 
       store.scan()
       await vi.advanceTimersByTimeAsync(1000)
       const [agent] = store.all()
-      expect(must(agent).status).toBe('running')
-      expect(must(agent).log?.entries.map(e => e.kind)).toEqual(['tool', 'think'])
+      expect(agent).toMatchObject({ status: 'running', tool: 'read_file' })
 
       listed = false
       await vi.advanceTimersByTimeAsync(1000)

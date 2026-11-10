@@ -265,7 +265,7 @@ describe('LSP file hrefs through the typed tool registry', () => {
 })
 
 // Drive the real App -> frame -> transcript -> work log -> tool registry, with fake I/O only.
-vi.mock('@tui/lib/history.js', () => ({ append: () => undefined, load: () => [] }))
+vi.mock('@hermes/shared/prompt-history', () => ({ append: () => undefined, load: () => [] }))
 
 const sshVariables = ['SSH_CONNECTION', 'SSH_CLIENT', 'SSH_TTY'] as const
 const previousHome = process.env['HERMES_HOME']

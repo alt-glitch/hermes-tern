@@ -6,11 +6,11 @@ import { HOLD_UNAVAILABLE, isHoldInfoKey } from '../voice/hold.js'
 import { setup } from './appSetup.js'
 import { key } from './fakes.js'
 
-vi.mock('@tui/lib/history.js', () => ({ append: () => undefined, load: () => [] }))
+vi.mock('@hermes/shared/prompt-history', () => ({ append: () => undefined, load: () => [] }))
 
 beforeEach(() => {
-  delete process.env['HERMES_TUI_QUERY']
-  delete process.env['HERMES_TUI_IMAGE']
+  delete process.env['HERMES_TERN_QUERY']
+  delete process.env['HERMES_TERN_IMAGE']
 })
 
 describe('real PTT release capability gate', () => {

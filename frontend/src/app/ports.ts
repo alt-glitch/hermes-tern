@@ -3,11 +3,10 @@
 // imports App, and App is the one place that implements them all. The names are the ones the
 // ports keep: a later package changes what stands behind a port, not the code that reads it.
 
+import type { GatewayClient } from '@hermes/shared/gateway-client'
 import type { Usage } from '@hermes/shared/gateway-events'
+import type { SessionInfo } from '@hermes/shared/gateway-types'
 import type { ScrollTo } from '@stencil-hq/tern'
-
-import type { GatewayClient } from '@tui/gatewayClient.js'
-import type { SessionInfo } from '@tui/types.js'
 
 import type { Agents } from '../agents/store.js'
 import type { BtwThreads } from '../btw.js'

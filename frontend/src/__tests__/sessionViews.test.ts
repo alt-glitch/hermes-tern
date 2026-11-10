@@ -1,5 +1,4 @@
-// SessionViews owns this pane's subscriptions: adopting ids, leaving on shared/private
-// gateways, serialising detach for one session, and releasing superseded switches.
+// SessionViews owns this pane's subscriptions: adopting ids, leaving via the gateway, serialising detach for one session, and releasing superseded switches.
 // Exercise it with the in-process gateway only; no App, network, or user profile.
 import { describe, expect, it } from 'vitest'
 
@@ -38,7 +37,7 @@ describe('SessionViews', () => {
   })
 
   it('leave_canonical', async () => {
-    const gw = new FakeGateway({ canonical: true })
+    const gw = new FakeGateway()
     const views = new SessionViews(gw.client)
     views.adopt(snapshot)
 
@@ -60,7 +59,7 @@ describe('SessionViews', () => {
   })
 
   it('leave_noSubscription', async () => {
-    const gw = new FakeGateway({ canonical: true })
+    const gw = new FakeGateway()
     const views = new SessionViews(gw.client)
     views.adopt({ session_id: 's1', stored_session_id: 'db1' })
 
@@ -79,32 +78,33 @@ describe('SessionViews', () => {
     expect(gw.calls).toEqual([])
   })
 
-  it('leave_private', async () => {
-    const gw = new FakeGateway({ canonical: false })
+  it('leave_detaches_without_closing_the_session', async () => {
+    const gw = new FakeGateway()
     const views = new SessionViews(gw.client)
-    views.adopt({ session_id: 's1', stored_session_id: 'db1' })
+    views.adopt(snapshot)
 
     await views.leave(liveSessionId('s1'), 'tui_close')
 
-    expect(gw.sent('session.close')).toEqual([{ session_id: 's1' }])
-    expect(gw.sent('session.detach')).toEqual([])
+    expect(gw.sent('session.close')).toEqual([])
+    expect(gw.sent('session.detach')).toEqual([{ end_reason: 'tui_close', session_id: 's1', subscription_id: 'sub1' }])
   })
 
-  it('leave_private_errorSwallowed', async () => {
-    const gw = new FakeGateway({ canonical: false })
-    gw.handlers.set('session.close', () => {
-      throw new Error('already closed')
+  it('leave_errorSwallowed', async () => {
+    const gw = new FakeGateway()
+    gw.handlers.set('session.detach', () => {
+      throw new Error('already detached')
     })
     const views = new SessionViews(gw.client)
+    views.adopt(snapshot)
 
     await expect(views.leave(liveSessionId('s1'), 'tui_close')).resolves.toBeUndefined()
 
-    expect(gw.sent('session.close')).toEqual([{ session_id: 's1' }])
-    expect(gw.sent('session.detach')).toEqual([])
+    expect(gw.sent('session.close')).toEqual([])
+    expect(gw.sent('session.detach')).toEqual([{ end_reason: 'tui_close', session_id: 's1', subscription_id: 'sub1' }])
   })
 
   it('leaveAll', async () => {
-    const gw = new FakeGateway({ canonical: true })
+    const gw = new FakeGateway()
     const views = new SessionViews(gw.client)
     views.adopt(snapshot)
     views.adopt({ session_id: 's2', stored_session_id: 'db2', subscription_id: 'sub2' })
@@ -118,8 +118,8 @@ describe('SessionViews', () => {
     expect(gw.sent('session.close')).toEqual([])
   })
 
-  it('leaveAll_privateSendsNothing', async () => {
-    const gw = new FakeGateway({ canonical: false })
+  it('leaveAll_withoutSubscriptionsSendsNothing', async () => {
+    const gw = new FakeGateway()
     const views = new SessionViews(gw.client)
     views.adopt({ session_id: 's1', stored_session_id: 'db1' })
     views.adopt({ session_id: 's2', stored_session_id: 'db2' })
@@ -218,7 +218,7 @@ describe('SessionViews', () => {
   })
 
   it('release_detachesOthers', async () => {
-    const gw = new FakeGateway({ canonical: true })
+    const gw = new FakeGateway()
     const views = new SessionViews(gw.client)
     views.superseded({ session_id: 's4', subscription_id: 'sub4' })
 
@@ -230,7 +230,7 @@ describe('SessionViews', () => {
   })
 
   it('release_noSubscription', async () => {
-    const gw = new FakeGateway({ canonical: true })
+    const gw = new FakeGateway()
     const views = new SessionViews(gw.client)
     views.superseded({ session_id: 's4' })
 
@@ -240,22 +240,22 @@ describe('SessionViews', () => {
     expect(gw.calls).toEqual([])
   })
 
-  it('release_private', async () => {
-    const gw = new FakeGateway({ canonical: false })
+  it('release_detachesSupersededSubscription', async () => {
+    const gw = new FakeGateway()
     const views = new SessionViews(gw.client)
-    views.superseded({ session_id: 's5' })
+    views.superseded({ session_id: 's5', subscription_id: 'sub5' })
 
     views.release(liveSessionId('s1'))
     await flush()
 
-    expect(gw.sent('session.close')).toEqual([{ session_id: 's5' }])
-    expect(gw.sent('session.detach')).toEqual([])
+    expect(gw.sent('session.close')).toEqual([])
+    expect(gw.sent('session.detach')).toEqual([{ session_id: 's5', subscription_id: 'sub5' }])
   })
 
-  it('release_private_skipsShown', async () => {
-    const gw = new FakeGateway({ canonical: false })
+  it('release_skipsShownSubscription', async () => {
+    const gw = new FakeGateway()
     const views = new SessionViews(gw.client)
-    views.superseded({ session_id: 's5' })
+    views.superseded({ session_id: 's5', subscription_id: 'sub5' })
 
     views.release(liveSessionId('s5'))
     await flush()
@@ -263,18 +263,19 @@ describe('SessionViews', () => {
     expect(gw.calls).toEqual([])
   })
 
-  it('release_private_errorSwallowed', async () => {
-    const gw = new FakeGateway({ canonical: false })
-    gw.handlers.set('session.close', () => {
+  it('release_errorSwallowed', async () => {
+    const gw = new FakeGateway()
+    gw.handlers.set('session.detach', () => {
       throw new Error('already gone')
     })
     const views = new SessionViews(gw.client)
-    views.superseded({ session_id: 's5' })
+    views.superseded({ session_id: 's5', subscription_id: 'sub5' })
 
     views.release(null)
     await flush()
 
-    expect(gw.sent('session.close')).toEqual([{ session_id: 's5' }])
+    expect(gw.sent('session.detach')).toEqual([{ session_id: 's5', subscription_id: 'sub5' }])
+    expect(gw.sent('session.close')).toEqual([])
   })
 
   it('release_clearsStale', async () => {

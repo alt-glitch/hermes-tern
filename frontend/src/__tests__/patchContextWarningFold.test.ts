@@ -17,7 +17,7 @@ import { call } from './toolFixtures.js'
 const tool = (id: string, c: ToolCall): Extract<Block, { kind: 'tool' }> => ({ kind: 'tool', id: entryId(id), call: c })
 const text = (id: string): Block => ({ kind: 'text', id: entryId(id), text: id })
 const turn = (blocks: Block[]): TurnEntry => ({ kind: 'turn', id: entryId('turn'), rev: 0, startedAt: 0, end: { status: 'done', endedAt: 1000 }, blocks })
-const cx: TranscriptContext = { copy: () => undefined, now: 1000, welcome: { tip: '', version: '' } }
+const cx: TranscriptContext = { copy: () => undefined, now: 1000, welcome: { version: '' } }
 const nodes = (root: NodeJson): NodeJson[] => [root, ...(root.c ?? []).flatMap(nodes)]
 
 function payload(): Record<string, unknown> {
@@ -99,7 +99,7 @@ describe('patch context warning visibility in work', () => {
     const args = record(p['args'])
     if (!args) throw new Error('missing args')
     let n = 0
-    const replay = (content?: string) => history({ kept: [], compactions: [], id: prefix => entryId(`${prefix}${++n}`), messages: [
+    const replay = (content?: string) => history({ kept: [], id: prefix => entryId(`${prefix}${++n}`), messages: [
       { role: 'tool', name: 'patch', tool_call_id: 'patch-warning', args, ...(content ? { content } : {}) },
       { role: 'assistant', text: 'answer' }
     ] }).find(e => e.kind === 'turn')

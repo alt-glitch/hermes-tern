@@ -1,7 +1,7 @@
 import { type Op, type Surface, type TspEvent } from '@stencil-hq/tern'
 import { describe, expect, it, vi } from 'vitest'
 
-import { entryId, subagentId, subagentKey, toolCallId } from '../core/ids.js'
+import { entryId, subagentKey, toolCallId } from '../core/ids.js'
 import { transcriptContext, type FrameCx } from '../app/frame.js'
 import type { Entry, TurnEntry } from '../model.js'
 import { Transcript } from '../transcript/store.js'
@@ -15,7 +15,7 @@ const defaultCopy = vi.fn()
 const context = (copy = defaultCopy): TranscriptContext => ({
   copy,
   now: 1_000,
-  welcome: { tip: 'A tip', version: 'v1' }
+  welcome: { version: 'v1' }
 })
 
 function history(turns: number): Entry[] {
@@ -122,7 +122,7 @@ describe('retained long-session transcript', () => {
         id: toolCallId('delegate'), name: 'delegate_task', args: {}, argsText: '', context: '',
         outcome: { kind: 'done', duration: 10 }, startedAt: 1, via: { kind: 'direct' },
         subagents: [{
-          id: subagentId('child'), key: subagentKey('child'), goal: 'inspect', index: 0, name: 'Agent 1',
+          id: 'child', key: subagentKey('child'), goal: 'inspect', index: 0, name: 'Agent 1',
           status: 'failed', toolCount: 0, tokens: 0, calls: 0, startedAt: 1
         }]
       },
@@ -425,12 +425,12 @@ describe('retained long-session transcript', () => {
     expect(transcript.changedEntries.size).toBe(0)
   })
 
-  it('refreshes a late backend version and tip without rebuilding evicted history', () => {
+  it('refreshes a late backend version and logo without rebuilding evicted history', () => {
     const entries: Entry[] = [{ id: entryId('welcome'), kind: 'welcome' }, ...history(25)]
     const h = harness()
     const session = { info: { version: '1.0' }, ref: { live: null } }
     const frame = stub<Pick<FrameCx, 'session' | 'copies' | 'welcome'>>({
-      session, copies: { copy: defaultCopy }, welcome: { version: '', tip: 'First tip' }
+      session, copies: { copy: defaultCopy }, welcome: { version: '' }
     })
     h.paint(entries, transcriptContext(frame, 1_000))
     h.gone(['main.u0', 'main.t0'])
@@ -439,11 +439,16 @@ describe('retained long-session transcript', () => {
 
     // Session.info can arrive after welcome was first projected.
     session.info.version = '2.0'
-    frame.welcome.tip = 'Updated tip'
     h.paint(entries, transcriptContext(frame, 1_001))
     const diff = h.since(before)
     expect(JSON.stringify(diff)).toContain('v2.0')
-    expect(JSON.stringify(diff)).toContain('Updated tip')
+    const beforeLogo = h.ops().length
+    frame.welcome.logo = 'uploaded-logo'
+    h.paint(entries, transcriptContext(frame, 1_002))
+    const logoDiff = h.since(beforeLogo)
+    expect(JSON.stringify(logoDiff)).toContain('uploaded-logo')
+    expect(logoDiff.some(op => op[0] === 'add' && (op[1] === 'main.u0' || op[1] === 'main.t0'))).toBe(false)
+    expect(logoDiff.some(op => op[0] === 'del' && (op[1] === 'main.u0' || op[1] === 'main.t0'))).toBe(false)
     expect(diff.some(op => op[0] === 'add' && (op[1] === 'main.u0' || op[1] === 'main.t0'))).toBe(false)
     expect(diff.some(op => op[0] === 'del' && (op[1] === 'main.u0' || op[1] === 'main.t0'))).toBe(false)
   })

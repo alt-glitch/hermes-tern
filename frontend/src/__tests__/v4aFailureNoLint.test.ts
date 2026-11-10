@@ -21,7 +21,7 @@ const args = { mode: 'patch', patch: '*** Begin Patch\n*** End Patch' }
 const make = (result: unknown, more: Partial<ToolCall> = {}) => call('patch', args, { result, outcome: { kind: 'error', duration: 1 }, ...more })
 const tool = (id: string, c: ToolCall): Block => ({ kind: 'tool', id: entryId(id), call: c })
 const turn = (blocks: Block[]): TurnEntry => ({ kind: 'turn', id: entryId('turn'), rev: 0, startedAt: 0, end: { status: 'done', endedAt: 1000 }, blocks })
-const cx: TranscriptContext = { copy: () => undefined, now: 1000, welcome: { tip: '', version: '' } }
+const cx: TranscriptContext = { copy: () => undefined, now: 1000, welcome: { version: '' } }
 const nodes = (root: NodeJson): NodeJson[] => [root, ...(root.c ?? []).flatMap(nodes)]
 const errorNodes = (roots: NodeJson[]) => roots.flatMap(nodes).filter(n => n.p?.['role'] === 'omp.tool.error')
 
@@ -61,7 +61,7 @@ describe('V4A apply failures without retained lint errors', () => {
       const replayArgs = record(payload['args'])
       if (!replayArgs) throw new Error('missing replay args')
       let n = 0
-      const replay = history({ kept: [], compactions: [], id: p => entryId(`${p}${++n}`), messages: [
+      const replay = history({ kept: [], id: p => entryId(`${p}${++n}`), messages: [
         { role: 'tool', name: 'patch', tool_call_id: 'replay', args: replayArgs, content: String(payload['result']) },
         { role: 'assistant', text: 'answer' }
       ] })
