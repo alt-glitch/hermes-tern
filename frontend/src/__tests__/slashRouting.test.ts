@@ -2,19 +2,13 @@ import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 
 import { storedSessionId } from '../core/ids.js'
 
 import { FakeGateway, fakeTern, stubOverlay } from './fakes.js'
 
 process.env['HERMES_HOME'] = mkdtempSync(join(tmpdir(), 'hermes-tern-slash-'))
-
-vi.mock('../hermes/sessionIndex.js', async importOriginal => ({
-  ...(await importOriginal<typeof import('../hermes/sessionIndex.js')>()),
-  lastReply: () => '',
-  storedSessions: () => []
-}))
 
 const { App } = await import('../app/chat.js')
 

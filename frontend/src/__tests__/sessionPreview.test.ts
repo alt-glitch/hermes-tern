@@ -1,7 +1,7 @@
 import type { NodeJson } from '@stencil-hq/tern'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { StoredSession } from '../hermes/sessionIndex.js'
+import type { ListedSession } from '../hermes/sessionList.js'
 import type { PreviewRow, TranscriptPage, TranscriptReader } from '../hermes/sessionTranscript.js'
 import { MORE, sessionDetail } from '../overlays/sessions/detail.js'
 import { type Preview, PreviewLoader } from '../overlays/sessions/preview.js'
@@ -16,15 +16,10 @@ function fakeReader(pages: Record<number, TranscriptPage> = { 0: { next: null, r
   const reads: string[] = []
   const state = { fail: false }
   const reader: TranscriptReader = {
-    ends: id => {
-      reads.push(`ends ${id}`)
-
-      return state.fail ? Promise.reject(new Error('locked')) : Promise.resolve({ firstPrompt: `first of ${id}`, lastReply: `last of ${id}` })
-    },
     page: (id, after) => {
       reads.push(`page ${id} ${after}`)
 
-      return Promise.resolve(must(pages[after], `page ${after}`))
+      return state.fail ? Promise.reject(new Error('locked')) : Promise.resolve(must(pages[after], `page ${after}`))
     }
   }
 
@@ -57,8 +52,8 @@ describe('PreviewLoader', () => {
     await vi.advanceTimersByTimeAsync(1)
     await flush()
 
-    expect(reads).toEqual(['ends b', 'page b 0'])
-    expect(loader.get('b')).toMatchObject({ ends: { lastReply: 'last of b' }, next: null, status: 'ready' })
+    expect(reads).toEqual(['page b 0'])
+    expect(loader.get('b')).toMatchObject({ next: null, status: 'ready' })
     expect(loader.get('a')).toBeUndefined()
   })
 
@@ -73,7 +68,7 @@ describe('PreviewLoader', () => {
     loader.select('a')
     await vi.advanceTimersByTimeAsync(50)
 
-    expect(reads).toEqual(['ends a', 'page a 0', 'ends b', 'page b 0'])
+    expect(reads).toEqual(['page a 0', 'page b 0'])
   })
 
   it('shows loading, then the error; selecting the session again retries', async () => {
@@ -93,7 +88,7 @@ describe('PreviewLoader', () => {
     await vi.advanceTimersByTimeAsync(10)
 
     expect(loader.get('a')?.status).toBe('ready')
-    expect(reads.filter(r => r === 'ends a')).toHaveLength(2)
+    expect(reads.filter(r => r === 'page a 0')).toHaveLength(2)
   })
 
   it('reads the next page on request, one at a time, without rows it already holds, and stops at the end', async () => {
@@ -175,9 +170,9 @@ describe('list rows', () => {
 
 const ID = 'local-c17b6fd5a5334f0e9d1c2b3a4f5e6d7c8b9a0f1e'
 
-const session: StoredSession = {
-  branch: 'main', cwd: '/w/app', id: ID, lastActive: 1_000, messages: 12, model: 'm', pinned: false,
-  preview: 'the first prompt, cut at 400', repoRoot: '/w/app', source: 'tui', startedAt: 500, title: 'Fix CI'
+const session: ListedSession = {
+  branch: 'main', conversation: ID, cwd: '/w/app', id: ID, lastActive: 1_000, lastReply: 'the last reply', messages: 12, model: 'm',
+  pinned: false, preview: 'the first prompt', running: false, source: 'tui', startedAt: 500, title: 'Fix CI', workspace: '/w/app'
 }
 
 /** Every text a node tree shows: `text` props and span texts. */
@@ -193,13 +188,12 @@ function texts(n: NodeJson): string[] {
 }
 
 function pane(preview: Preview | undefined, focused?: string) {
-  const d = sessionDetail({ copied: false, focus: () => {}, focused, isCurrent: false, more: () => {}, now: 2_000, preview, running: false, session })
+  const d = sessionDetail({ copied: false, focus: () => {}, focused, isCurrent: false, more: () => {}, now: 2_000, preview, session })
 
   return { blocks: d.blocks, json: d.nodes.map(tree), text: d.nodes.map(tree).flatMap(texts).join('\n') }
 }
 
 const ready = (rows: PreviewRow[], next: number | null): Preview => ({
-  ends: { firstPrompt: 'the whole first prompt', lastReply: 'the whole last reply' },
   loadingMore: false,
   next,
   rows,
@@ -215,15 +209,11 @@ describe('the preview pane', () => {
     expect(text).not.toMatch(/local-c17b6fd5a533[^\n]*…/)
   })
 
-  it('shows the first prompt and last reply whole once loaded, the listed prompt before', () => {
-    expect(pane(undefined).text).toContain('the first prompt, cut at 400')
+  it('shows the listed first prompt and last reply before the conversation loads', () => {
+    expect(pane(undefined).text).toContain('the first prompt')
+    expect(pane(undefined).text).toContain('the last reply')
     expect(pane(undefined).text).toContain('Loading the conversation…')
-
-    const loaded = pane(ready([], null)).text
-
-    expect(loaded).toContain('the whole first prompt')
-    expect(loaded).toContain('the whole last reply')
-    expect(loaded).toContain('No messages.')
+    expect(pane(ready([], null)).text).toContain('No messages.')
   })
 
   it('lists the conversation as blocks, a tool call on one line, and a Load more block while pages remain', () => {

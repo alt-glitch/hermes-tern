@@ -24,12 +24,6 @@ vi.mock('../overlays/pullRequests.js', async importOriginal => ({
   ...(await importOriginal<typeof import('../overlays/pullRequests.js')>()),
   openUrl: (url: string) => void browsed.push(url)
 }))
-vi.mock('../hermes/sessionIndex.js', async importOriginal => ({
-  ...(await importOriginal<typeof import('../hermes/sessionIndex.js')>()),
-  lastReply: () => '',
-  storedSessions: () => []
-}))
-
 const { App } = await import('../app/chat.js')
 const { ownsCard } = await import('../view/workLogModel.js')
 const { toolNode } = await import('../view/tools/shell.js')

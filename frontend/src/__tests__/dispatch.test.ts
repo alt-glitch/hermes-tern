@@ -46,12 +46,6 @@ vi.mock('../gateway/dispatch.js', async importOriginal => {
   }
 })
 vi.mock('@hermes/shared/prompt-history', () => ({ append: () => undefined, load: () => [] }))
-vi.mock('../hermes/sessionIndex.js', async importOriginal => ({
-  ...(await importOriginal<typeof import('../hermes/sessionIndex.js')>()),
-  lastReply: () => '',
-  storedSessions: () => []
-}))
-
 const home = mkdtempSync(join(tmpdir(), 'hermes-tern-dispatch-'))
 process.env['HERMES_HOME'] = home
 

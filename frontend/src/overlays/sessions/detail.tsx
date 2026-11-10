@@ -9,7 +9,7 @@ import { launchEnv } from '../../config/env.js'
 import { optional } from '../../core/assert.js'
 import { toolCallId } from '../../core/ids.js'
 import { clip } from '../../core/text.js'
-import { sessionLabel, type StoredSession } from '../../hermes/sessionIndex.js'
+import { type ListedSession, sessionLabel } from '../../hermes/sessionList.js'
 import type { PreviewRow } from '../../hermes/sessionTranscript.js'
 import { ageShort, homeTilde } from '../../view/format.js'
 import { hubIconOf } from '../../view/tools/registry.js'
@@ -24,11 +24,10 @@ const MESSAGE_MAX = 6000
 
 /** What the pane shows of one session. */
 export interface DetailInput {
-  session: StoredSession
+  session: ListedSession
   preview: Preview | undefined
   now: number
   isCurrent: boolean
-  running: boolean
   /** The focused block's key, when the preview has the keys. */
   focused?: string | undefined
   /** The id was copied a moment ago. */
@@ -67,10 +66,8 @@ export function sessionDetail(d: DetailInput): Detail {
     )
   }
 
-  const ends = preview?.ends
-  const failed = preview?.status === 'error'
-  const first = ends?.firstPrompt || s.preview
-  const reply = ends ? ends.lastReply : undefined
+  const first = s.preview
+  const reply = s.lastReply
 
   const nodes: JSX.Element[] = [
     <text key="title" role="omp.picker.title" text={sessionLabel(s)} wrap="word" />,
@@ -96,7 +93,7 @@ export function sessionDetail(d: DetailInput): Detail {
       <text key="head" spans={[{ s: 'muted strong', t: 'Last reply' }]} />,
       reply
         ? <md key="text" role="hermes.sessions.reply" text={reply} />
-        : <text key="text" spans={[{ s: 'dim', t: reply === undefined && !failed ? 'Loading…' : 'No reply yet.' }]} />
+        : <text key="text" spans={[{ s: 'dim', t: 'No reply yet.' }]} />
     ]),
     <rule key="tx" label="Conversation" />
   ]
@@ -128,10 +125,10 @@ export function sessionDetail(d: DetailInput): Detail {
   return { blocks, nodes }
 }
 
-function overview(s: StoredSession, d: Pick<DetailInput, 'isCurrent' | 'now' | 'running'>) {
+function overview(s: ListedSession, d: Pick<DetailInput, 'isCurrent' | 'now'>) {
   const status: Span[] | undefined = d.isCurrent
     ? [{ s: 'success', t: 'open here' }]
-    : d.running
+    : s.running
       ? [{ s: 'accent', t: 'running in another pane' }]
       : undefined
 

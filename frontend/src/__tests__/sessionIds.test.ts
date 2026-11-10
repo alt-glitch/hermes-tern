@@ -27,12 +27,6 @@ vi.mock('../github/links.js', async importOriginal => ({
   ...(await importOriginal<typeof import('../github/links.js')>()),
   storedLinks: spy.links
 }))
-vi.mock('../hermes/sessionIndex.js', async importOriginal => ({
-  ...(await importOriginal<typeof import('../hermes/sessionIndex.js')>()),
-  lastReply: () => '',
-  storedSessions: () => []
-}))
-
 const { App } = await import('../app/chat.js')
 
 /** A session the gateway creates: runtime id `live-N`, and stored id `stored-N` unless `stored` is false. */

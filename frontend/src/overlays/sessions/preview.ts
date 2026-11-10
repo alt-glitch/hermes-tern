@@ -1,15 +1,13 @@
-// The session picker's preview loader: the selected session's first prompt, last reply and the
-// first page of its transcript, read once the selection rests (arrowing through the list reads
+// The session picker's preview loader: the first page of the selected session's transcript, read once the selection rests (arrowing through the list reads
 // nothing), kept per session while the picker is open, and the next page read on request (the
 // preview reaching the end of what it holds). One read of a session runs at a time.
 
 import { errorText } from '../../core/errors.js'
-import type { PreviewRow, SessionEnds, TranscriptReader } from '../../hermes/sessionTranscript.js'
+import type { PreviewRow, TranscriptReader } from '../../hermes/sessionTranscript.js'
 
 /** One session's preview as loaded so far. */
 export interface Preview {
   status: 'error' | 'loading' | 'ready'
-  ends?: SessionEnds | undefined
   rows: PreviewRow[]
   /** The cursor of the next page; null at the end, or before the first page. */
   next: number | null
@@ -102,9 +100,8 @@ export class PreviewLoader {
     this.#changed()
 
     try {
-      const [ends, page] = await Promise.all([this.#reader.ends(id), this.#reader.page(id, 0, this.#pageSize)])
+      const page = await this.#reader.page(id, 0, this.#pageSize)
 
-      entry.ends = ends
       entry.status = 'ready'
       entry.next = page.next
       this.#keep(entry, page.rows)

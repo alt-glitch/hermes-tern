@@ -12,17 +12,6 @@ import { FakeGateway, fakeTern, given, key, must, stubOverlay } from './fakes.js
 
 process.env['HERMES_HOME'] = mkdtempSync(join(tmpdir(), 'hermes-tern-lifecycle-'))
 
-// The picker reads state.db; here it lists one other session.
-vi.mock('../hermes/sessionIndex.js', async importOriginal => ({
-  ...(await importOriginal<typeof import('../hermes/sessionIndex.js')>()),
-  storedSessions: () => [
-    {
-      branch: '', cwd: '', id: 'gone', lastActive: Date.now(), messages: 2, model: '', pinned: false,
-      preview: 'an old chat', repoRoot: '', source: 'tui', startedAt: Date.now(), title: 'Old chat'
-    }
-  ]
-}))
-
 const { App } = await import('../app/chat.js')
 const { openSessionPicker } = await import('../overlays/sessions.js')
 
@@ -115,6 +104,12 @@ describe('session lifecycle', () => {
     gw.handlers.set('session.resume', () => {
       throw new Error('not_found')
     })
+    // The gateway lists one other session, from history.
+    gw.handlers.set('session.list', p =>
+      p['scope'] === 'stored'
+        ? { scope: 'stored', sessions: [{ id: 'gone', message_count: 2, preview: 'an old chat', running: false, session_id: 'gone', source: 'tui', started_at: 1, title: 'Old chat' }] }
+        : { scope: 'live', sessions: [] }
+    )
 
     openSessionPicker(app)
     // The list loads after the sheet is up (it asks git for the project).

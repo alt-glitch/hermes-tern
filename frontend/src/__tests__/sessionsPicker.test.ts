@@ -1,7 +1,7 @@
 import type { NodeJson } from '@stencil-hq/tern'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import * as z from 'zod/mini'
 
-import type { StoredSession } from '../hermes/sessionIndex.js'
 import type { PreviewRow, TranscriptReader } from '../hermes/sessionTranscript.js'
 import type { Overlay } from '../overlays/overlay.js'
 
@@ -11,14 +11,14 @@ const copied: string[] = []
 
 vi.mock('../clipboard.js', () => ({ copyToClipboard: (text: string) => copied.push(text) }))
 
-const row = (id: string, title: string): StoredSession => ({
-  branch: '', cwd: '/w/app', id, lastActive: Date.now(), messages: 4, model: '', pinned: false,
-  preview: `${title} prompt`, repoRoot: '/w/app', source: 'tui', startedAt: Date.now(), title
+/** A `session.list` row with its picker fields. */
+const row = (id: string, title: string, at: number) => ({
+  cwd: '/w/app', id, last_active_at: at, message_count: 4, preview: `${title} prompt`, running: false,
+  session_id: id, source: 'tui', started_at: at, title, workspace: '/w/app'
 })
 
-vi.mock('../hermes/sessionIndex.js', async importOriginal => ({
-  ...(await importOriginal<typeof import('../hermes/sessionIndex.js')>()),
-  storedSessions: () => [row('a', 'First'), row('b', 'Second')],
+vi.mock('../hermes/sessionList.js', async importOriginal => ({
+  ...(await importOriginal<typeof import('../hermes/sessionList.js')>()),
   workspaceOf: () => Promise.resolve('/w/app')
 }))
 
@@ -29,11 +29,6 @@ const user = (text: string): PreviewRow => ({ key: text, kind: 'user', steer: fa
 function setup() {
   const reads: string[] = []
   const reader: TranscriptReader = {
-    ends: id => {
-      reads.push(`ends ${id}`)
-
-      return Promise.resolve({ firstPrompt: `${id} first`, lastReply: `${id} last` })
-    },
     page: (id, after) => {
       reads.push(`page ${id} ${after}`)
 
@@ -41,10 +36,17 @@ function setup() {
     }
   }
   let overlay: Overlay | undefined
+  const gateway = new FakeGateway({
+    replies: {
+      // One live session and one from history; the stored scope also repeats the live one.
+      'session.list': p =>
+        p['scope'] === 'stored' ? { sessions: [row('b', 'Second', 100), row('a', 'First', 200)] } : { sessions: [row('a', 'First', 200)] }
+    }
+  })
   const host = {
     changed: vi.fn(),
     close: vi.fn(),
-    gw: new FakeGateway({ replies: { 'session.list': () => ({ sessions: [] }) } }).client,
+    gw: gateway.client,
     open: (o: Overlay) => {
       overlay = o
     },
@@ -65,7 +67,7 @@ function setup() {
     return draw()
   }
 
-  return { draw, host, press, reads, sheet }
+  return { draw, gateway, host, press, reads, sheet }
 }
 
 describe('the session picker', () => {
@@ -76,6 +78,18 @@ describe('the session picker', () => {
 
   afterEach(() => {
     vi.useRealTimers()
+  })
+
+  it('lists the live and the stored scope once each, newest activity first', async () => {
+    const { draw, gateway } = setup()
+    await vi.advanceTimersByTimeAsync(0)
+    const items = draw().p?.['items']
+
+    expect(gateway.sent('session.list')).toEqual([
+      { limit: 200, picker: true, scope: 'live' },
+      { limit: 200, picker: true, scope: 'stored' }
+    ])
+    expect(z.array(z.object({ id: z.string() })).parse(items).map(i => i.id)).toEqual(['a', 'b'])
   })
 
   it('reads the selected preview only once the selection rests, and keeps it', async () => {
@@ -93,14 +107,14 @@ describe('the session picker', () => {
 
     await vi.advanceTimersByTimeAsync(1)
 
-    expect(reads).toEqual(['ends a', 'page a 0'])
+    expect(reads).toEqual(['page a 0'])
 
     press('down')
     await vi.advanceTimersByTimeAsync(200)
     press('up')
     await vi.advanceTimersByTimeAsync(200)
 
-    expect(reads).toEqual(['ends a', 'page a 0', 'ends b', 'page b 0'])
+    expect(reads).toEqual(['page a 0', 'page b 0'])
   })
 
   it('→ focuses the preview, ↓ steps through it, and stepping near the end reads the next page', async () => {

@@ -5,7 +5,7 @@ import { DatabaseSync } from 'node:sqlite'
 
 import { describe, expect, it } from 'vitest'
 
-import { contentText, promptText, readSessionEnds, readTranscriptPage, skillPrompt } from '../hermes/sessionTranscript.js'
+import { contentText, promptText, readTranscriptPage, skillPrompt } from '../hermes/sessionTranscript.js'
 
 function tempDb(): { path: string; conn: DatabaseSync } {
   const path = join(mkdtempSync(join(tmpdir(), 'tern-transcript-')), 'state.db')
@@ -87,7 +87,6 @@ describe('readTranscriptPage', () => {
     conn.close()
 
     expect(readTranscriptPage('s', 0, 10, path).rows.map(r => r.kind)).toEqual(['user', 'assistant'])
-    expect(readSessionEnds('s', path)).toEqual({ firstPrompt: 'hi', lastReply: 'hello' })
   })
 
   it('throws without a database, for the loader to show', () => {
@@ -95,11 +94,7 @@ describe('readTranscriptPage', () => {
   })
 })
 
-describe('readSessionEnds', () => {
-  it('reads the whole first typed prompt and the last reply from the newest segment', () => {
-    expect(readSessionEnds('root', db())).toEqual({ firstPrompt: 'Fix the build', lastReply: 'Done: the build is green.' })
-  })
-
+describe('contentText', () => {
   it('reads text out of structured content', () => {
     expect(contentText('\x00json:[{"type":"text","text":"a"},{"type":"image_url"},{"type":"text","text":"b"}]')).toBe('a\nb')
     expect(contentText('plain')).toBe('plain')

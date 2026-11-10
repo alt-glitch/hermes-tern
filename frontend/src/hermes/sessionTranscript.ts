@@ -12,7 +12,7 @@ import { DatabaseSync } from 'node:sqlite'
 import * as z from 'zod/mini'
 
 import { parseJson } from '../wire/json.js'
-import { first, real, rows, type StoredCall, storedArgs, storedCalls, text, textBytes } from '../wire/sqlite.js'
+import { real, rows, type StoredCall, storedArgs, storedCalls, text, textBytes } from '../wire/sqlite.js'
 
 import { stateDbPath } from './paths.js'
 
@@ -29,15 +29,8 @@ export interface TranscriptPage {
   next: number | null
 }
 
-/** The whole first prompt and last reply, for the preview's two fixed sections. */
-export interface SessionEnds {
-  firstPrompt: string
-  lastReply: string
-}
-
 /** What the preview reads; the picker's loader takes it so the tests can stand in for the database. */
 export interface TranscriptReader {
-  ends(id: string): Promise<SessionEnds>
   page(id: string, after: number, limit: number): Promise<TranscriptPage>
 }
 
@@ -72,8 +65,6 @@ const messageRow = z.object({
 })
 
 type MessageRow = z.infer<typeof messageRow>
-
-const contentRow = z.object({ content: textBytes })
 
 /** The columns an older database may not have, each read as NULL there. */
 function messageColumns(conn: DatabaseSync): { calls: string; kind: string; visible: string } {
@@ -248,30 +239,6 @@ export function readTranscriptPage(id: string, after: number, limit: number, db 
   })
 }
 
-/** Conversation `id`'s first typed prompt and its last reply, whole. */
-export function readSessionEnds(id: string, db = stateDbPath()): SessionEnds {
-  return readStateDb(db, conn => {
-    const { kind, visible } = messageColumns(conn)
-    const firstPrompt = conn.prepare(
-      `${CHAIN}
-       SELECT CAST(m.content AS BLOB) AS content FROM messages m WHERE m.session_id IN (SELECT cur FROM chain) AND m.role = 'user' AND ${visible}
-         AND COALESCE(${kind}, '') IN ('', 'steer') AND instr(COALESCE(m.content, ''), '${COMPACTION}') = 0
-       ORDER BY m.id LIMIT 1`
-    )
-    const lastReply = conn.prepare(
-      `${CHAIN}
-       SELECT CAST(m.content AS BLOB) AS content FROM messages m WHERE m.session_id IN (SELECT cur FROM chain) AND m.role = 'assistant' AND ${visible}
-         AND COALESCE(${kind}, '') != 'failed_turn' AND m.content IS NOT NULL AND m.content != ''
-       ORDER BY m.id DESC LIMIT 1`
-    )
-
-    return {
-      firstPrompt: promptText(contentText(first(firstPrompt, contentRow, id)?.content ?? null)),
-      lastReply: contentText(first(lastReply, contentRow, id)?.content ?? null).trim()
-    }
-  })
-}
-
 /** The reader over the profile's state.db. Reads are synchronous; each runs after the caller's turn. */
 export function storedTranscripts(db = stateDbPath()): TranscriptReader {
   const later = <T>(read: () => T) => new Promise<T>((resolve, reject) => setImmediate(() => {
@@ -283,7 +250,6 @@ export function storedTranscripts(db = stateDbPath()): TranscriptReader {
   }))
 
   return {
-    ends: id => later(() => readSessionEnds(id, db)),
     page: (id, after, limit) => later(() => readTranscriptPage(id, after, limit, db))
   }
 }

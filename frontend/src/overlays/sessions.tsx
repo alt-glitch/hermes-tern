@@ -1,5 +1,5 @@
-// The session picker (`/resume`, `/sessions`): stored conversations from the profile's state.db
-// (hermes/sessionIndex.ts), scoped the way `hermes -c` scopes them. The first tab holds this
+// The session picker (`/resume`, `/sessions`): the conversations the gateway offers
+// (hermes/sessionList.ts), scoped the way `hermes -c` scopes them. The first tab holds this
 // project's sessions (the pane's repo, or its folder); All holds every local one with this
 // project's first. Rows are grouped by last activity, pinned ones on top; a search ranks title,
 // first prompt, folder, branch and id across the tab. The preview (sessions/detail.tsx) shows
@@ -18,12 +18,11 @@ import { launchEnv } from '../config/env.js'
 import { optional } from '../core/assert.js'
 import { errorText } from '../core/errors.js'
 import { Flash } from '../core/flash.js'
-import { durable, storedSessionId } from '../core/ids.js'
+import { storedSessionId } from '../core/ids.js'
 import { mutateSession } from '../hermes/mutate.js'
-import { inWorkspace, sessionLabel, type StoredSession, storedSessions, workspaceOf } from '../hermes/sessionIndex.js'
+import { inWorkspace, listSessions, type ListedSession, sessionLabel, workspaceOf } from '../hermes/sessionList.js'
 import { storedTranscripts, type TranscriptReader } from '../hermes/sessionTranscript.js'
 import { homeTilde } from '../view/format.js'
-import { rpc } from '../wire/rpc.js'
 
 import type { Overlay } from './overlay.js'
 import { editQuery, hitRuns, moveSelection, rank } from './search.js'
@@ -35,7 +34,6 @@ import { dayOf, itemOf } from './sessions/rows.js'
 export type SessionsHost = Pick<ChatPorts, 'changed' | 'close' | 'gw' | 'open' | 'resume' | 'reveal' | 'scroll' | 'session' | 'transcript'>
 
 const KEY = 'sessions'
-const LIMIT = 400
 /** Blocks from the end of what is loaded at which the preview reads its next page. */
 const NEAR_END = 3
 
@@ -44,8 +42,7 @@ type Tab = 'all' | 'here'
 /** Opens the session picker; picking a row resumes that session. */
 export function openSessionPicker(host: SessionsHost, reader: TranscriptReader = storedTranscripts()) {
   let state: 'loading' | 'ready' | 'error' = 'loading'
-  let sessions: StoredSession[] = []
-  let running = new Set<string>()
+  let sessions: ListedSession[] = []
   let workspace = ''
   let tab: Tab = 'here'
   let query = ''
@@ -60,7 +57,9 @@ export function openSessionPicker(host: SessionsHost, reader: TranscriptReader =
   let nodeId = `layer.${KEY}`
   /** The selection the loader was last told of. */
   let told: string | undefined
-  const current = durable(host.session.ref) ?? ''
+  const { live: currentLive, stored: currentStored } = host.session.ref
+  /** The open session's row: the gateway may name it by its runtime id or its stored one. */
+  const isCurrent = (s: ListedSession) => [s.id, s.conversation].some(id => id === currentLive || id === currentStored)
   const loader = new PreviewLoader(reader, () => host.changed())
   const copied = new Flash<string>(() => host.changed())
 
@@ -69,23 +68,25 @@ export function openSessionPicker(host: SessionsHost, reader: TranscriptReader =
     host.changed()
 
     const cwd = host.session.info?.cwd || launchEnv().cwd
-    // The open session may have no messages yet; every other empty one is litter.
-    const [key, live] = await Promise.all([
-      workspaceOf(cwd),
-      rpc(host.gw, 'session.list', { limit: 200 }).catch(() => ({ sessions: [] }))
-    ])
+    const [key, listed] = await Promise.all([workspaceOf(cwd), listSessions(host.gw).catch(() => undefined)])
+
+    if (!listed) {
+      state = 'error'
+      host.changed()
+
+      return
+    }
 
     workspace = key
-    // Only the shared gateway's rows say whether the session runs.
-    running = new Set((live.sessions ?? []).filter(s => 'running' in s && s.running && s.id).map(s => s.id))
-    sessions = storedSessions(LIMIT).filter(s => s.messages > 0 || s.id === current)
+    // The open session may have no messages yet; every other empty one is litter.
+    sessions = listed.filter(s => s.messages > 0 || isCurrent(s))
     tab = sessions.some(s => inWorkspace(s, workspace)) ? 'here' : 'all'
-    selected = rows().find(s => s.id !== current)?.id ?? rows()[0]?.id
+    selected = rows().find(s => !isCurrent(s))?.id ?? rows()[0]?.id
     state = 'ready'
     host.changed()
   }
 
-  const here = (s: StoredSession) => inWorkspace(s, workspace)
+  const here = (s: ListedSession) => inWorkspace(s, workspace)
   const rows = () => (tab === 'here' ? sessions.filter(here) : sessions)
 
   const resume = (id: string | undefined) => {
@@ -97,7 +98,7 @@ export function openSessionPicker(host: SessionsHost, reader: TranscriptReader =
 
     host.close(overlay)
 
-    if (s.id !== current) {
+    if (!isCurrent(s)) {
       // A refusal (deleted elsewhere, gateway down) is a notice; the view stays where it was.
       host.resume(storedSessionId(s.id)).catch((error: unknown) => {
         host.transcript.notice(`Could not resume: ${errorText(error)}`, 'error')
@@ -110,8 +111,8 @@ export function openSessionPicker(host: SessionsHost, reader: TranscriptReader =
     deleting = null
 
     try {
-      // The shared gateway deletes through a revision-fenced mutation (the whole lineage).
-      await (host.gw.isCanonical ? mutateSession(host.gw, id, 'delete', {}) : rpc(host.gw, 'session.delete', { session_id: id }))
+      // A revision-fenced mutation deletes the whole lineage.
+      await mutateSession(host.gw, id, 'delete', {})
       sessions = sessions.filter(s => s.id !== id)
       loader.forget(id)
     } catch (error) {
@@ -126,7 +127,7 @@ export function openSessionPicker(host: SessionsHost, reader: TranscriptReader =
       return
     }
 
-    if (selected === current) {
+    if (sessions.some(s => s.id === selected && isCurrent(s))) {
       host.transcript.notice('The open session cannot be deleted; start a new one first.', 'warning')
     } else {
       deleting = selected
@@ -204,7 +205,7 @@ export function openSessionPicker(host: SessionsHost, reader: TranscriptReader =
 
   const view = (now: number) => {
     // Browsing All: pinned first, then this project's, then the rest, each newest first.
-    const rank0 = (x: StoredSession) => (x.pinned ? 0 : tab === 'all' && here(x) ? 1 : 2)
+    const rank0 = (x: ListedSession) => (x.pinned ? 0 : tab === 'all' && here(x) ? 1 : 2)
     const list = query ? rows() : [...rows()].sort((a, b) => rank0(a) - rank0(b))
     // The label leads the searched text, so a title hit ranks first and its marks land in the label.
     const ranked = rank(list, query, s => `${sessionLabel(s)}\n${s.preview} ${s.cwd} ${s.branch} ${s.id}`, { scattered: false })
@@ -264,11 +265,10 @@ export function openSessionPicker(host: SessionsHost, reader: TranscriptReader =
             copied: copied.value === s.id,
             focus: key => focusBlock(key),
             focused: focus === 'preview' ? block : undefined,
-            isCurrent: s.id === current,
+            isCurrent: isCurrent(s),
             more: () => loader.more(s.id),
             now,
             preview: loader.get(s.id),
-            running: running.has(s.id),
             session: s
           })
         : undefined
@@ -284,7 +284,7 @@ export function openSessionPicker(host: SessionsHost, reader: TranscriptReader =
               ? { id: 'list', keys: ['left'], label: 'Back to list' }
               : { ...optional('disabled', s ? undefined : 'No session'), id: 'browse', keys: ['right'], label: 'Browse' },
             { end: true, id: 'close', keys: ['esc'], label: 'Close' },
-            { ...optional('disabled', s ? undefined : 'No session'), id: 'resume', keys: ['enter'], label: s?.id === current ? 'Back to it' : 'Resume', primary: true }
+            { ...optional('disabled', s ? undefined : 'No session'), id: 'resume', keys: ['enter'], label: s && isCurrent(s) ? 'Back to it' : 'Resume', primary: true }
           ]}
           columns={[
             { format: 'dim', id: 'size', priority: 1 },
@@ -292,12 +292,12 @@ export function openSessionPicker(host: SessionsHost, reader: TranscriptReader =
           ]}
           key={KEY}
           {...optional('confirm', deleting ? { act: 'confirm', label: 'Delete', text: `Delete “${sessionLabel(sessions.find(x => x.id === deleting) ?? { preview: '', title: '' })}”?` } : undefined)}
-          current={current ? [current] : []}
+          current={sessions.filter(isCurrent).map(x => x.id)}
           empty={tab === 'here' ? `No sessions in ${project} yet. Tab shows every folder.` : 'No saved sessions yet'}
           focus={focus}
           hits={hits}
           icon="history"
-          items={rows().map(x => itemOf(x, now, running.has(x.id), tab === 'all' && !here(x)))}
+          items={rows().map(x => itemOf(x, now, tab === 'all' && !here(x)))}
           layout="cards"
           noun="sessions"
           onAction={{
@@ -408,6 +408,5 @@ export function openSessionPicker(host: SessionsHost, reader: TranscriptReader =
   }
 
   host.open(overlay)
-  // After the sheet is up: the read is synchronous.
-  setTimeout(() => void load(), 0)
+  void load()
 }

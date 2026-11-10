@@ -20,12 +20,6 @@ vi.mock('node:crypto', async importOriginal => ({
   randomUUID: () => `00000000-0000-4000-8000-${String(++ids.n).padStart(12, '0')}`
 }))
 vi.mock('@hermes/shared/prompt-history', () => ({ append: () => undefined, load: () => [] }))
-vi.mock('../hermes/sessionIndex.js', async importOriginal => ({
-  ...(await importOriginal<typeof import('../hermes/sessionIndex.js')>()),
-  lastReply: () => '',
-  storedSessions: () => []
-}))
-
 const home = mkdtempSync(join(tmpdir(), 'hermes-tern-golden-'))
 process.env['HERMES_HOME'] = home
 
