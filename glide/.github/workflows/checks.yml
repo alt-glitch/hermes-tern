@@ -1,0 +1,30 @@
+name: checks
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # Public Hermes core the suite runs against (tests/test_memory_core.py uses its SessionDB).
+      HERMES_CORE_SHA: d478c8ffc66cd7e1ab6e38e16d04491d293dffa7
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: NousResearch/hermes-agent
+          ref: ${{ env.HERMES_CORE_SHA }}
+          path: .hermes-agent
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --project .hermes-agent --frozen
+      - name: plugin suite
+        run: PYTHONPATH=.hermes-agent uv run --project .hermes-agent --frozen --no-sync --with pytest python -m pytest -q -p no:cacheprovider tests
