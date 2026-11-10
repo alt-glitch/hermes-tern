@@ -177,15 +177,15 @@ def pick_session(args: argparse.Namespace) -> Optional[str]:
 def hermes_api() -> SimpleNamespace:
     """Hermes' published launcher functions. An older Hermes lacks them: one line, exit 1."""
     try:
-        from hermes_cli import session_worktree
         from hermes_cli.chat_launch import hermes_command, print_exit_summary
         from hermes_cli.gateway_chat import shell_client_env
+        from hermes_cli.session_worktree import create, finish, restore
     except ImportError:
         print(TOO_OLD, file=sys.stderr)
         sys.exit(1)
     return SimpleNamespace(shell_client_env=shell_client_env, hermes_command=hermes_command,
-                           print_exit_summary=print_exit_summary, create_worktree=session_worktree.create,
-                           restore_worktree=session_worktree.restore, finish_worktree=session_worktree.finish)
+                           print_exit_summary=print_exit_summary, create_worktree=create,
+                           restore_worktree=restore, finish_worktree=finish)
 
 
 def create_options(args: argparse.Namespace, client_env: dict[str, str]) -> dict[str, Any]:
