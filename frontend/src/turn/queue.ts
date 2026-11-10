@@ -1,8 +1,7 @@
-// The prompts waiting behind the turn, as one store: those this pane holds (no session yet, a
-// switch in flight, a private gateway's busy turn, a compaction) and this pane's admissions into
-// the shared gateway's queue, with the other viewers' rows of it. The dock's queued rows, Alt+Up
-// and Edit (back into the composer), Alt+Enter and Steer (into the running turn) and the drain
-// once the session is idle all act here. App decides when a prompt is held or admitted.
+// The prompts waiting behind the turn, as one store: those this pane holds (no session yet, or a
+// switch in flight) and this pane's admissions into the gateway's queue, with the other viewers'
+// rows of it. The dock's queued rows, Alt+Up and Edit (back into the composer), Alt+Enter and
+// Steer (into the running turn) and the drain once the session is idle all act here. App decides when a prompt is held or admitted.
 //
 // A held prompt knows whom it waits for: whichever session is adopted next (none was shown, or a
 // switch was in flight), or the session it was held in (behind its turn or its compaction). When
@@ -90,7 +89,7 @@ export interface QueueHost {
 
 /** The prompts waiting behind the turn: held here, then the shared gateway's queue. */
 export class PromptQueue {
-  /** Prompts held here until they can be sent: no session yet, a switch in flight, or a private gateway's busy turn. */
+  /** Prompts held here until they can be sent: no session yet, or a switch in flight. */
   #held: Held[] = []
   /** The shared gateway's queue for this session: its FIFO, this pane's admissions, the bubbles they owe. */
   readonly server = new ServerQueue<Admitted>()

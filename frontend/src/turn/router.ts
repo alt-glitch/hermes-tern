@@ -7,7 +7,7 @@
 import type { GatewayClient } from '@hermes/shared/gateway-client'
 
 import { type LiveSessionId, newInputId } from '../core/ids.js'
-import type { SessionState, SessionTicket } from '../session/state.js'
+import type { SessionTicket } from '../session/state.js'
 import type { Transcript } from '../transcript/store.js'
 import { rpc } from '../wire/rpc.js'
 
@@ -15,7 +15,7 @@ import type { Activity } from './activity.js'
 import { redirectTurn, steerTurn } from './control.js'
 import { EXPANDING_LABEL, expand, type Expanded, hasCommands } from './expand.js'
 import { IMAGE_ONLY_PROMPT, type Prompt, shownText, userImages } from './prompt.js'
-import type { HeldTarget, PromptQueue } from './queue.js'
+import type { PromptQueue } from './queue.js'
 import type { BusyMode } from './serverQueue.js'
 
 /** What the gates read: the shown session's state when a prompt arrives. */
@@ -30,8 +30,6 @@ export interface GateState {
   compacting: boolean
   /** The launcher's --image still waits for the first session. */
   awaitingStartup: boolean
-  /** The gateway is Hermes' shared one, whose queue admits a prompt at once. */
-  canonical: boolean
 }
 
 /** What the session is doing: a turn (it wins over a compaction inside it), a compaction, or nothing. */
@@ -106,7 +104,6 @@ export interface RouterHost {
   readonly gw: Pick<GatewayClient, 'request'>
   readonly activity: Activity
   readonly queue: PromptQueue
-  readonly session: Pick<SessionState, 'ref'>
   readonly transcript: Pick<Transcript, 'notice' | 'steer' | 'user'>
   /** The session's state, for the gates. */
   gates(): GateState
@@ -192,23 +189,19 @@ export class PromptRouter {
   }
 
   /**
-   * Puts `prompt` behind the running turn: into the shared gateway's queue at once, else held here;
-   * `first` holds it ahead of the prompts held already (it was sent before any of them).
+   * Puts `prompt` behind the running turn: into the gateway's queue at once, or held here for the
+   * next session while none is adopted; `first` holds it ahead of the prompts held already (it was
+   * sent before any of them).
    */
   behind(prompt: Prompt, { first = false }: { first?: boolean } = {}) {
     const host = this.#host
-    const s = host.gates()
-    const gate = canSend(s)
+    const gate = canSend(host.gates())
 
-    // A private gateway has no queue to admit into: the prompt waits here, for this session (or,
-    // with none adopted, for the next).
-    if (gate.kind === 'hold' || !s.canonical) {
-      const target: HeldTarget = gate.kind === 'hold' ? { kind: 'next' } : { kind: 'session', ref: { live: gate.sid, stored: host.session.ref.stored } }
-
+    if (gate.kind === 'hold') {
       if (first) {
-        host.queue.holdFirst(prompt, target)
+        host.queue.holdFirst(prompt)
       } else {
-        host.queue.hold(prompt, target)
+        host.queue.hold(prompt)
       }
 
       host.queue.drain()

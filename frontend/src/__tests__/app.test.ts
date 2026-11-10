@@ -34,25 +34,6 @@ describe('App: a refused prompt', () => {
 })
 
 describe('App: images in the draft', () => {
-  it('a prompt queued behind the turn (private gateway) takes the images attached with it', async () => {
-    const { app, attach, emit, press, sent, type } = setup({}, { canonical: false })
-    given.busy(app.stores, { ...busy })
-    await attach()
-    await type('first')
-    await press(key('enter'))
-    expect(app.stores.queue.held).toMatchObject([{ images: [{ path: '/uploads/1.png' }], text: 'first' }])
-
-    // Typed while the first waits: no images of its own.
-    await type('second')
-    await press(key('enter'))
-    emit('event', { payload: { text: 'done' }, session_id: 's1', type: 'message.complete' })
-    await settle()
-
-    const [submit] = sent('prompt.submit')
-    expect(submit).toMatchObject({ attachments: [{ path: '/uploads/1.png' }], text: 'first' })
-    expect(app.stores.queue.held).toMatchObject([{ images: [], text: 'second' }])
-  })
-
   it('Ctrl+C clears the images with the text, and Ctrl+D does not exit over an image', async () => {
     const { app, attach, press, sent, type } = setup()
     const quit = vi.spyOn(app, 'quit')
@@ -68,22 +49,6 @@ describe('App: images in the draft', () => {
     expect(sent('prompt.submit')[0]).not.toHaveProperty('attachments')
   })
 
-  it('Alt+Up brings a queued prompt (private gateway) back with its images', async () => {
-    const { app, attach, press, type } = setup({}, { canonical: false })
-    given.busy(app.stores, { ...busy })
-    await attach()
-    await type('edit me')
-    await press(key('enter'))
-    await press(key('up', { alt: true }))
-
-    expect(app.stores.composer.text).toBe('edit me')
-    expect(app.stores.queue.held).toEqual([])
-    // Back in the draft: Ctrl+D still sees it.
-    const quit = vi.spyOn(app, 'quit')
-    app.stores.composer.set('')
-    await press(key('d', { ctrl: true }))
-    expect(quit).not.toHaveBeenCalled()
-  })
 })
 
 describe('App: an attached image shows', () => {
@@ -121,18 +86,6 @@ describe('App: a prompt of images alone', () => {
 
     expect(sent('prompt.submit')).toMatchObject([{ attachments: [{ path: '/uploads/1.png' }], text: 'What do you see in this image?' }])
     expect(app.transcript.entries.findLast(e => e.kind === 'user')).toMatchObject({ attachments: [{ name: 'shot.png' }], text: '' })
-  })
-
-  it('a private gateway queues it behind a running turn; it goes when the turn ends', async () => {
-    const { app, attach, emit, press, sent } = setup({}, { canonical: false })
-    given.busy(app.stores, { ...busy })
-    await attach()
-    await press(key('enter'))
-    expect(app.stores.queue.held).toMatchObject([{ images: [{ path: '/uploads/1.png' }], text: '' }])
-
-    emit('event', { payload: { text: 'done' }, session_id: 's1', type: 'message.complete' })
-    await settle()
-    expect(sent('prompt.submit')).toMatchObject([{ attachments: [{ path: '/uploads/1.png' }], text: 'What do you see in this image?' }])
   })
 
   it('the shared gateway admits it to its queue at once', async () => {

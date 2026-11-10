@@ -18,8 +18,6 @@ import type { ControlHost } from './control.js'
 
 /** What a session command needs beyond a control command's host; commands/host.ts's sessionHost() supplies it. */
 export interface SessionHost extends ControlHost {
-  /** The gateway is Hermes' shared one (only it serves `session.mutate`). */
-  canonical: boolean
   /** The view has moved off the session this host was made for. */
   stale(): boolean
   panel(title: string, text: string): void
@@ -36,16 +34,11 @@ export interface SessionHost extends ControlHost {
 export interface SessionCommand {
   name: string
   aliases?: readonly string[]
-  /** Returning false hands the command to `slash.exec` (a private gateway, which still serves it). */
-  run(host: SessionHost, arg: string): Promise<boolean | void> | boolean | void
+  run(host: SessionHost, arg: string): Promise<void> | void
 }
 
 /** `/undo` and `/retry`: rewind to before the newest user turn; `/retry` then resends that turn's text. */
 async function rewind(host: SessionHost, intent: 'retry' | 'undo') {
-  if (!host.canonical) {
-    return false
-  }
-
   if (!host.sid) {
     return host.notice(`Nothing to ${intent}.`)
   }
@@ -87,10 +80,6 @@ export function compressReport(summary: CompressionSummary | null | undefined): 
 
 /** `/compress [here [N] | focus | --preview]`: the raw argument is the payload's `focus`, parsed by the owner. */
 async function compress(host: SessionHost, arg: string) {
-  if (!host.canonical) {
-    return false
-  }
-
   if (!host.sid) {
     return host.notice('No active session.', 'warning')
   }
@@ -162,10 +151,6 @@ async function compress(host: SessionHost, arg: string) {
 
 /** `/branch [title]`: a copy of the session the view then moves to (the original keeps its history). */
 async function branch(host: SessionHost, arg: string) {
-  if (!host.canonical) {
-    return false
-  }
-
   if (!host.sid) {
     return host.notice('No active session.', 'warning')
   }
@@ -216,11 +201,7 @@ async function reloadSkills(host: SessionHost) {
  * `/reload-mcp`: the shared gateway refuses it in `slash.exec` but serves `reload.mcp`, desktop's
  * add/toggle/repair call. Typing it is the confirmation the RPC asks for, as the desktop's button is.
  */
-async function reloadMcp(host: SessionHost): Promise<boolean | void> {
-  if (!host.canonical) {
-    return false
-  }
-
+async function reloadMcp(host: SessionHost) {
   const r = await rpc(host.gw, 'reload.mcp', { confirm: true, ...(host.sid ? { session_id: host.sid } : {}) })
 
   host.panel('Reload MCP', r?.message?.trim() || 'MCP servers reloaded.')

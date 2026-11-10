@@ -43,8 +43,6 @@ export type DelegationId = Brand<string, 'DelegationId'>
 export type PrKey = Brand<string, 'PrKey'>
 /** A native GitHub stack's key: `host/repository#stack:number`. */
 export type StackKey = Brand<string, 'StackKey'>
-/** A connect card's key: the tool call and the operation it watches. */
-export type CardKey = Brand<string, 'CardKey'>
 /** An overlay's key on the overlay stack. */
 export type OverlayKey = Brand<string, 'OverlayKey'>
 
@@ -70,10 +68,6 @@ export const newInputId = () => inputId(randomUUID())
 export const toolCallId = (raw: string) => raw as ToolCallId
 /** `raw` as an entry id. */
 export const entryId = (raw: string) => raw as EntryId
-/** `raw` as a background process id. */
-export const processId = (raw: string) => raw as ProcessId
-/** `raw` as a subagent id. */
-export const subagentId = (raw: string) => raw as SubagentId
 /** `raw` as a subagent row's node key. */
 export const subagentKey = (raw: string) => raw as SubagentKey
 /** `raw` as a delegation id. */
@@ -82,8 +76,6 @@ export const delegationId = (raw: string) => raw as DelegationId
 export const prKey = (ref: { host: string; repository: string; number: number }) => `${ref.host}/${ref.repository}#${ref.number}` as PrKey
 /** The key of native stack `number` in `repository` on `host`. */
 export const stackKey = (host: string, repository: string, number: number) => `${host}/${repository}#stack:${number}` as StackKey
-/** `raw` as a connect card key. */
-export const cardKey = (raw: string) => raw as CardKey
 /** `raw` as an overlay key. */
 export const overlayKey = (raw: string) => raw as OverlayKey
 

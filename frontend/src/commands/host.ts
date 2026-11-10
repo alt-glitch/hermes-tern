@@ -45,7 +45,6 @@ export function sessionHost(cx: SessionHostCx): SessionHost {
       return cx.activity.busy !== null
     },
     // A steer that fell back to the queue: steering carries no images.
-    canonical: cx.gw.isCanonical,
     enqueue: text => cx.router.behind({ images: [], kind: 'app', text }),
     gw: cx.gw,
     notice: (text, tone) => {

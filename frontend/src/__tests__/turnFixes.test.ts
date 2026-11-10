@@ -34,8 +34,8 @@ function held() {
 }
 
 /** The app on a fake Tern and gateway, session s1 shown. */
-function setup(replies: Record<string, Reply> = {}, { canonical = true } = {}) {
-  const gw = new FakeGateway({ canonical, replies })
+function setup(replies: Record<string, Reply> = {}) {
+  const gw = new FakeGateway({ replies })
   const tern = fakeTern({ cols: 100, draws: true })
   const app = new App(tern.session, gw.client, '1.0.0')
   void app.run()
@@ -114,10 +114,10 @@ describe('the working row is ended only by the work that owns it', () => {
 
   it("a {!cmd} that fails after the turn started leaves the turn's row, and nothing drains into the turn", async () => {
     const shell = held()
-    const { app, emit, enter, gw } = setup({ 'shell.exec': shell.reply }, { canonical: false })
+    const { app, emit, enter, gw } = setup({ 'prompt.submit': () => ({ admission_id: 'a1', status: 'queued' }), 'shell.exec': shell.reply })
     await enter('today is {!date}')
     await enter('next')
-    expect(app.stores.queue.held).toMatchObject([{ text: 'next' }])
+    expect(gw.sent('prompt.submit')).toMatchObject([{ queued: true, text: 'next' }])
 
     // The turn starts (another viewer's prompt, say) while the expansion runs: it takes the row.
     await emit('message.start')
@@ -126,27 +126,23 @@ describe('the working row is ended only by the work that owns it', () => {
     await vi.waitFor(() => expect(app.stores.composer.text).toBe('today is {!date}'))
 
     expect(app.stores.activity.busy).toBe(row)
-    expect(gw.sent('prompt.submit')).toEqual([])
-    expect(app.stores.queue.held).toMatchObject([{ text: 'next' }])
+    // Only the admission into the gateway's queue went out: no prompt was sent into the turn.
+    expect(gw.sent('prompt.submit')).toMatchObject([{ queued: true, text: 'next' }])
   })
 
   it('a {!cmd} that resolves after the turn started goes behind the turn, not into it', async () => {
     const shell = held()
-    const { app, emit, enter, gw } = setup({ 'shell.exec': shell.reply }, { canonical: false })
+    const { app, emit, enter, gw } = setup({ 'prompt.submit': () => ({ admission_id: 'a1', status: 'queued' }), 'shell.exec': shell.reply })
     await enter('today is {!date}')
 
     await emit('message.start')
     const row = app.stores.activity.busy
     shell.resolve({ code: 0, stderr: '', stdout: 'Tuesday' })
-    await vi.waitFor(() => expect(app.stores.queue.held).toMatchObject([{ kind: 'app', text: 'today is Tuesday' }]))
 
+    // Into the gateway's queue behind the turn, expanded once: its command is not run again.
+    await vi.waitFor(() => expect(gw.sent('prompt.submit')).toMatchObject([{ queued: true, text: 'today is Tuesday' }]))
     expect(app.stores.activity.busy).toBe(row)
-    expect(gw.sent('prompt.submit')).toEqual([])
     expect(app.transcript.entries.filter(e => e.kind === 'user')).toEqual([])
-
-    // The turn ends: the expanded prompt goes as the next one, its command not run again.
-    await emit('message.complete')
-    expect(gw.sent('prompt.submit')).toMatchObject([{ queued: true, text: 'today is Tuesday' }])
     expect(gw.sent('shell.exec')).toHaveLength(1)
   })
   it('a prompt.submit that fails after its turn started leaves the turn running', async () => {
@@ -179,57 +175,6 @@ describe('the working row is ended only by the work that owns it', () => {
 
     expect(app.stores.activity.busy?.label).toBe('Writing…')
     expect(notices()).not.toContain('Could not stop the turn: boom')
-  })
-})
-
-describe('held prompts keep the session they were held for', () => {
-  const resumed = (session_id: string, stored: string) => () => ({ info: { stored_session_id: stored }, messages: [], session_id })
-
-  it("on a private gateway, a prompt held behind session A's turn goes back to the composer when B is adopted; one for the next session goes to B", async () => {
-    const { app, enter, gw, notices } = setup({ 'session.resume': resumed('b', 'sb') }, { canonical: false })
-    given.busy(app.stores, { label: 'Working…', since: {}, startedAt: 0 })
-    await enter('for A')
-    expect(app.stores.queue.held).toMatchObject([{ text: 'for A' }])
-
-    // The gateway goes away (the turn with it); a prompt typed now waits for whichever session comes.
-    gw.emit('exit', null)
-    await enter('for whoever')
-    await app.resume(storedSessionId('sb'))
-    await settle(gw)
-
-    expect(app.session.ref.live).toBe('b')
-    expect(gw.sent('prompt.submit')).toMatchObject([{ session_id: 'b', text: 'for whoever' }])
-    expect(app.stores.composer.text).toBe('for A')
-    expect(notices()).toContain('A prompt queued for the last session is back in the composer.')
-  })
-
-  it('the notice that says so stays when the adopted session brings its history', async () => {
-    const history = () => ({ info: { stored_session_id: 'sb' }, messages: [{ role: 'user', text: 'earlier' }], session_id: 'b' })
-    const { app, enter, gw, notices } = setup({ 'session.resume': history }, { canonical: false })
-    given.busy(app.stores, { label: 'Working…', since: {}, startedAt: 0 })
-    await enter('for A')
-
-    gw.emit('exit', null)
-    await app.resume(storedSessionId('sb'))
-    await settle(gw)
-
-    expect(app.stores.composer.text).toBe('for A')
-    expect(app.transcript.entries.flatMap(e => (e.kind === 'user' ? [e.text] : []))).toEqual(['earlier'])
-    expect(notices()).toContain('A prompt queued for the last session is back in the composer.')
-  })
-
-  it('a reattach of the same stored session keeps the prompts held for it', async () => {
-    const { app, enter, gw } = setup({ 'session.resume': resumed('s1b', 'st1') }, { canonical: false })
-    app.session.ref = { live: app.session.ref.live, stored: storedSessionId('st1') }
-    given.busy(app.stores, { label: 'Working…', since: {}, startedAt: 0 })
-    await enter('for A')
-
-    gw.emit('exit', null)
-    gw.event({ payload: {}, type: 'gateway.ready' })
-    await settle(gw)
-
-    expect(app.session.ref.live).toBe('s1b')
-    expect(gw.sent('prompt.submit')).toMatchObject([{ session_id: 's1b', text: 'for A' }])
   })
 })
 
@@ -377,7 +322,6 @@ describe('/compress takes back only its own compaction, and only in its own sess
     })
     const host: SessionHost = {
       busy: false,
-      canonical: true,
       compressing,
       enqueue: () => undefined,
       gw: gw.client,

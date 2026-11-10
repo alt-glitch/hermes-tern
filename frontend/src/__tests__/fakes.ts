@@ -31,14 +31,14 @@ export function key(name: string, mods: Partial<Key> = {}): Key {
 
 /** A shared-gateway stand-in: `request` answers from `handlers` (else `{}`), `event` feeds the app. */
 export class FakeGateway extends EventEmitter {
-  isCanonical: boolean
+  // overlays/sessions.tsx still branches on it until its own change lands.
+  readonly isCanonical = true
   attached = true
   readonly calls: Call[] = []
   readonly handlers: Map<string, Reply>
 
-  constructor({ canonical = true, replies = {} }: { canonical?: boolean; replies?: Record<string, Reply> } = {}) {
+  constructor({ replies = {} }: { replies?: Record<string, Reply> } = {}) {
     super()
-    this.isCanonical = canonical
     // A current gateway: it lists what the frontend needs (hermes/requirements.ts).
     this.handlers = new Map(Object.entries({ 'runtime.describe': () => ({ capabilities: REQUIRED_CAPABILITIES }), ...replies }))
   }

@@ -271,7 +271,6 @@ function lifecycle() {
       awaitingStartup: () => false,
       canSwitch: () => ({ kind: 'switch' }),
       changed: () => void log.push('changed'),
-      cols: () => 80,
       drain: () => void log.push('drain'),
       gw: gw.client,
       launch: { create: {}, paneCwd: '', restored: false, resume: '', sessionCwd: '' },

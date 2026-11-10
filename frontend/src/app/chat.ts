@@ -79,7 +79,7 @@ export class App implements ChatPorts {
     this.#tern = tern
     this.#gw = gw
     this.#launch = launch
-    const s = chatStores(this, { act: () => this.#act, gw, launch, settings, surface: () => this.#surface, tern, version })
+    const s = chatStores(this, { act: () => this.#act, gw, launch, settings, surface: () => this.#surface, version })
     this.stores = s
     this.session = s.session
     this.transcript = s.transcript

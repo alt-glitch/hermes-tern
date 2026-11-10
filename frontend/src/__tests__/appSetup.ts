@@ -23,9 +23,9 @@ writeFileSync(png, Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 0]))
 /** The gateway of the app the running test set up. */
 let gateway: FakeGateway
 
-/** The app on a fake Tern and gateway: keys go in, gateway requests come out (`canonical`: the shared gateway). */
-export function setup(replies: Record<string, Reply> = {}, { canonical = true, features = [] }: { canonical?: boolean; features?: string[] } = {}) {
-  const gw = (gateway = new FakeGateway({ canonical, replies }))
+/** The app on a fake Tern and gateway: keys go in, gateway requests come out. */
+export function setup(replies: Record<string, Reply> = {}, { features = [] }: { features?: string[] } = {}) {
+  const gw = (gateway = new FakeGateway({ replies }))
   let uploads = 0
 
   if (!replies['image.attach_bytes']) {

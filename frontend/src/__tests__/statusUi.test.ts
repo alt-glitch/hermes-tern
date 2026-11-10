@@ -23,8 +23,8 @@ const { openModelPicker } = await import('../overlays/models.js')
 
 const settle = () => new Promise(resolve => setTimeout(resolve, 5))
 
-function setup(replies: Record<string, Reply> = {}, canonical = true) {
-  const gw = new FakeGateway({ canonical, replies })
+function setup(replies: Record<string, Reply> = {}) {
+  const gw = new FakeGateway({ replies })
   const tern = fakeTern({ cols: 100, draws: true })
   /** The last frame's dock. */
   const shown = () => tern.region('dock') ?? []
@@ -271,15 +271,11 @@ describe('App: setting the effort', () => {
     expect(app.session.info?.reasoning_effort).toBe('high')
   })
 
-  it('keeps config.set scope=global for Save as default, and config.set on a private gateway', async () => {
-    const shared = setup(mutation())
-    await shared.app.setEffort('max', 'global')
-    expect(shared.sent('config.set')).toEqual([{ key: 'reasoning', scope: 'global', session_id: 's1', value: 'max' }])
-    expect(shared.sent('session.mutate')).toEqual([])
-
-    const own = setup({}, false)
-    await own.app.setEffort('low', 'session')
-    expect(own.sent('config.set')).toEqual([{ key: 'reasoning', scope: 'session', session_id: 's1', value: 'low' }])
+  it('keeps config.set scope=global for Save as default', async () => {
+    const { app, sent } = setup(mutation())
+    await app.setEffort('max', 'global')
+    expect(sent('config.set')).toEqual([{ key: 'reasoning', scope: 'global', session_id: 's1', value: 'max' }])
+    expect(sent('session.mutate')).toEqual([])
   })
 
   it('rolls the chip back when the change is refused', async () => {

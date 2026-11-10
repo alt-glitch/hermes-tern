@@ -32,7 +32,6 @@ function host(over: Partial<SessionHost> = {}, replies: Record<string, unknown> 
 
   const h = {
     busy: false,
-    canonical: true,
     enqueue: vi.fn(),
     gw: stub<SessionHost['gw']>({ request }),
     notice: vi.fn(),
@@ -120,16 +119,6 @@ describe('session commands', () => {
 
     expect(h.reload).toHaveBeenCalled()
     expect(h.send).toHaveBeenCalledWith('fix the bug')
-  })
-
-  it('leaves rewind, compress and branch to slash.exec on a private gateway', async () => {
-    const { h, request } = host({ canonical: false })
-
-    for (const name of ['undo', 'retry', 'compact', 'fork']) {
-      expect(await run(name, h)).toBe(false)
-    }
-
-    expect(request).not.toHaveBeenCalled()
   })
 
   it('/compress sends the raw argument as focus, runs the compaction rule, and reloads', async () => {
@@ -232,13 +221,6 @@ describe('session commands', () => {
     expect(request).toHaveBeenCalledWith('reload.mcp', { confirm: true, session_id: 'sid-1' })
     expect(h.panel).toHaveBeenCalledWith('Reload MCP', 'MCP servers reconciled (added: argus)')
     expect(h.notice).toHaveBeenCalledWith('Did not connect: linear.', 'warning')
-  })
-
-  it('/reload-mcp on a private gateway is left to slash.exec', async () => {
-    const { h, request } = host({ canonical: false })
-
-    expect(await run('reload-mcp', h)).toBe(false)
-    expect(request).not.toHaveBeenCalled()
   })
 
   it('/rollback lists, diffs and restores checkpoints', async () => {
