@@ -416,17 +416,17 @@ function decodeEvent(raw2) {
     case "edit": {
       const from = num(raw2, "from");
       const to = num(raw2, "to");
-      const text15 = str(raw2, "text");
+      const text16 = str(raw2, "text");
       const cursor = num(raw2, "cursor");
       const len = num(raw2, "len");
-      if (sf === void 0 || id === void 0 || from === void 0 || to === void 0 || text15 === void 0 || cursor === void 0 || len === void 0) {
+      if (sf === void 0 || id === void 0 || from === void 0 || to === void 0 || text16 === void 0 || cursor === void 0 || len === void 0) {
         return unknown4();
       }
-      return { ev, sf, id, from, to, text: text15, cursor, len, raw: raw2 };
+      return { ev, sf, id, from, to, text: text16, cursor, len, raw: raw2 };
     }
     case "send": {
-      const text15 = str(raw2, "text");
-      return sf !== void 0 && id !== void 0 && text15 !== void 0 ? { ev, sf, id, text: text15, raw: raw2 } : unknown4();
+      const text16 = str(raw2, "text");
+      return sf !== void 0 && id !== void 0 && text16 !== void 0 ? { ev, sf, id, text: text16, raw: raw2 } : unknown4();
     }
     case "error":
       return defined({ ev, msg: str(raw2, "msg") ?? "", raw: raw2 }, { sf, s: num(raw2, "s"), op: num(raw2, "op"), sheet: str(raw2, "sheet"), id });
@@ -747,8 +747,8 @@ function modsOf(param) {
     meta: (bits & 8) !== 0
   };
 }
-function key(name, mods2, text15) {
-  return text15 === void 0 ? { name, ...mods2 } : { name, text: text15, ...mods2 };
+function key(name, mods2, text16) {
+  return text16 === void 0 ? { name, ...mods2 } : { name, text: text16, ...mods2 };
 }
 var LETTER_KEYS = {
   A: "up",
@@ -1322,21 +1322,21 @@ function createNode(kind, input2, children3) {
     if (run6.length > 0)
       Object.assign(props, textProps(run6));
   } else if (kind === "el") {
-    let text15 = "";
+    let text16 = "";
     for (const part of parts3) {
       if (part instanceof Span)
         throw new TypeError("el takes no spans; use html.span");
       if (typeof part === "string") {
         if (nodes.length === 0)
-          text15 += part;
+          text16 += part;
         else
           nodes.push(new Node("el", { tag: "span", text: part }));
       } else {
         nodes.push(part);
       }
     }
-    if (text15 !== "")
-      props["text"] = text15;
+    if (text16 !== "")
+      props["text"] = text16;
   } else {
     nodes = containerChildren(parts3);
   }
@@ -1540,11 +1540,11 @@ var View = class _View {
   }
 };
 function diff(old, now, ops) {
-  const text15 = isTextKind(now.kind);
+  const text16 = isTextKind(now.kind);
   const set = {};
   let changed = false;
   for (const key2 in now.props) {
-    if (text15 && key2 === "text")
+    if (text16 && key2 === "text")
       continue;
     const value = now.props[key2];
     if (value === void 0 || jsonEqual(old.props[key2], value))
@@ -1553,14 +1553,14 @@ function diff(old, now, ops) {
     changed = true;
   }
   for (const key2 in old.props) {
-    if (!(text15 && key2 === "text") && !(key2 in now.props)) {
+    if (!(text16 && key2 === "text") && !(key2 in now.props)) {
       set[key2] = null;
       changed = true;
     }
   }
   if (changed)
     ops.push(["set", now.id, set]);
-  if (text15) {
+  if (text16) {
     const before = old.props["text"];
     const after = now.props["text"];
     if (!jsonEqual(before, after)) {
@@ -2383,10 +2383,10 @@ function sessionHost(cx) {
     },
     // A steer that fell back to the queue: steering carries no images.
     canonical: cx.gw.isCanonical,
-    enqueue: (text15) => cx.router.behind({ images: [], kind: "app", text: text15 }),
+    enqueue: (text16) => cx.router.behind({ images: [], kind: "app", text: text16 }),
     gw: cx.gw,
-    notice: (text15, tone) => {
-      cx.transcript.notice(text15, tone);
+    notice: (text16, tone) => {
+      cx.transcript.notice(text16, tone);
       cx.changed();
     },
     // The shared gateway (the one /branch runs on) answers a resume with one id for both kinds.
@@ -2394,8 +2394,8 @@ function sessionHost(cx) {
       await cx.life.resume(id);
       return durable(cx.state.ref) === id;
     },
-    panel: (title, text15) => {
-      cx.transcript.panel(title, text15);
+    panel: (title, text16) => {
+      cx.transcript.panel(title, text16);
       cx.changed();
     },
     compressing: (state) => {
@@ -2419,15 +2419,15 @@ function sessionHost(cx) {
         await cx.life.reload(sid);
       }
     },
-    send: (text15) => cx.router.send({ images: [], kind: "app", text: text15 }),
+    send: (text16) => cx.router.send({ images: [], kind: "app", text: text16 }),
     sid,
     stale: () => !ticket.isCurrent(),
-    steered: (text15) => {
-      cx.transcript.steer(text15);
+    steered: (text16) => {
+      cx.transcript.steer(text16);
       cx.changed();
     },
     // /queue: behind the turn whatever busy_input_mode says.
-    submit: (text15) => cx.submit(text15)
+    submit: (text16) => cx.submit(text16)
   };
 }
 
@@ -3954,15 +3954,15 @@ function record2(v) {
   }
   return v && typeof v === "object" && !Array.isArray(v) ? v : void 0;
 }
-function parseJson(text15) {
+function parseJson(text16) {
   try {
-    return JSON.parse(text15);
+    return JSON.parse(text16);
   } catch {
     return void 0;
   }
 }
-function decodeJson(text15) {
-  return JSON.parse(text15);
+function decodeJson(text16) {
+  return JSON.parse(text16);
 }
 
 // src/hermes/connect.ts
@@ -3991,7 +3991,7 @@ var runFile = (file2, args, env2) => new Promise((resolve5) => {
     resolve5({ code: code7, stderr: stderr || (error && !stdout ? error.message : ""), stdout });
   });
 });
-var lastJson = (text15) => text15.split("\n").reverse().map((line) => line.trim()).filter(Boolean).map((line) => parseJson(line)).find((value) => value !== void 0);
+var lastJson = (text16) => text16.split("\n").reverse().map((line) => line.trim()).filter(Boolean).map((line) => parseJson(line)).find((value) => value !== void 0);
 function attachGateway(hermes, run6 = runFile, env2 = process.env) {
   return async (start, recover) => {
     const [file2, ...args] = hermes.argv;
@@ -4048,6 +4048,9 @@ function errorText(error) {
 }
 function errorCode(error) {
   return error instanceof Error && "code" in error && typeof error.code === "string" ? error.code : void 0;
+}
+function rpcErrorCode(error) {
+  return error instanceof Error && "code" in error && typeof error.code === "number" ? error.code : void 0;
 }
 
 // src/core/scheduler.ts
@@ -4227,8 +4230,6 @@ var IGNORED = [
   "billing.step_up.verification",
   "bot_relay.outbox.pending",
   "browser.progress",
-  "connection.request",
-  "connection.update",
   "cron.changed",
   "dashboard.new_session_requested",
   "display.install.done",
@@ -4328,13 +4329,13 @@ var Notices = class {
   #seq = 0;
   /** Adds or replaces the notice; returns it (undefined for an empty one). */
   show(p3, now = Date.now()) {
-    const text15 = p3.text?.trim();
-    if (!text15) {
+    const text16 = p3.text?.trim();
+    if (!text16) {
       return void 0;
     }
     const key2 = p3.key || p3.id || `n${++this.#seq}`;
     const ttl = p3.kind === "ttl" && typeof p3.ttl_ms === "number" && p3.ttl_ms > 0 ? p3.ttl_ms : void 0;
-    const notice = { key: key2, text: text15, tone: TONES[p3.level ?? ""] ?? "info", ...ttl ? { expires: now + ttl } : {} };
+    const notice = { key: key2, text: text16, tone: TONES[p3.level ?? ""] ?? "info", ...ttl ? { expires: now + ttl } : {} };
     this.#list = [...this.#list.filter((n) => n.key !== key2), notice];
     return notice;
   }
@@ -4440,11 +4441,11 @@ var chromeHandlers = {
   },
   // What the background self-improvement review saved to memory or skills.
   "review.summary": (ev, cx) => {
-    const text15 = String(ev.payload?.text ?? "").trim();
-    if (!text15) {
+    const text16 = String(ev.payload?.text ?? "").trim();
+    if (!text16) {
       return "quiet";
     }
-    cx.transcript.notice(text15);
+    cx.transcript.notice(text16);
     return "render";
   },
   notice: (ev, cx) => {
@@ -4472,6 +4473,18 @@ var chromeHandlers = {
   },
   "background.complete": answered,
   "btw.complete": answered
+};
+
+// src/gateway/handlers/connections.ts
+var connectionHandlers = {
+  "connection.request": (ev, cx) => {
+    cx.connect.request(ev.payload, ev.session_id);
+    return "quiet";
+  },
+  "connection.update": (ev, cx) => {
+    cx.connect.update(ev.payload, ev.session_id);
+    return "quiet";
+  }
 };
 
 // src/gateway/handlers/processes.ts
@@ -4532,7 +4545,7 @@ function sharedPromptRequest(ev, gw2, onNotice) {
     id: sharedPromptId(shared.prompt_id),
     method: kind,
     params: { ...shared, questions, session_id: ev.session_id },
-    respond: ({ answers, choice: choice2 }) => kind === "approval" ? send2(() => rpc(gw2, "approval.respond", { choice: typeof choice2 === "string" ? choice2 : "deny", ...control })) : send2(() => rpc(gw2, "clarify.respond", { answer: firstAnswer(answers), ...control })),
+    respond: ({ answers: answers2, choice: choice2 }) => kind === "approval" ? send2(() => rpc(gw2, "approval.respond", { choice: typeof choice2 === "string" ? choice2 : "deny", ...control })) : send2(() => rpc(gw2, "clarify.respond", { answer: firstAnswer(answers2), ...control })),
     // Unanswered here: the prompt stays pending for another viewer or its own timeout.
     fail: () => void 0
   };
@@ -4542,11 +4555,11 @@ function clarifyQuestions(clarify, promptId) {
   const batch = Array.isArray(clarify?.questions) && clarify.questions.length ? clarify.questions : null;
   return batch ?? (single ? [{ choices: clarify?.choices ?? [], multi_select: clarify?.multi_select === true, qid: promptId, question: single }] : []);
 }
-function firstAnswer(answers) {
-  if (!answers || typeof answers !== "object") {
+function firstAnswer(answers2) {
+  if (!answers2 || typeof answers2 !== "object") {
     return "";
   }
-  const first2 = Object.values(answers)[0];
+  const first2 = Object.values(answers2)[0];
   return Array.isArray(first2) ? first2.join(", ") : typeof first2 === "string" ? first2 : "";
 }
 
@@ -4890,11 +4903,11 @@ var ITALIC_STAR = /(?<![*\\])\*(?=[^\s*])([^\n*]*?[^\s*\\])\*(?!\*)/g;
 var ITALIC_UNDERSCORE = /(?<![\w\\])_(?=[^\s_])([^\n_]*?[^\s_\\])_(?![\w])/g;
 var STRIKE = /~~(?=\S)([^\n]*?\S)~~/g;
 var LINK = /\[(?<label>[^\]\n]+)\]\(([^)\s]+)\)/g;
-function markdownDecor(text15) {
-  if (!text15) {
+function markdownDecor(text16) {
+  if (!text16) {
     return [];
   }
-  const marks = Array.from({ length: text15.length }, () => []);
+  const marks = Array.from({ length: text16.length }, () => []);
   const mark2 = (from, to, s2) => {
     for (const tokens2 of marks.slice(from, to)) {
       if (!tokens2.includes(s2)) {
@@ -4904,7 +4917,7 @@ function markdownDecor(text15) {
   };
   let at = 0;
   let fenced = false;
-  for (const line of text15.split("\n")) {
+  for (const line of text16.split("\n")) {
     const end = at + line.length;
     if (FENCE.test(line)) {
       mark2(at, end, "dim");
@@ -4998,11 +5011,11 @@ function runs(marks) {
   }
   return out;
 }
-function listNewline(text15, cursor) {
-  const start = text15.lastIndexOf("\n", cursor - 1) + 1;
-  const nl = text15.indexOf("\n", cursor);
-  const end = nl < 0 ? text15.length : nl;
-  const line = text15.slice(start, end);
+function listNewline(text16, cursor) {
+  const start = text16.lastIndexOf("\n", cursor - 1) + 1;
+  const nl = text16.indexOf("\n", cursor);
+  const end = nl < 0 ? text16.length : nl;
+  const line = text16.slice(start, end);
   const m = LIST.exec(line);
   if (!m || cursor - start < m[0].length) {
     return void 0;
@@ -5017,55 +5030,55 @@ function listNewline(text15, cursor) {
 ${indent2}${next2}${gap}${box ? "[ ] " : ""}`;
   return { cursor: cursor + insert.length, from: cursor, text: insert, to: cursor };
 }
-function toggleMark(text15, from, to, marker2) {
+function toggleMark(text16, from, to, marker2) {
   const n = marker2.length;
   if (from !== to) {
-    if (text15.slice(from - n, from) === marker2 && text15.slice(to, to + n) === marker2 && !doubled(text15, from - n, to + n, marker2)) {
-      return { anchor: from - n, cursor: to - n, from: from - n, text: text15.slice(from, to), to: to + n };
+    if (text16.slice(from - n, from) === marker2 && text16.slice(to, to + n) === marker2 && !doubled(text16, from - n, to + n, marker2)) {
+      return { anchor: from - n, cursor: to - n, from: from - n, text: text16.slice(from, to), to: to + n };
     }
-    const inner = text15.slice(from, to);
+    const inner = text16.slice(from, to);
     if (inner.length > 2 * n && inner.startsWith(marker2) && inner.endsWith(marker2)) {
       return { anchor: from, cursor: to - 2 * n, from, text: inner.slice(n, -n), to };
     }
     return { anchor: from + n, cursor: to + n, from, text: `${marker2}${inner}${marker2}`, to };
   }
   const at = from;
-  if (text15.slice(at - n, at) === marker2 && text15.slice(at, at + n) === marker2) {
+  if (text16.slice(at - n, at) === marker2 && text16.slice(at, at + n) === marker2) {
     return { cursor: at - n, from: at - n, text: "", to: at + n };
   }
-  const run6 = markedRun(text15, at, marker2);
+  const run6 = markedRun(text16, at, marker2);
   if (run6 && at === run6.close) {
     return { cursor: at + n, from: at, text: "", to: at };
   }
   if (run6) {
-    const inner = text15.slice(run6.open + n, run6.close);
+    const inner = text16.slice(run6.open + n, run6.close);
     return { cursor: at - n, from: run6.open, text: inner, to: run6.close + n };
   }
-  const word = wordAt(text15, at);
+  const word = wordAt(text16, at);
   if (word) {
-    return { cursor: at + n, from: word.from, text: `${marker2}${text15.slice(word.from, word.to)}${marker2}`, to: word.to };
+    return { cursor: at + n, from: word.from, text: `${marker2}${text16.slice(word.from, word.to)}${marker2}`, to: word.to };
   }
   return { cursor: at + n, from: at, text: `${marker2}${marker2}`, to: at };
 }
 var WORD = /[\p{L}\p{N}'’-]/u;
-function wordAt(text15, at) {
+function wordAt(text16, at) {
   let from = at;
   let to = at;
-  while (from > 0 && WORD.test(text15[from - 1] ?? "")) {
+  while (from > 0 && WORD.test(text16[from - 1] ?? "")) {
     from--;
   }
-  while (to < text15.length && WORD.test(text15[to] ?? "")) {
+  while (to < text16.length && WORD.test(text16[to] ?? "")) {
     to++;
   }
   return from < to ? { from, to } : void 0;
 }
-function doubled(text15, open, close, marker2) {
-  return marker2.length === 1 && (text15[open - 1] === marker2 || text15[close] === marker2);
+function doubled(text16, open, close, marker2) {
+  return marker2.length === 1 && (text16[open - 1] === marker2 || text16[close] === marker2);
 }
-function markedRun(text15, at, marker2) {
-  const start = text15.lastIndexOf("\n", at - 1) + 1;
-  const nl = text15.indexOf("\n", at);
-  const line = text15.slice(start, nl < 0 ? text15.length : nl);
+function markedRun(text16, at, marker2) {
+  const start = text16.lastIndexOf("\n", at - 1) + 1;
+  const nl = text16.indexOf("\n", at);
+  const line = text16.slice(start, nl < 0 ? text16.length : nl);
   const re2 = marker2 === "**" ? /\*\*(?=\S)([^\n]*?\S)\*\*/g : /(?<![\w_])_(?=[^\s_])([^\n_]*?[^\s_])_(?![\w_])/g;
   for (const m of line.matchAll(re2)) {
     const open = start + m.index;
@@ -5180,23 +5193,23 @@ var Composer = class {
    * last draft held go with it: `pasted` names the ones `text` holds (a prompt back in the
    * composer, with the draft it went in front of).
    */
-  set(text15, { cursor = text15.length, pasted = [] } = {}) {
+  set(text16, { cursor = text16.length, pasted = [] } = {}) {
     this.#record({ merge: false });
-    this.#text = text15;
-    this.#cursor = clamp(cursor, text15.length);
+    this.#text = text16;
+    this.#cursor = clamp(cursor, text16.length);
     this.#pasted = [...pasted];
   }
   /** Clears the draft after a submit, remembering it in the prompt history. */
   take() {
-    const text15 = this.text;
-    append(text15);
+    const text16 = this.text;
+    append(text16);
     this.#pasted = [];
     this.#steps.clear();
     this.#browse = -1;
     this.#text = "";
     this.#cursor = 0;
     this.#anchor = void 0;
-    return text15;
+    return text16;
   }
   /** Types `s` at the caret, over the selection if there is one. */
   insert(s2) {
@@ -5403,8 +5416,8 @@ var Composer = class {
     return true;
   }
   /** Applies a Markdown edit as one undo step, with the selection it leaves. */
-  #apply({ anchor, cursor, from, text: text15, to }) {
-    this.#replace({ cursor, from, merge: false, s: text15, to });
+  #apply({ anchor, cursor, from, text: text16, to }) {
+    this.#replace({ cursor, from, merge: false, s: text16, to });
     this.#anchor = anchor !== void 0 && anchor !== this.cursor ? anchor : void 0;
     return true;
   }
@@ -5437,12 +5450,12 @@ var Composer = class {
       return true;
     }
     this.#browse = at;
-    const text15 = at === items.length ? this.#draft : items[at] ?? "";
+    const text16 = at === items.length ? this.#draft : items[at] ?? "";
     if (at === items.length) {
       this.#browse = -1;
     }
-    this.#text = text15;
-    this.#cursor = text15.length;
+    this.#text = text16;
+    this.#cursor = text16.length;
     this.#anchor = void 0;
     return true;
   }
@@ -5482,19 +5495,19 @@ var Composer = class {
 function clamp(n, max) {
   return Math.max(0, Math.min(max, n));
 }
-function lineStart(text15, at) {
-  return at <= 0 ? 0 : text15.lastIndexOf("\n", at - 1) + 1;
+function lineStart(text16, at) {
+  return at <= 0 ? 0 : text16.lastIndexOf("\n", at - 1) + 1;
 }
-function lineEnd(text15, at) {
-  const i = text15.indexOf("\n", at);
-  return i < 0 ? text15.length : i;
+function lineEnd(text16, at) {
+  const i = text16.indexOf("\n", at);
+  return i < 0 ? text16.length : i;
 }
-function boundaryAt(text15, at) {
-  if (at >= text15.length) {
-    return text15.length;
+function boundaryAt(text16, at) {
+  if (at >= text16.length) {
+    return text16.length;
   }
   let floor = 0;
-  for (const { index: index2 } of graphemes.segment(text15)) {
+  for (const { index: index2 } of graphemes.segment(text16)) {
     if (index2 > at) {
       break;
     }
@@ -5502,9 +5515,9 @@ function boundaryAt(text15, at) {
   }
   return floor;
 }
-function prevGrapheme(text15, at) {
+function prevGrapheme(text16, at) {
   let prev = 0;
-  for (const { index: index2 } of graphemes.segment(text15)) {
+  for (const { index: index2 } of graphemes.segment(text16)) {
     if (index2 >= at) {
       break;
     }
@@ -5512,36 +5525,36 @@ function prevGrapheme(text15, at) {
   }
   return prev;
 }
-function nextGrapheme(text15, at) {
-  for (const { index: index2, segment } of graphemes.segment(text15)) {
+function nextGrapheme(text16, at) {
+  for (const { index: index2, segment } of graphemes.segment(text16)) {
     if (index2 >= at) {
       return index2 + segment.length;
     }
   }
-  return text15.length;
+  return text16.length;
 }
-function prevWord(text15, at) {
+function prevWord(text16, at) {
   let i = at;
-  while (i > 0 && !WORD2.test(text15[i - 1] ?? "")) {
+  while (i > 0 && !WORD2.test(text16[i - 1] ?? "")) {
     i--;
   }
-  while (i > 0 && WORD2.test(text15[i - 1] ?? "")) {
+  while (i > 0 && WORD2.test(text16[i - 1] ?? "")) {
     i--;
   }
   return i;
 }
-function nextWord(text15, at) {
+function nextWord(text16, at) {
   let i = at;
-  while (i < text15.length && !WORD2.test(text15[i] ?? "")) {
+  while (i < text16.length && !WORD2.test(text16[i] ?? "")) {
     i++;
   }
-  while (i < text15.length && WORD2.test(text15[i] ?? "")) {
+  while (i < text16.length && WORD2.test(text16[i] ?? "")) {
     i++;
   }
   return i;
 }
-function pastedCommand(text15) {
-  return text15.includes("{!") || text15.trimStart().startsWith("!");
+function pastedCommand(text16) {
+  return text16.includes("{!") || text16.trimStart().startsWith("!");
 }
 
 // src/prompts/clarify.tsx
@@ -5552,7 +5565,7 @@ function tabLabel(question) {
 }
 function clarifyOverlay(host, prompt) {
   const { questions, req } = prompt;
-  const answers = { ...prompt.answers };
+  const answers2 = { ...prompt.answers };
   const drafts = questions.map(() => ({
     other: new Composer(),
     picked: /* @__PURE__ */ new Set(),
@@ -5565,7 +5578,7 @@ function clarifyOverlay(host, prompt) {
   const cancel2 = () => sending.error ? host.close(overlay2) : respond({});
   let step = Math.max(
     0,
-    questions.findIndex((q2) => !(q2.qid in answers))
+    questions.findIndex((q2) => !(q2.qid in answers2))
   );
   const optionsOf = (q2, d) => [
     ...q2.choices.map((c, i) => ({
@@ -5580,16 +5593,16 @@ function clarifyOverlay(host, prompt) {
   const commit = (answer) => {
     const q2 = questions[step];
     if (q2) {
-      answers[q2.qid] = answer;
+      answers2[q2.qid] = answer;
     }
-    const next2 = questions.findIndex((other, i) => i > step && !(other.qid in answers));
-    const first2 = questions.findIndex((other) => !(other.qid in answers));
+    const next2 = questions.findIndex((other, i) => i > step && !(other.qid in answers2));
+    const first2 = questions.findIndex((other) => !(other.qid in answers2));
     if (next2 >= 0 || first2 >= 0) {
       step = next2 >= 0 ? next2 : first2;
       host.changed();
       return;
     }
-    respond({ answers });
+    respond({ answers: answers2 });
   };
   const submit = () => {
     const q2 = questions[step];
@@ -5651,7 +5664,7 @@ function clarifyOverlay(host, prompt) {
         return /* @__PURE__ */ jsx("overlay", { anchor: "bottom", modal: true, role: "omp.overlay.ask", size: "md" }, key2);
       }
       const freeText = !q2.choices.length;
-      const last = questions.every((other, i) => i === step || other.qid in answers);
+      const last = questions.every((other, i) => i === step || other.qid in answers2);
       return /* @__PURE__ */ jsx("overlay", { anchor: "bottom", modal: true, role: "omp.overlay.ask", size: "md", children: /* @__PURE__ */ jsxs("col", { gap: "md", children: [
         questions.length > 1 ? /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "omp.ask.head", children: [
           /* @__PURE__ */ jsx(
@@ -5660,7 +5673,7 @@ function clarifyOverlay(host, prompt) {
               active: String(step),
               items: questions.map((other, i) => ({
                 id: String(i),
-                label: `${other.qid in answers ? "\u2713 " : ""}${tabLabel(other.question)}`
+                label: `${other.qid in answers2 ? "\u2713 " : ""}${tabLabel(other.question)}`
               })),
               onSelect: (ev) => {
                 const to = Number(ev.item);
@@ -6075,9 +6088,9 @@ var IMAGE_ONLY_PROMPT = "What do you see in this image?";
 function shownText(prompt) {
   return (prompt.kind === "command" ? prompt.display : void 0) ?? prompt.text;
 }
-function userText(text15, images) {
+function userText(text16, images) {
   const count2 = images.length ? `\u{1F4CE} ${images.length} image${images.length === 1 ? "" : "s"}` : "";
-  return [text15, count2].filter(Boolean).join("\n\n");
+  return [text16, count2].filter(Boolean).join("\n\n");
 }
 function userImages(images) {
   return images.map((i) => ({ kind: "image", name: i.name, ...i.preview ? { source: i.preview } : {} }));
@@ -6439,12 +6452,12 @@ function storedCompactions(sid, db = stateDbPath(), lineage = ancestry) {
   }
 }
 function handoff(content5) {
-  const text15 = textOf(content5);
-  const from = text15.indexOf(MARKER);
+  const text16 = textOf(content5);
+  const from = text16.indexOf(MARKER);
   if (from < 0) {
     return {};
   }
-  const body = text15.slice(from);
+  const body = text16.slice(from);
   const count2 = /\bThe (\d+) compacted message/.exec(body);
   const start = body.indexOf("\n## ");
   const end = body.indexOf(END);
@@ -6462,40 +6475,40 @@ function textOf(content5) {
   const parts3 = parseJson(content5);
   return Array.isArray(parts3) ? parts3.map((p3) => textPart.safeParse(p3).data?.text ?? "").join("\n") : content5;
 }
-function lineTokens(text15) {
-  const num5 = (s2) => Number(s2.replace(/,/g, ""));
-  const pair3 = /~(?<before>[\d,]+)\s*→\s*~(?<after>[\d,]+)\s*tok/.exec(text15)?.groups;
+function lineTokens(text16) {
+  const num6 = (s2) => Number(s2.replace(/,/g, ""));
+  const pair3 = /~(?<before>[\d,]+)\s*→\s*~(?<after>[\d,]+)\s*tok/.exec(text16)?.groups;
   if (pair3) {
-    return { after: num5(pair3["after"] ?? ""), before: num5(pair3["before"] ?? "") };
+    return { after: num6(pair3["after"] ?? ""), before: num6(pair3["before"] ?? "") };
   }
-  const one5 = /~(?<before>[\d,]+)\s*tok/.exec(text15)?.groups;
-  return one5 ? { before: num5(one5["before"] ?? "") } : {};
+  const one5 = /~(?<before>[\d,]+)\s*tok/.exec(text16)?.groups;
+  return one5 ? { before: num6(one5["before"] ?? "") } : {};
 }
 
 // src/status.ts
 var COMPACTING_LABEL = "Compacting context\u2026";
 function statusEffect(payload, last) {
-  const text15 = payload?.text?.trim();
+  const text16 = payload?.text?.trim();
   const kind = payload?.kind ?? "";
-  if (!text15) {
+  if (!text16) {
     return kind === "ready" ? { compacting: false } : {};
   }
   if (kind === "goal") {
-    return { notice: { text: text15, tone: text15.startsWith("\u2713") ? "success" : "info" } };
+    return { notice: { text: text16, tone: text16.startsWith("\u2713") ? "success" : "info" } };
   }
   if (kind === "compacting" || kind === "compressing") {
-    return { compacting: true, label: COMPACTING_LABEL, ...counted(text15) };
+    return { compacting: true, label: COMPACTING_LABEL, ...counted(text16) };
   }
   if (kind === "compacted" || kind === "ready") {
-    return { compacting: false, label: text15, ...counted(text15) };
+    return { compacting: false, label: text16, ...counted(text16) };
   }
   if (kind === "warn" || kind === "approval" || kind === "error") {
-    return text15 === last ? {} : { note: text15, notice: { text: text15, tone: kind === "error" ? "error" : "warning" } };
+    return text16 === last ? {} : { note: text16, notice: { text: text16, tone: kind === "error" ? "error" : "warning" } };
   }
-  return { label: text15 };
+  return { label: text16 };
 }
-function counted(text15) {
-  const tokens2 = lineTokens(text15);
+function counted(text16) {
+  const tokens2 = lineTokens(text16);
   return tokens2.before || tokens2.after ? { tokens: tokens2 } : {};
 }
 
@@ -6545,8 +6558,8 @@ function appTitle(slug) {
 }
 function actionPhrase(tool, app2 = "") {
   const prefix2 = `${app2.replace(/-/g, "_").toUpperCase()}_`;
-  const text15 = app2 && tool.toUpperCase().startsWith(prefix2) ? tool.slice(prefix2.length) : tool;
-  return text15.split(/[-_\s]+/).filter(Boolean).join(" ").toLowerCase();
+  const text16 = app2 && tool.toUpperCase().startsWith(prefix2) ? tool.slice(prefix2.length) : tool;
+  return text16.split(/[-_\s]+/).filter(Boolean).join(" ").toLowerCase();
 }
 function appOf(name, args) {
   const [prefix2, connector, ...tool] = name.split("__");
@@ -6705,7 +6718,7 @@ function connectTargets(call, card) {
   return parseTargets(Array.isArray(targets) ? targets : []);
 }
 function loadConnect(call, dir2 = dataDir(), now = Date.now()) {
-  if (call.name !== CONNECT_TOOL) {
+  if (call.name !== CONNECT_TOOL || resultCard(call)) {
     return void 0;
   }
   const key2 = call.connect?.key ?? findCard(call, dir2);
@@ -6727,28 +6740,82 @@ function loadConnect(call, dir2 = dataDir(), now = Date.now()) {
 function parseTargets(targets) {
   return targets.flatMap((t) => {
     const r = record2(t);
-    const name = typeof r?.["name"] === "string" ? r["name"] : "";
+    const name = typeof r?.["name"] === "string" ? r["name"].trim() : "";
+    const fields = Array.isArray(r?.["required_env"]) ? r["required_env"].flatMap((f) => envField(f)) : [];
+    const env2 = Object.fromEntries(fields.flatMap((f) => f.default ? [[f.name, f.default]] : []));
+    const needs = fields.filter((f) => f.required && !f.default).map((f) => f.name);
     return name ? [
       {
-        alias: typeof r?.["alias"] === "string" && r["alias"] ? r["alias"] : void 0,
-        detail: typeof r?.["detail"] === "string" && r["detail"] ? r["detail"] : void 0,
+        alias: text2(r?.["alias"]),
+        detail: text2(r?.["detail"]),
+        env: Object.keys(env2).length ? env2 : void 0,
+        kind: text2(r?.["kind"]),
+        launch: launchOf(r?.["launch"]),
         name,
+        needs: needs.length ? needs : void 0,
         state: typeof r?.["state"] === "string" ? r["state"] : "pending",
         title: appTitle(name),
-        url: typeof r?.["connect_url"] === "string" && r["connect_url"] ? r["connect_url"] : void 0
+        url: text2(r?.["connect_url"])
       }
     ] : [];
   });
 }
+function launchOf(raw2) {
+  const r = record2(raw2);
+  const kind = r?.["kind"];
+  const target2 = text2(r?.["target"]);
+  if (kind !== "remote" && kind !== "stdio" || !target2) {
+    return void 0;
+  }
+  const env2 = Array.isArray(r?.["env"]) ? r["env"].filter((k) => typeof k === "string" && k !== "") : [];
+  return { cwd: text2(r?.["cwd"]), env: env2.length ? env2 : void 0, kind, target: target2 };
+}
+var text2 = (v) => typeof v === "string" && v ? v : void 0;
+function envField(raw2) {
+  const r = record2(raw2);
+  const name = text2(r?.["name"]);
+  return name ? [{ default: typeof r?.["default"] === "string" ? r["default"] : "", name, required: r?.["required"] === true }] : [];
+}
 var waiting = (t) => t.state === "initiated" || t.state === "pending";
+var CONTINUE = "continue";
+var sendingVerb = (card, name) => card.sending?.find((r) => r.endsWith(`:${name}`))?.split(":")[0];
 var allConnected = (card) => {
   const own14 = card.targets.filter((t) => t.state !== "superseded");
   return own14.length > 0 && own14.every((t) => t.state === "connected");
 };
+function settleReason(r) {
+  if (r["settled"] !== true && typeof r["settled_at"] !== "number") {
+    return void 0;
+  }
+  switch (r["settled_by"]) {
+    case "all_resolved":
+    case "deadline":
+    case "interrupt":
+      return r["settled_by"];
+    case "continue":
+      return "continued";
+    default:
+      return "stopped";
+  }
+}
+function resultCard(call) {
+  const r = call.name === CONNECT_TOOL ? record2(call.result) : void 0;
+  const settled2 = r && r["status"] === "settled" && typeof r["op_id"] === "string" ? settleReason(r) : void 0;
+  const targets = settled2 && Array.isArray(r?.["targets"]) ? parseTargets(r["targets"]) : [];
+  return targets.length ? { gateway: true, opened: [], settled: settled2, targets, told: false } : void 0;
+}
 function isConnectCall(call) {
   const card = call.connect;
-  return card ? card.settled !== "superseded" && card.targets.some((t) => t.url) : connectTargets(call).some((t) => t.url);
+  if (card?.op) {
+    return card.targets.length > 0;
+  }
+  if (card) {
+    return card.settled !== "superseded" && card.targets.some((t) => t.url);
+  }
+  return resultCard(call) !== void 0 || connectTargets(call).some((t) => t.url);
 }
+var unresolved = (t) => ["expired", "failed", "initiated", "pending"].includes(t.state);
+var cardRef = (call) => call.connect?.op?.id ?? call.connect?.key ?? call.id;
 var and = (names) => names.length < 3 ? names.join(" and ") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
 function continueMessage(targets) {
   const names = targets.filter((t) => t.state === "connected" || waiting(t)).map((t) => t.title);
@@ -6810,8 +6877,8 @@ function moaReferenceLabel(label, index2, count2) {
 }
 
 // src/gateway/handlers/turn.ts
-function kaomojiLabel(text15) {
-  const word = text15.match(/([A-Za-z][A-Za-z ]*[A-Za-z])\.{2,}\s*$/)?.[1];
+function kaomojiLabel(text16) {
+  const word = text16.match(/([A-Za-z][A-Za-z ]*[A-Za-z])\.{2,}\s*$/)?.[1];
   return word ? `${word.charAt(0).toUpperCase()}${word.slice(1)}\u2026` : "";
 }
 function moaStep(ev, cx) {
@@ -6919,6 +6986,7 @@ var HANDLERS = {
   ...agentHandlers,
   ...processHandlers,
   ...promptHandlers,
+  ...connectionHandlers,
   ...chromeHandlers
 };
 var TABLE = HANDLERS;
@@ -6993,24 +7061,24 @@ function followGateway(gw2, cx) {
 
 // src/clipboard.ts
 import { spawn } from "node:child_process";
-function copyToClipboard(text15, env2 = process.env) {
-  process.stdout.write(`\x1B]52;c;${Buffer.from(text15).toString("base64")}\x07`);
+function copyToClipboard(text16, env2 = process.env) {
+  process.stdout.write(`\x1B]52;c;${Buffer.from(text16).toString("base64")}\x07`);
   if (process.platform === "darwin" && !env2["SSH_CONNECTION"] && !env2["SSH_TTY"]) {
     const child = spawn("pbcopy", [], { stdio: ["pipe", "ignore", "ignore"] });
     child.on("error", () => {
     });
-    child.stdin.end(text15);
+    child.stdin.end(text16);
   }
 }
 
 // src/view/time.ts
 var kAge = /* @__PURE__ */ Symbol("tsp.age");
-function age(owner, startedAt, now) {
-  const aged = owner;
+function age(owner2, startedAt, now) {
+  const aged = owner2;
   return aged[kAge] ??= Math.max(0, now - startedAt);
 }
-function countdownAge(owner, dueAt, now) {
-  const aged = owner;
+function countdownAge(owner2, dueAt, now) {
+  const aged = owner2;
   return aged[kAge] ??= Math.min(0, now - dueAt);
 }
 function compact(n) {
@@ -7038,9 +7106,9 @@ var SUBAGENT_LOOK = {
 var LINE = /^(?<at>\d{2}:\d{2}:\d{2}) (?<role>\S+)\s*\| (?<body>.*)$/;
 var TOOL = /^-> (?<name>[^(]+)\((?<args>.*)\)$/;
 var RESULT = /^(?<name>\S+) (?<status>ok|ERROR)(?: (?<secs>[\d.]+)s)?: ?(?<text>.*)$/;
-function parseLiveLog(text15) {
+function parseLiveLog(text16) {
   const log = { entries: [] };
-  for (const raw2 of text15.split("\n")) {
+  for (const raw2 of text16.split("\n")) {
     const m = LINE.exec(raw2);
     if (!m) {
       continue;
@@ -7059,9 +7127,9 @@ function parseLiveLog(text15) {
         const r = RESULT.exec(body)?.groups;
         const call = r && log.entries.findLast((e) => e.kind === "tool" && e.status === "running" && e.name === r["name"]);
         if (call && call.kind === "tool" && r) {
-          const { secs, status, text: text16 = "" } = r;
+          const { secs, status, text: text17 = "" } = r;
           call.status = status === "ok" ? "ok" : "error";
-          call.result = text16;
+          call.result = text17;
           if (secs) {
             call.took = Math.round(Number(secs) * 1e3);
           }
@@ -7275,21 +7343,21 @@ function mergeTail(seen, tail) {
   merged ??= seen + (seen && !seen.endsWith("\n") ? "\n" : "") + tail.slice(tail.indexOf("\n") + 1);
   return merged.length > MAX_LOG_BYTES ? merged.slice(merged.indexOf("\n", merged.length - MAX_LOG_BYTES) + 1) : merged;
 }
-function completionOutcomes(text15) {
-  const head2 = /^\[ASYNC DELEGATION (BATCH COMPLETE|COMPLETE|TASK FAILED) — ([^\],]+)(?:, task (\d+)\/\d+)?\]/.exec(text15.trim());
+function completionOutcomes(text16) {
+  const head2 = /^\[ASYNC DELEGATION (BATCH COMPLETE|COMPLETE|TASK FAILED) — ([^\],]+)(?:, task (\d+)\/\d+)?\]/.exec(text16.trim());
   if (!head2) {
     return void 0;
   }
   const [, kind, delegationId = "", task] = head2;
   const outcomes = /* @__PURE__ */ new Map();
   if (kind === "BATCH COMPLETE") {
-    for (const [, n, status] of text15.matchAll(/^--- \S+ TASK (\d+)\/\d+.*\(status=([^,)\s]+)/gm)) {
+    for (const [, n, status] of text16.matchAll(/^--- \S+ TASK (\d+)\/\d+.*\(status=([^,)\s]+)/gm)) {
       if (status) {
         outcomes.set(Number(n) - 1, status);
       }
     }
   } else {
-    const status = /^Status: (\S+)/m.exec(text15)?.[1];
+    const status = /^Status: (\S+)/m.exec(text16)?.[1];
     if (status) {
       outcomes.set(kind === "TASK FAILED" ? Number(task) - 1 : 0, status);
     }
@@ -7469,13 +7537,13 @@ function rank(items, query, textOf2, { scattered = true } = {}) {
   }
   const scored = [];
   items.forEach((item3, index2) => {
-    const text15 = textOf2(item3).toLowerCase();
+    const text16 = textOf2(item3).toLowerCase();
     const positions = /* @__PURE__ */ new Set();
     let score = 0;
     for (const word of words3) {
-      const at = text15.indexOf(word);
+      const at = text16.indexOf(word);
       if (at >= 0) {
-        const boundary = at === 0 || /[\s/_.:-]/.test(text15[at - 1] ?? "");
+        const boundary = at === 0 || /[\s/_.:-]/.test(text16[at - 1] ?? "");
         score += 100 - Math.min(at, 50) + (boundary ? 25 : 0);
         for (let i = at; i < at + word.length; i++) {
           positions.add(i);
@@ -7487,7 +7555,7 @@ function rank(items, query, textOf2, { scattered = true } = {}) {
       }
       let from = 0;
       for (const ch of word) {
-        const i = text15.indexOf(ch, from);
+        const i = text16.indexOf(ch, from);
         if (i < 0) {
           return;
         }
@@ -7573,9 +7641,9 @@ function reduceHub(state, action, agents2) {
     case "steerCancel":
       return { state: state.ask.kind === "steering" ? { ...state, ask: NONE } : state };
     case "steerSend": {
-      const text15 = state.ask.kind === "steering" ? state.ask.text.trim() : "";
+      const text16 = state.ask.kind === "steering" ? state.ask.text.trim() : "";
       const next2 = { ...state, ask: state.ask.kind === "steering" ? NONE : state.ask };
-      return a2 && text15 ? { effect: { agent: a2, kind: "steer", text: text15 }, state: next2 } : { state: next2 };
+      return a2 && text16 ? { effect: { agent: a2, kind: "steer", text: text16 }, state: next2 } : { state: next2 };
     }
     case "stop":
       return running(a2) ? { state: { ...state, ask: { kind: "confirmStop" } } } : { state };
@@ -7596,8 +7664,8 @@ function hubKey(state, k, agents2) {
     if (k.name === "enter") {
       return { type: "steerSend" };
     }
-    const text15 = editQuery(k, ask.text);
-    return text15 === void 0 ? void 0 : { text: text15, type: "steerEdit" };
+    const text16 = editQuery(k, ask.text);
+    return text16 === void 0 ? void 0 : { text: text16, type: "steerEdit" };
   }
   if (ask.kind === "confirmStop") {
     return k.name === "enter" || k.name === "y" ? { type: "stopConfirm" } : k.name === "escape" || k.name === "n" ? { type: "stopCancel" } : void 0;
@@ -7655,8 +7723,8 @@ var HUB_CLICKS = {
 function nonEmpty(v) {
   return typeof v === "string" && v ? v : void 0;
 }
-function flat(text15) {
-  return text15.replace(/\s+/g, " ").trim();
+function flat(text16) {
+  return text16.replace(/\s+/g, " ").trim();
 }
 function duration2(ms) {
   if (ms < 1e3) {
@@ -7737,20 +7805,20 @@ function relativePath(path2, o) {
 function plural(n, one5, many = `${one5}s`) {
   return `${n} ${n === 1 ? one5 : many}`;
 }
-function clip(text15, o) {
-  if (text15.length <= o.max) {
-    return text15;
+function clip(text16, o) {
+  if (text16.length <= o.max) {
+    return text16;
   }
-  return o.mark === "line" ? `${text15.slice(0, o.max)}
-\u2026` : `${text15.slice(0, o.max - 1)}\u2026`;
+  return o.mark === "line" ? `${text16.slice(0, o.max)}
+\u2026` : `${text16.slice(0, o.max - 1)}\u2026`;
 }
 var ESCAPES = /\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[@-_]/g;
-function withoutEscapes(text15) {
-  return text15.replace(ESCAPES, "");
+function withoutEscapes(text16) {
+  return text16.replace(ESCAPES, "");
 }
 
 // src/tools/fields.ts
-function text2(v) {
+function text3(v) {
   return typeof v === "string" && v ? v : void 0;
 }
 function num3(v) {
@@ -7766,15 +7834,15 @@ function objects(v) {
   return records(v).filter((r) => r !== void 0);
 }
 function texts(v) {
-  return Array.isArray(v) ? v.map((i) => text2(i)).filter((t) => t !== void 0) : [];
+  return Array.isArray(v) ? v.map((i) => text3(i)).filter((t) => t !== void 0) : [];
 }
 
 // src/tools/ask.ts
 function askDetail({ args, result }) {
-  const asked2 = list(args["questions"]) ?? (text2(args["question"]) ? [args] : []);
+  const asked2 = list(args["questions"]) ?? (text3(args["question"]) ? [args] : []);
   return {
     answered: result !== void 0,
-    questions: objects(asked2).map((q2) => ({ choices: texts(q2["choices"]), question: text2(q2["question"]) })),
+    questions: objects(asked2).map((q2) => ({ choices: texts(q2["choices"]), question: text3(q2["question"]) })),
     responses: records(result?.["responses"]).map((r) => {
       if (!r) {
         return void 0;
@@ -7789,24 +7857,24 @@ function askDetail({ args, result }) {
 // src/tools/files.ts
 function readDetail({ args, result }) {
   return {
-    content: text2(result?.["content"]),
-    path: text2(args["path"]),
+    content: text3(result?.["content"]),
+    path: text3(args["path"]),
     tool: "read_file",
     totalLines: num3(result?.["total_lines"])
   };
 }
 function editDetail(tool) {
-  return ({ args, result }) => ({ content: text2(args["content"]), diff: text2(result?.["diff"]), path: text2(args["path"]), tool });
+  return ({ args, result }) => ({ content: text3(args["content"]), diff: text3(result?.["diff"]), path: text3(args["path"]), tool });
 }
 
 // src/tools/misc.ts
 function genericFields({ args, result }) {
   return {
-    prompt: text2(args["prompt"]),
-    query: text2(args["query"]),
-    question: text2(args["question"]),
-    said: text2(result?.["analysis"]) ?? text2(result?.["text_summary"]),
-    url: text2(args["url"])
+    prompt: text3(args["prompt"]),
+    query: text3(args["query"]),
+    question: text3(args["question"]),
+    said: text3(result?.["analysis"]) ?? text3(result?.["text_summary"]),
+    url: text3(args["url"])
   };
 }
 function plainDetail(tool) {
@@ -7820,32 +7888,32 @@ function processDetail(raw2) {
 }
 function evalDetail({ args, result }) {
   return {
-    code: text2(args["code"]),
-    error: text2(result?.["error"]) ?? text2(result?.["stderr"]),
-    output: text2(result?.["output"]) ?? text2(result?.["stdout"]),
+    code: text3(args["code"]),
+    error: text3(result?.["error"]) ?? text3(result?.["stderr"]),
+    output: text3(result?.["output"]) ?? text3(result?.["stdout"]),
     tool: "execute_code"
   };
 }
 function memoryDetail({ args, result }) {
-  return { action: text2(args["action"]), tool: "memory", usage: text2(result?.["usage"]) };
+  return { action: text3(args["action"]), tool: "memory", usage: text3(result?.["usage"]) };
 }
 function skillsDetail({ result }) {
   const skills = list(result?.["skills"]) ?? [];
   return {
-    message: text2(result?.["message"]),
-    names: skills.map((s2) => text2(record2(s2)?.["name"]) ?? text2(s2)).filter((n) => n !== void 0),
+    message: text3(result?.["message"]),
+    names: skills.map((s2) => text3(record2(s2)?.["name"]) ?? text3(s2)).filter((n) => n !== void 0),
     tool: "skills_list"
   };
 }
 function skillDetail({ args, result }) {
-  return { content: text2(result?.["content"]), name: text2(args["name"]), tool: "skill_view" };
+  return { content: text3(result?.["content"]), name: text3(args["name"]), tool: "skill_view" };
 }
 function toolSearchDetail(raw2) {
   const { args } = raw2;
   const queries = list(args["queries"]);
   return {
     ...genericFields(raw2),
-    queries: queries ? queries.filter((q2) => typeof q2 === "string") : texts([text2(args["queries"]) ?? text2(args["query"])]),
+    queries: queries ? queries.filter((q2) => typeof q2 === "string") : texts([text3(args["queries"]) ?? text3(args["query"])]),
     tool: "tool_search"
   };
 }
@@ -7854,7 +7922,7 @@ function toolDescribeDetail(raw2) {
   return { ...genericFields(raw2), names: texts(Array.isArray(names) ? names : [names]), tool: "tool_describe" };
 }
 function pullRequestDetail(tool) {
-  return (raw2) => ({ ...genericFields(raw2), number: num3(raw2.args["number"]), repository: text2(raw2.args["repository"]), tool });
+  return (raw2) => ({ ...genericFields(raw2), number: num3(raw2.args["number"]), repository: text3(raw2.args["repository"]), tool });
 }
 
 // src/tools/search.ts
@@ -7865,11 +7933,11 @@ function searchDetail({ args, result }) {
     filesOnly: args["target"] === "files",
     matches: matches2 ? objects(matches2).map((m) => ({
       line: num3(m["line"]) ?? 0,
-      path: text2(m["path"]) ?? "",
+      path: text3(m["path"]) ?? "",
       text: typeof m["content"] === "string" ? m["content"] : ""
     })) : void 0,
-    path: text2(args["path"]),
-    pattern: text2(args["pattern"]),
+    path: text3(args["path"]),
+    pattern: text3(args["pattern"]),
     tool: "search_files",
     total: num3(result?.["total_count"])
   };
@@ -7879,13 +7947,13 @@ function searchDetail({ args, result }) {
 function taskDetail({ args, result }) {
   return {
     background: result?.["mode"] === "background",
-    briefs: records(args["tasks"]).map((t) => text2(t?.["context"])),
-    context: text2(args["context"]),
+    briefs: records(args["tasks"]).map((t) => text3(t?.["context"])),
+    context: text3(args["context"]),
     dispatched: result?.["status"] === "dispatched",
     failed: Boolean(result?.["error"]),
-    goal: text2(args["goal"]),
-    results: records(result?.["results"]).map((r) => r && { error: text2(r["error"]), status: text2(r["status"]), summary: text2(r["summary"]) }),
-    tasks: objects(args["tasks"]).map((t) => ({ context: text2(t["context"]), goal: text2(t["goal"]) })),
+    goal: text3(args["goal"]),
+    results: records(result?.["results"]).map((r) => r && { error: text3(r["error"]), status: text3(r["status"]), summary: text3(r["summary"]) }),
+    tasks: objects(args["tasks"]).map((t) => ({ context: text3(t["context"]), goal: text3(t["goal"]) })),
     tool: "delegate_task"
   };
 }
@@ -7894,27 +7962,27 @@ function taskDetail({ args, result }) {
 function terminalDetail({ args, result }) {
   return {
     background: args["background"] === true || typeof result?.["session_id"] === "string",
-    command: text2(args["command"]),
-    error: text2(result?.["error"]),
+    command: text3(args["command"]),
+    error: text3(result?.["error"]),
     exit: num3(result?.["exit_code"]),
-    output: text2(result?.["output"]),
+    output: text3(result?.["output"]),
     tool: "terminal"
   };
 }
 
 // src/tools/web.ts
 function source(r) {
-  return { content: text2(r["content"]), title: text2(r["title"]), url: text2(r["url"]) };
+  return { content: text3(r["content"]), title: text3(r["title"]), url: text3(r["url"]) };
 }
 function webSearchDetail({ args, result }) {
   const web = list(record2(result?.["data"])?.["web"]);
-  return { hits: objects(web ?? result?.["results"]).map(source), query: text2(args["query"]), tool: "web_search" };
+  return { hits: objects(web ?? result?.["results"]).map(source), query: text3(args["query"]), tool: "web_search" };
 }
 function fetchDetail({ args, result }) {
   return {
     pages: objects(result?.["results"]).map(source),
     tool: "web_extract",
-    url: text2(args["url"]),
+    url: text3(args["url"]),
     urls: (list(args["urls"]) ?? []).filter((u) => typeof u === "string")
   };
 }
@@ -8079,8 +8147,8 @@ function briefOf(call, index2) {
   const d = detailOf(call);
   return d.tool === "delegate_task" ? d.briefs[index2] ?? d.context : void 0;
 }
-function briefNode(head2, text15) {
-  return /* @__PURE__ */ jsx("section", { collapsed: true, collapsible: true, head: head2, role: "hermes.task.brief", children: /* @__PURE__ */ jsx("md", { children: text15 }, "md") }, "brief");
+function briefNode(head2, text16) {
+  return /* @__PURE__ */ jsx("section", { collapsed: true, collapsible: true, head: head2, role: "hermes.task.brief", children: /* @__PURE__ */ jsx("md", { children: text16 }, "md") }, "brief");
 }
 
 // src/media.ts
@@ -8303,7 +8371,7 @@ function toneStyle(tone) {
   }
 }
 var sp = (t, s2) => s2 ? { s: s2, t } : { t };
-var plain = (text15) => text15.replace(/\s+/g, " ").trim();
+var plain = (text16) => text16.replace(/\s+/g, " ").trim();
 var fraction = (value, max) => !(max > 0) || !Number.isFinite(value) ? 0 : Math.min(1, Math.max(0, value / max));
 function glance(view) {
   const h2 = view.headline;
@@ -8395,14 +8463,14 @@ function tile({ process: p3, view }) {
   const g = live && glance(live);
   const title = plain(live?.title ?? "") || plain(p3.command.split(/\r?\n/, 1)[0] ?? "") || p3.id;
   const visual = tileVisual(live?.blocks[0]);
-  const look = PROCESS_LOOK[p3.state.status];
-  return /* @__PURE__ */ jsxs("col", { gap: "xs", role: "omp.job.tile", tone: look.tone, children: [
+  const look2 = PROCESS_LOOK[p3.state.status];
+  return /* @__PURE__ */ jsxs("col", { gap: "xs", role: "omp.job.tile", tone: look2.tone, children: [
     /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", role: "omp.job.tile.head", children: [
       /* @__PURE__ */ jsx(
         "text",
         {
           role: "omp.job.tile.dot",
-          spans: [{ ...optional2("s", toneStyle(look.tone)), t: look.glyph, ...p3.state.status === "running" ? { fx: "pulse" } : {} }],
+          spans: [{ ...optional2("s", toneStyle(look2.tone)), t: look2.glyph, ...p3.state.status === "running" ? { fx: "pulse" } : {} }],
           wrap: "none"
         },
         "dot"
@@ -8770,8 +8838,8 @@ var CMDLETS = {
   "start-process": "start a process",
   "stop-process": "stop a process"
 };
-function powershellScript(text15) {
-  const used = [...new Set([...text15.matchAll(/\b([A-Z][a-z]+-[A-Z][A-Za-z]+)\b/g)].flatMap((m) => m[1]?.toLowerCase() ?? []))];
+function powershellScript(text16) {
+  const used = [...new Set([...text16.matchAll(/\b([A-Z][a-z]+-[A-Z][A-Za-z]+)\b/g)].flatMap((m) => m[1]?.toLowerCase() ?? []))];
   const said = [...new Set(used.map((c) => CMDLETS[c] ?? (c.startsWith("get-") ? `read ${c.slice(4)}` : void 0)).filter(Boolean))];
   return said.length ? said.slice(0, 2).join(" and ") : void 0;
 }
@@ -8828,12 +8896,12 @@ function segments(line) {
 var SETUP = /* @__PURE__ */ new Set(["cd", "export", "set", "source", ".", "true", "clear", "pushd", "popd"]);
 var FILTERS = /* @__PURE__ */ new Set(["head", "tail", "grep", "sort", "uniq", "wc", "cut", "tr", "awk", "jq", "tee", "column", "less", "cat", "xargs", "sed"]);
 function describeCommand(command2) {
-  const text15 = command2.trim();
-  if (!text15) {
+  const text16 = command2.trim();
+  if (!text16) {
     return "Run a command";
   }
   const docs = [];
-  const line = text15.replace(/<<-?\s*['"]?(\w+)['"]?([^\n]*)\n([\s\S]*?)\n\s*\1\s*(?=\n|$)/g, (_m, _tag, rest, body) => {
+  const line = text16.replace(/<<-?\s*['"]?(\w+)['"]?([^\n]*)\n([\s\S]*?)\n\s*\1\s*(?=\n|$)/g, (_m, _tag, rest, body) => {
     docs.push(body);
     return rest;
   });
@@ -8865,15 +8933,15 @@ function commandLine(command2, n = 96) {
   const flat3 = command2.replace(/<<-?\s*['"]?(\w+)['"]?[\s\S]*?\n\s*\1\s*(?=\n|$)/g, "<<'$1' \u2026").replace(/\s+/g, " ").trim();
   return clip(flat3, { max: n });
 }
-function oneLine(text15) {
-  return text15.replace(/\s+/g, " ").trim();
+function oneLine(text16) {
+  return text16.replace(/\s+/g, " ").trim();
 }
 
 // src/view/tools/cards/image.tsx
-function imageCard(call, d, look, src) {
+function imageCard(call, d, look2, src) {
   const said = call.outcome.kind === "running" ? void 0 : d.said;
   return {
-    ...look,
+    ...look2,
     body: [
       ...src ? [imageNode(call, d, src)] : [],
       ...said ? [/* @__PURE__ */ jsx("text", { lines: 6, spans: [{ s: "muted", t: clip(said, { mark: "line", max: 2e3 }) }], wrap: "word" }, "said")] : []
@@ -8902,7 +8970,7 @@ function imageNode(call, d, src) {
 
 // src/view/tools/cards/generic.tsx
 var own = (call) => ({ name: call.name, title: humanize(call.name) });
-var plain2 = (look, action = "other") => ({ action, card: (call, d) => genericCard(call, d, look(call)), step: namedStep });
+var plain2 = (look2, action = "other") => ({ action, card: (call, d) => genericCard(call, d, look2(call)), step: namedStep });
 var otherView = plain2(own);
 var sessionSearchView = plain2(() => ({ name: "search", title: "Session search" }));
 var visionView = plain2(() => ({ name: "image", title: "Vision" }));
@@ -8956,14 +9024,14 @@ function pullRequestStep(verb, d) {
 var linkView = { ...plain2(own), step: (_call, d) => pullRequestStep("Linked", d) };
 var unlinkView = { ...plain2(own), step: (_call, d) => pullRequestStep("Unlinked", d) };
 var listPullRequestsView = { ...plain2(own), step: () => "Listed linked pull requests" };
-function genericCard(call, d, look) {
+function genericCard(call, d, look2) {
   const src = shownImage(call);
   if (src) {
-    return imageCard(call, d, look, src);
+    return imageCard(call, d, look2, src);
   }
   const chart = isWatchCall(call) && call.process?.chart ? tilesNode([{ process: call.process, view: call.process.chart }]) : void 0;
   return {
-    ...look,
+    ...look2,
     body: [...chart ? [chart] : [], ...genericBody(call)],
     folded: !chart,
     frame: "inline",
@@ -8972,11 +9040,11 @@ function genericCard(call, d, look) {
   };
 }
 function genericBody(call) {
-  const text15 = call.resultText ?? (call.result === void 0 ? void 0 : pretty(call.result));
-  if (!text15 || call.outcome.kind === "running") {
+  const text16 = call.resultText ?? (call.result === void 0 ? void 0 : pretty(call.result));
+  if (!text16 || call.outcome.kind === "running") {
     return [];
   }
-  return [/* @__PURE__ */ jsx("code", { lang: /^\s*[[{]/.test(text15) ? "json" : "text", text: clip(text15, { mark: "line", max: 4e3 }) }, "out")];
+  return [/* @__PURE__ */ jsx("code", { lang: /^\s*[[{]/.test(text16) ? "json" : "text", text: clip(text16, { mark: "line", max: 4e3 }) }, "out")];
 }
 function fallbackView(call) {
   return {
@@ -9062,17 +9130,17 @@ function askCard(call, d) {
   const body = [];
   for (const [i, q2] of qs.entries()) {
     const choices = q2.choices;
-    const answers = d.responses[i]?.answers ?? [];
+    const answers2 = d.responses[i]?.answers ?? [];
     if (qs.length > 1) {
       body.push(/* @__PURE__ */ jsx("md", { children: q2.question ?? "" }, `q${i}`));
     }
     for (const [j, c] of choices.entries()) {
-      body.push(answerRow(`q${i}.o${j}`, c, answers.includes(c)));
+      body.push(answerRow(`q${i}.o${j}`, c, answers2.includes(c)));
     }
-    for (const [j, typed] of answers.filter((a2) => !choices.includes(a2)).entries()) {
+    for (const [j, typed] of answers2.filter((a2) => !choices.includes(a2)).entries()) {
       body.push(answerRow(`q${i}.a${j}`, typed, true));
     }
-    if (!answers.length && call.outcome.kind !== "running" && d.answered) {
+    if (!answers2.length && call.outcome.kind !== "running" && d.answered) {
       const skipped2 = d.responses[i]?.skipped === true;
       body.push(/* @__PURE__ */ jsx("text", { role: "omp.tool.notice", spans: [{ s: "muted", t: skipped2 ? "Skipped" : "No answer" }] }, `q${i}.none`));
     }
@@ -9086,94 +9154,211 @@ function askCard(call, d) {
     title: "Ask"
   };
 }
-function answerRow(key2, text15, picked) {
+function answerRow(key2, text16, picked) {
   return /* @__PURE__ */ jsxs("row", { role: picked ? "omp.tool.answer" : "omp.tool.answer.off", children: [
     /* @__PURE__ */ jsx("text", { spans: [picked ? { s: "success", t: "\u2713" } : { s: "dim", t: "\xB7" }] }, "c"),
-    /* @__PURE__ */ jsx("text", { spans: [{ t: text15 }] }, "t")
+    /* @__PURE__ */ jsx("text", { spans: [{ t: text16 }] }, "t")
   ] }, key2);
 }
+
+// src/connections/live.ts
+var num4 = (v) => typeof v === "number" && Number.isFinite(v) ? v : void 0;
+function liveCard(payload, session2) {
+  const r = record2(payload);
+  const id = typeof r?.["op_id"] === "string" ? r["op_id"] : "";
+  const seq = num4(r?.["seq"]);
+  const deadlineAt = num4(r?.["deadline_at"]);
+  const targets = parseTargets(Array.isArray(r?.["targets"]) ? r["targets"] : []);
+  if (!r || !id || seq === void 0 || !deadlineAt || !targets.length || targets.some((t) => t.kind === "plugin" || t.kind === "skill")) {
+    return void 0;
+  }
+  const callId = typeof r["tool_call_id"] === "string" && r["tool_call_id"] ? r["tool_call_id"] : void 0;
+  const op = { deadlineAt, id, seq, session: session2 };
+  return { callId, card: { gateway: true, op, opened: [], settled: settleReason(r), targets, told: false } };
+}
+function applyFrame(card, frame) {
+  const r = record2(frame);
+  const op = card.op;
+  const seq = num4(r?.["seq"]);
+  if (!r || !op || card.settled || r["op_id"] !== op.id || seq === void 0 || seq <= op.seq) {
+    return void 0;
+  }
+  const rows2 = Array.isArray(r["targets"]) ? parseTargets(r["targets"]) : [];
+  const before = new Map(card.targets.map((t) => [t.name, t]));
+  const targets = rows2.length ? rows2.map((t) => ({ ...t, url: t.url ?? before.get(t.name)?.url })) : card.targets;
+  return { ...card, op: { ...op, deadlineAt: num4(r["deadline_at"]) ?? op.deadlineAt, seq }, settled: settleReason(r), targets };
+}
+function verbOf(t) {
+  switch (t.state) {
+    case "pending":
+      return t.kind === "mcp" ? t.needs ? "none" : "approve" : t.url ? "open" : "none";
+    case "initiated":
+      return t.url ? "open" : "none";
+    case "expired":
+    case "failed":
+      return "retry";
+    default:
+      return "none";
+  }
+}
+var minutesLeft = (op, now) => Math.max(1, Math.ceil((op.deadlineAt * 1e3 - now) / 6e4));
+var liveOpen = (card) => Boolean(card?.op && !card.settled && card.targets.some(unresolved));
+var owner = (op) => ({ session_id: op.session, type: "session" });
+var opParams = (op) => ({ op_id: op.id, owner: owner(op) });
+var respondParams = (op, result) => ({ ...opParams(op), result });
+var retryParams = (op, name) => ({ connectors: [name], owner: owner(op), reconnect: true });
+var answers = {
+  /** An MCP row's Connect, with the credentials it has defaults for. */
+  approve: (t) => ({ targets: [{ name: t.name, status: "approved", ...t.env ? { env: t.env } : {} }] }),
+  /** Continue: the tool returns now, its unresolved apps not connected. */
+  continue: () => ({ settled_by: "continue" }),
+  skip: (t) => ({ targets: [{ name: t.name, status: "skipped" }] })
+};
 
 // src/view/tools/cards/connect.tsx
 var connectView = {
   action: "other",
-  card: (call, d) => isConnectCall(call) ? connectCard(call) : genericCard(call, d, { name: call.name, title: humanize(call.name) }),
+  card: (call, d, now) => isConnectCall(call) ? connectCard(call, now) : genericCard(call, d, { name: call.name, title: humanize(call.name) }),
   step: namedStep
 };
-var PENDING = { icon: "clock", tone: "muted", word: "needs authorizing" };
-var CONNECT_STATE = {
-  connected: { icon: "check", tone: "success", word: "connected" },
-  expired: { icon: "clock", tone: "error", word: "link expired" },
-  failed: { icon: "x", tone: "error", word: "failed" },
-  initiated: { icon: "clock", tone: "pending", word: "waiting for your browser" },
-  not_connected: { icon: "minus", tone: "muted", word: "not connected" },
-  pending: PENDING,
-  skipped: { icon: "minus", tone: "muted", word: "skipped" },
-  superseded: { icon: "minus", tone: "muted", word: "asked again below" }
+var look = (icon, tone, word) => ({ mark: { icon, tone }, tone, word });
+var NEEDS = look("pending", "muted", "needs authorizing");
+var BROWSER = { mark: "spinner", tone: "pending", word: "waiting for your browser\u2026" };
+var SETTING_UP = { mark: "spinner", tone: "pending", word: "setting up\u2026" };
+var NOT_CONNECTED = look("minus", "muted", "not connected");
+var STATE = {
+  connected: look("check", "success", "connected"),
+  expired: look("clock", "error", "link expired"),
+  failed: look("x", "error", "failed"),
+  not_connected: NOT_CONNECTED,
+  skipped: look("minus", "muted", "skipped"),
+  superseded: look("minus", "muted", "asked again below")
 };
-var SETTLED_NOTE = {
+function lookOf(card, t) {
+  if (card.settled && waiting(t)) {
+    return NOT_CONNECTED;
+  }
+  if (t.state === "pending" || t.state === "initiated") {
+    if (!t.url) {
+      return t.state === "initiated" ? SETTING_UP : NOT_CONNECTED;
+    }
+    return card.opened.includes(t.name) ? BROWSER : NEEDS;
+  }
+  return STATE[t.state] ?? NOT_CONNECTED;
+}
+var FILE_NOTE = {
   all_resolved: "All connected.",
   continued: "Sent to Hermes.",
   deadline: "Stopped waiting after 15 minutes. Ask Hermes to connect again.",
   error: "Hermes stopped watching these links.",
+  interrupt: "The turn was stopped before every app connected.",
   stopped: "Hermes stopped watching these links. Ask Hermes to connect again.",
   superseded: "A later request replaced this one."
 };
-function connectCard(call) {
-  const card = call.connect ?? { opened: [], targets: connectTargets(call), told: false };
-  const { settled: settled2, targets } = card;
-  const ref = card.key ?? call.id;
-  const stateOf2 = (t) => settled2 && waiting(t) ? "not_connected" : t.state === "initiated" && !card.opened.includes(t.name) ? "pending" : t.state;
-  const open = settled2 ? [] : targets.filter(waiting);
-  const rows2 = targets.map((t, i) => {
-    const look = CONNECT_STATE[stateOf2(t)] ?? PENDING;
-    return /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "hermes.connect.row", children: [
-      /* @__PURE__ */ jsx("icon", { name: look.icon, ...optional2("tone", look.tone) }, "i"),
-      /* @__PURE__ */ jsx(
-        "text",
-        {
-          grow: 1,
-          spans: [
-            { s: "strong", t: t.title },
-            ...t.alias ? [{ s: "muted", t: ` (${t.alias})` }] : [],
-            { s: look.tone ?? "muted", t: `  ${look.word}` },
-            ...t.detail && look.tone === "error" ? [{ s: "muted", t: ` \xB7 ${t.detail}` }] : []
-          ],
-          truncate: "end",
-          wrap: "none"
-        },
-        "n"
-      ),
-      t.url && !settled2 && waiting(t) ? /* @__PURE__ */ jsx("row", { actions: { click: `connect-open=${ref}:${t.name}` }, align: "center", gap: "xs", role: "hermes.connect.open", title: t.url, children: /* @__PURE__ */ jsx("text", { text: "Authorize \u2197" }, "t") }, "go") : null
-    ] }, `t${i}`);
-  });
-  const note = card.told ? open.length || settled2 && settled2 !== "all_resolved" ? "Sent to Hermes." : "All connected. Hermes carries on." : settled2 ? `${SETTLED_NOTE[settled2]}${settled2 === "error" && card.error ? ` ${card.error}` : ""}` : void 0;
+var GATEWAY_NOTE = {
+  deadline: "Hermes stopped waiting. Ask it to connect again.",
+  interrupt: "The turn stopped before every app connected.",
+  stopped: "Hermes stopped watching these links."
+};
+function button2(key2, label, role, act, title) {
+  return /* @__PURE__ */ jsx("row", { align: "center", ...optional2("actions", act ? { click: act } : void 0), role: act ? role : "hermes.connect.busy", ...optional2("title", title), children: /* @__PURE__ */ jsx("text", { text: label, wrap: "none" }, "t") }, key2);
+}
+var SENDING = { approve: "Connecting\u2026", retry: "Retrying\u2026", skip: "Skipping\u2026" };
+function rowButtons(card, ref, t) {
+  if (card.settled || card.told) {
+    return [];
+  }
+  const row2 = `${ref}:${t.name}`;
+  const open = (label) => button2("go", label, "hermes.connect.open", `connect-open=${row2}`, t.url);
+  if (!card.op) {
+    return t.url && waiting(t) ? [open("Authorize \u2197")] : [];
+  }
+  const verb = verbOf(t);
+  const sending = sendingVerb(card, t.name);
+  if (sending) {
+    return [button2("busy", SENDING[sending] ?? "Sending\u2026", "")];
+  }
+  return [
+    ...verb === "open" && t.url ? [open(card.opened.includes(t.name) ? "Open again \u2197" : "Authorize \u2197")] : [],
+    ...verb === "approve" ? [button2("go", "Connect", "hermes.connect.approve", `connect-approve=${row2}`)] : [],
+    ...verb === "retry" ? [button2("go", "Try again", "hermes.connect.retry", `connect-retry=${row2}`)] : [],
+    ...unresolved(t) ? [button2("skip", "Not now", "hermes.connect.skip", `connect-skip=${row2}`)] : []
+  ];
+}
+function noteOf(card) {
+  const { settled: settled2 } = card;
+  if (card.told) {
+    return settled2 && settled2 !== "all_resolved" ? "Sent to Hermes." : "All connected. Hermes carries on.";
+  }
+  if (!settled2) {
+    return void 0;
+  }
+  if (card.gateway) {
+    return GATEWAY_NOTE[settled2];
+  }
+  return `${FILE_NOTE[settled2]}${settled2 === "error" && card.error ? ` ${card.error}` : ""}`;
+}
+function hintOf(card, now) {
+  if (!card.op) {
+    return "Authorize in your browser. Hermes hears when every app is connected.";
+  }
+  const minutes = minutesLeft(card.op, now);
+  const authorize = card.targets.some((t) => verbOf(t) === "open" && t.url) ? "Authorize in your browser. " : "";
+  return `${authorize}Hermes waits up to ${minutes} more minute${minutes === 1 ? "" : "s"}.`;
+}
+function launchNode(card, t, i) {
+  const l = t.launch;
+  if (!l || card.settled || card.told || !unresolved(t)) {
+    return null;
+  }
+  const lines = [l.kind === "stdio" ? `Runs: ${l.target}` : `Connects to: ${l.target}`, ...l.cwd ? [`Working dir: ${l.cwd}`] : [], ...l.env ? [`Env: ${l.env.join(", ")}`] : []];
+  return /* @__PURE__ */ jsx("row", { role: "hermes.connect.launch", children: /* @__PURE__ */ jsx("text", { grow: 1, spans: [{ s: "mono muted", t: lines.join("\n") }], wrap: "word" }, "t") }, `l${i}`);
+}
+function rowNode(card, ref, t, i) {
+  const l = lookOf(card, t);
+  const live = !card.settled && !card.told;
+  const why = live && t.detail && l.tone === "error" ? [{ s: "muted", t: ` \xB7 ${t.detail}` }] : [];
+  const needs = live && t.needs ? [{ s: "muted", t: ` \xB7 needs ${t.needs.join(", ")}: set it up in Hermes Desktop` }] : [];
+  return /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "hermes.connect.row", children: [
+    l.mark === "spinner" ? /* @__PURE__ */ jsx("spinner", { style: "dots", tone: "accent" }, "i") : /* @__PURE__ */ jsx("icon", { name: l.mark.icon, tone: l.mark.tone }, "i"),
+    /* @__PURE__ */ jsx(
+      "text",
+      {
+        grow: 1,
+        spans: [
+          { s: "strong", t: t.title },
+          ...t.alias ? [{ s: "muted", t: ` (${t.alias})` }] : [],
+          { s: l.tone, t: `  ${l.word}` },
+          ...why,
+          ...needs
+        ],
+        truncate: "end",
+        wrap: "none"
+      },
+      "n"
+    ),
+    rowButtons(card, ref, t)
+  ] }, `t${i}`);
+}
+function connectCard(call, now) {
+  const card = call.connect ?? resultCard(call) ?? { opened: [], targets: connectTargets(call), told: false };
+  const { targets } = card;
+  const ref = cardRef(call);
+  const own14 = targets.filter((t) => t.state !== "superseded");
+  const open = card.settled || card.told ? [] : targets.filter(card.op ? unresolved : waiting);
+  const note = noteOf(card);
+  const continuing = card.sending?.includes(CONTINUE);
+  const foot = open.length ? /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "hermes.connect.foot", children: [
+    /* @__PURE__ */ jsx("text", { grow: 1, spans: [{ s: "muted", t: hintOf(card, now) }], wrap: "word" }, "hint"),
+    continuing ? button2("go", "Continuing\u2026", "") : button2("go", "Continue", "hermes.connect.continue", `connect-continue=${ref}`)
+  ] }, "foot") : note ? /* @__PURE__ */ jsx("text", { role: "hermes.connect.note", spans: [{ s: "muted", t: note }], wrap: "word" }, "note") : null;
   return {
-    body: [
-      ...rows2,
-      ...note ? [/* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: note }], wrap: "word" }, "done")] : [
-        /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", children: [
-          /* @__PURE__ */ jsx(
-            "text",
-            {
-              grow: 1,
-              spans: [
-                {
-                  s: "muted",
-                  t: open.length ? "Authorize in the browser. Hermes hears when every app is connected." : "All set."
-                }
-              ],
-              wrap: "word"
-            },
-            "hint"
-          ),
-          open.length ? /* @__PURE__ */ jsx("row", { actions: { click: `connect-continue=${ref}` }, align: "center", role: "hermes.connect.continue", children: /* @__PURE__ */ jsx("text", { text: "Done, continue" }, "t") }, "go") : null
-        ] }, "foot")
-      ]
-    ],
+    body: [...targets.flatMap((t, i) => [rowNode(card, ref, t, i), launchNode(card, t, i)].filter((n) => n !== null)), ...foot ? [foot] : []],
     name: "plug",
-    target: `${targets.filter((t) => t.state === "connected").length} of ${targets.filter((t) => t.state !== "superseded").length} connected`,
+    // One app names itself on its row; several get a count.
+    target: own14.length > 1 ? `${own14.filter((t) => t.state === "connected").length} of ${own14.length} connected` : void 0,
     targetKind: "text",
-    title: allConnected(card) ? "Apps connected" : "Connect apps"
+    title: allConnected(card) ? own14.length > 1 ? "Apps connected" : "App connected" : own14.length > 1 ? "Connect apps" : "Connect an app"
   };
 }
 
@@ -9252,12 +9437,12 @@ function editCard(call, d) {
     title: write ? "Write" : "Edit"
   };
   if (write && content5 && (!diff2 || diff2.startsWith("@@ -0,0 "))) {
-    const text15 = content5.replace(/\n$/, "");
-    const lines = text15.split("\n").length;
+    const text16 = content5.replace(/\n$/, "");
+    const lines = text16.split("\n").length;
     return {
       ...head2,
       badges: diff2 ? [{ text: "new file", tone: "success" }] : void 0,
-      body: [/* @__PURE__ */ jsx("code", { lang: lang ?? "text", numbers: true, text: text15 }, "code")],
+      body: [/* @__PURE__ */ jsx("code", { lang: lang ?? "text", numbers: true, text: text16 }, "code")],
       folded: true,
       meta: [plural(lines, "line")],
       preview: { lines: 8 }
@@ -9304,8 +9489,8 @@ function evalCard(call, d) {
     title: firstLine(code7)?.startsWith("#") ? firstLine(code7)?.replace(/^#+\s*/, "") ?? "Eval" : "Eval"
   };
 }
-function firstLine(text15) {
-  return text15?.split("\n").find((l) => l.trim())?.trim();
+function firstLine(text16) {
+  return text16?.split("\n").find((l) => l.trim())?.trim();
 }
 
 // src/transcript/todos.ts
@@ -10087,8 +10272,8 @@ var FileTap = class {
     const start = Math.min(Math.max(from, this.#start), end);
     return { end, open: this.#open, start, text: this.#text.slice(start - this.#start) };
   }
-  #append(text15) {
-    this.#text += text15;
+  #append(text16) {
+    this.#text += text16;
     const excess = this.#text.length - CAPACITY;
     if (excess > CAPACITY / 4) {
       this.#text = this.#text.slice(excess);
@@ -10135,26 +10320,26 @@ function formatNumber(value, unit, digits) {
   }
   const scaled = unitStep(value, unit);
   if (scaled) {
-    const text16 = formatNumber(value / scaled.step, scaled.unit, digits ?? (Math.abs(value / scaled.step) >= 100 ? 0 : 1));
-    return digits === void 0 ? text16.replace(/\.0(?= )/, "") : text16;
+    const text17 = formatNumber(value / scaled.step, scaled.unit, digits ?? (Math.abs(value / scaled.step) >= 100 ? 0 : 1));
+    return digits === void 0 ? text17.replace(/\.0(?= )/, "") : text17;
   }
   const magnitude = Math.abs(value);
-  let text15;
+  let text16;
   if (magnitude >= COMPACT_FROM) {
     for (const [step, suffix] of COMPACT_STEPS) {
       if (magnitude < step) {
         continue;
       }
       const scaled2 = value / step;
-      text15 = `${scaled2.toFixed(digits ?? (Math.abs(scaled2) >= 100 ? 0 : 1))}${suffix}`;
+      text16 = `${scaled2.toFixed(digits ?? (Math.abs(scaled2) >= 100 ? 0 : 1))}${suffix}`;
       break;
     }
   }
-  text15 ??= Number.isInteger(value) && digits === void 0 ? String(value) : value.toFixed(digits ?? (magnitude >= 100 ? 0 : magnitude >= 10 ? 1 : 2));
+  text16 ??= Number.isInteger(value) && digits === void 0 ? String(value) : value.toFixed(digits ?? (magnitude >= 100 ? 0 : magnitude >= 10 ? 1 : 2));
   if (!unit) {
-    return text15;
+    return text16;
   }
-  return unit === "%" ? `${text15}%` : `${text15} ${unit}`;
+  return unit === "%" ? `${text16}%` : `${text16} ${unit}`;
 }
 function formatTrend(first2, last, better, unit) {
   const delta = last - first2;
@@ -10185,7 +10370,7 @@ import { setFlagsFromString } from "node:v8";
 
 // src/processes/widgets/check.ts
 var FIELD_NAME = /^[a-z][a-z0-9_]{0,23}$/;
-var cut = (text15, max) => text15.length > max ? `${text15.slice(0, max - 1)}\u2026` : text15;
+var cut = (text16, max) => text16.length > max ? `${text16.slice(0, max - 1)}\u2026` : text16;
 function list2(value, where, errors, min, max) {
   if (!Array.isArray(value)) {
     errors.push(`${where}: expected an array`);
@@ -10222,10 +10407,10 @@ function str3(value, where, errors, o = {}) {
   return o.cut === void 0 ? trimmed : cut(unescape(trimmed), o.cut);
 }
 var ENTITIES = { "&#39;": "'", "&amp;": "&", "&gt;": ">", "&lt;": "<", "&quot;": '"' };
-function unescape(text15) {
-  return text15.replace(/&(?:amp|lt|gt|quot|#39);/g, (e) => ENTITIES[e] ?? e);
+function unescape(text16) {
+  return text16.replace(/&(?:amp|lt|gt|quot|#39);/g, (e) => ENTITIES[e] ?? e);
 }
-function num4(value, where, errors) {
+function num5(value, where, errors) {
   if (value === void 0 || value === null) {
     return void 0;
   }
@@ -10350,9 +10535,9 @@ var LineMatcher = class {
   /** Every hit: the line's index, the pattern's index and its captures by group position. */
   matchLines(lines) {
     const hits = [];
-    lines.forEach((text15, line) => {
+    lines.forEach((text16, line) => {
       this.#patterns.forEach((re2, pattern) => {
-        const m = re2.exec(text15);
+        const m = re2.exec(text16);
         if (m) {
           hits.push({ captures: (this.#names[pattern] ?? []).map((name) => m.groups?.[name]), line, pattern });
         }
@@ -10391,15 +10576,15 @@ function aggNeedsValue(agg) {
 }
 var NUMBER_PREFIX = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?/;
 var SUFFIX_SCALE = { G: 1e9, K: 1e3, M: 1e6, k: 1e3 };
-function parseValue(text15) {
-  const first2 = text15.charCodeAt(0);
-  if (first2 >= 48 && first2 <= 57 && !/[xXbBoO]/.test(text15.charAt(1))) {
-    const plain4 = Number(text15);
+function parseValue(text16) {
+  const first2 = text16.charCodeAt(0);
+  if (first2 >= 48 && first2 <= 57 && !/[xXbBoO]/.test(text16.charAt(1))) {
+    const plain4 = Number(text16);
     if (Number.isFinite(plain4)) {
       return plain4;
     }
   }
-  const compact2 = text15.trim().replace(/[,_]/g, "");
+  const compact2 = text16.trim().replace(/[,_]/g, "");
   const match = NUMBER_PREFIX.exec(compact2);
   if (!match) {
     return Number.NaN;
@@ -10430,8 +10615,8 @@ function validateSpec(value, samples, brief) {
 var WRITTEN_NUMBER = /\d[\d,_]*(?:\.\d+)?[kKMG]?/g;
 function checkStatedNumbers(spec, samples, brief, errors) {
   const stated = /* @__PURE__ */ new Set();
-  const collect = (text15) => {
-    for (const m of text15.matchAll(WRITTEN_NUMBER)) {
+  const collect = (text16) => {
+    for (const m of text16.matchAll(WRITTEN_NUMBER)) {
       stated.add(parseValue(m[0]));
     }
   };
@@ -10491,10 +10676,10 @@ function dryRun(spec, matcher, samples, numeric, errors) {
 function fieldFeeds(spec) {
   const fields = /* @__PURE__ */ new Map();
   for (const rule of spec.rules) {
-    for (const { count: count2, field, text: text15 } of ruleFields(rule)) {
+    for (const { count: count2, field, text: text16 } of ruleFields(rule)) {
       const feed = fields.get(field) ?? { keyGroups: /* @__PURE__ */ new Set(), text: false, value: false };
-      feed.value ||= !text15 && !count2;
-      feed.text ||= text15;
+      feed.value ||= !text16 && !count2;
+      feed.text ||= text16;
       if (rule.key !== void 0) {
         feed.keyGroups.add(rule.key);
       }
@@ -10606,19 +10791,19 @@ function parseRule(value, where, errors) {
     return raw2;
   };
   const key2 = group("key");
-  const text15 = group("text");
+  const text16 = group("text");
   const count2 = value["count"] === void 0 ? void 0 : fieldName(value["count"], `${where}.count`, errors);
-  const scale = num4(value["scale"], `${where}.scale`, errors);
+  const scale = num5(value["scale"], `${where}.scale`, errors);
   if (from === void 0 || match === void 0) {
     return void 0;
   }
   const groups = patternGroupNames(match);
-  const wrap4 = text15 !== void 0 && FIELD_NAME.test(text15) && groups.size === 0;
+  const wrap4 = text16 !== void 0 && FIELD_NAME.test(text16) && groups.size === 0;
   const keyGroup = key2 !== void 0 && groups.has(key2) ? key2 : void 0;
-  const textGroup = text15 !== void 0 && (wrap4 || groups.has(text15)) ? text15 : void 0;
+  const textGroup = text16 !== void 0 && (wrap4 || groups.has(text16)) ? text16 : void 0;
   return {
     from,
-    match: wrap4 ? `(?P<${text15}>${match})` : match,
+    match: wrap4 ? `(?P<${text16}>${match})` : match,
     ...keyGroup !== void 0 ? { key: keyGroup } : {},
     ...textGroup !== void 0 ? { text: textGroup } : {},
     ...count2 !== void 0 ? { count: count2 } : {},
@@ -10634,7 +10819,7 @@ function parseValueRef(value, where, errors) {
   const key2 = str3(value["key"], `${where}.key`, errors, { max: 120 });
   const agg = choice(value["agg"], AGGS, `${where}.agg`, errors);
   const unit = str3(value["unit"], `${where}.unit`, errors, { cut: MAX_UNIT_CHARS });
-  const digits = num4(value["digits"], `${where}.digits`, errors);
+  const digits = num5(value["digits"], `${where}.digits`, errors);
   if (digits !== void 0 && (!Number.isInteger(digits) || digits < 0 || digits > 4)) {
     errors.push(`${where}.digits: expected an integer 0\u20134`);
   }
@@ -10671,10 +10856,10 @@ function parseBlock(value, where, errors) {
         ...optional3(str3(value["key"], `${where}.key`, errors, { max: 120 }), "key"),
         ...optional3(unit(), "unit"),
         ...optional3(betterValue(value["better"], `${where}.better`, errors), "better"),
-        ...optional3(num4(value["target"], `${where}.target`, errors), "target"),
+        ...optional3(num5(value["target"], `${where}.target`, errors), "target"),
         ...optional3(str3(value["targetLabel"], `${where}.targetLabel`, errors, { cut: MAX_LABEL_CHARS }), "targetLabel"),
-        ...optional3(num4(value["min"], `${where}.min`, errors), "min"),
-        ...optional3(num4(value["max"], `${where}.max`, errors), "max")
+        ...optional3(num5(value["min"], `${where}.min`, errors), "min"),
+        ...optional3(num5(value["max"], `${where}.max`, errors), "max")
       };
       break;
     case "bars":
@@ -10684,7 +10869,7 @@ function parseBlock(value, where, errors) {
         kind: "bars",
         label: label(),
         ...optional3(unit(), "unit"),
-        ...optional3(num4(value["max"], `${where}.max`, errors), "max"),
+        ...optional3(num5(value["max"], `${where}.max`, errors), "max"),
         ...optional3(betterValue(value["better"], `${where}.better`, errors), "better")
       };
       break;
@@ -10768,7 +10953,7 @@ var MAX_STAGE_CHARS = 200;
 var MAX_TEXT_CHARS = 200;
 var MAX_BAR_ITEMS = 16;
 var MAX_GRID_ITEMS = 48;
-var cut2 = (text15, max) => text15.length > max ? `${text15.slice(0, max - 1)}\u2026` : text15;
+var cut2 = (text16, max) => text16.length > max ? `${text16.slice(0, max - 1)}\u2026` : text16;
 var CONTROLS = /[\x00-\x08\x0b-\x1f\x7f]/g;
 var clean = (line) => withoutEscapes(line.replace(/\t/g, " ")).replace(CONTROLS, "");
 var SourceLineReader = class {
@@ -10782,22 +10967,22 @@ var SourceLineReader = class {
   /** New complete lines; `flush` also ends the line in progress (the process exited). */
   read(flush) {
     const chunk = this.source.read(this.#cursor);
-    let text15 = chunk.text;
+    let text16 = chunk.text;
     if (chunk.start > this.#cursor) {
       this.#partial = "";
       this.#torn = true;
     }
     this.#cursor = Math.max(this.#cursor, chunk.end);
     if (this.#torn) {
-      const lineEnd2 = text15.search(/[\r\n]/);
+      const lineEnd2 = text16.search(/[\r\n]/);
       if (lineEnd2 === -1) {
-        text15 = "";
+        text16 = "";
       } else {
-        text15 = text15.slice(lineEnd2 + 1);
+        text16 = text16.slice(lineEnd2 + 1);
         this.#torn = false;
       }
     }
-    const raw2 = (this.#partial + text15).replace(/\r\n?/g, "\n").split("\n");
+    const raw2 = (this.#partial + text16).replace(/\r\n?/g, "\n").split("\n");
     this.#partial = (raw2.pop() ?? "").slice(0, MAX_LINE_CHARS * 2);
     if ((flush || !chunk.open) && this.#partial) {
       raw2.push(this.#partial);
@@ -10809,7 +10994,7 @@ var SourceLineReader = class {
 function emptySeries() {
   return { count: 0, first: 0, last: 0, max: -Infinity, min: Infinity, recent: [], ring: [], sum: 0, updatedAt: 0, values: 0 };
 }
-function pushMatch(s2, value, text15, line, t) {
+function pushMatch(s2, value, text16, line, t) {
   s2.count++;
   const bucket = s2.recent.at(-1);
   if (bucket?.t === t) {
@@ -10833,8 +11018,8 @@ function pushMatch(s2, value, text15, line, t) {
       s2.ring.splice(0, s2.ring.length - RING_POINTS);
     }
   }
-  if (text15) {
-    s2.text = text15;
+  if (text16) {
+    s2.text = text16;
   }
   s2.line = line;
   s2.updatedAt = t;
@@ -11067,7 +11252,7 @@ var ChartRuntime = class {
       }
     }
   }
-  #push(name, key2, value, text15, line, t) {
+  #push(name, key2, value, text16, line, t) {
     let field = this.#fields.get(name);
     if (!field) {
       const all8 = emptySeries();
@@ -11079,9 +11264,9 @@ var ChartRuntime = class {
       series = emptySeries();
       field.keys.set(key2, series);
     }
-    pushMatch(series, value, text15, line, t);
+    pushMatch(series, value, text16, line, t);
     if (series !== field.all) {
-      pushMatch(field.all, value, text15, line, t);
+      pushMatch(field.all, value, text16, line, t);
     }
   }
   /** First and last lines per source, most active first, for the author and the dry run. */
@@ -11142,8 +11327,8 @@ var ChartRuntime = class {
   }
   #specStage() {
     const field = this.spec?.stage ? this.#fields.get(this.spec.stage) : void 0;
-    const text15 = (field?.all.text ?? field?.all.line)?.trim();
-    return text15 ? cut2(text15, MAX_STAGE_CHARS) : void 0;
+    const text16 = (field?.all.text ?? field?.all.line)?.trim();
+    return text16 ? cut2(text16, MAX_STAGE_CHARS) : void 0;
   }
   /** The last non-empty line of the most recently active source. */
   #lastLine() {
@@ -11166,13 +11351,13 @@ var ChartRuntime = class {
     const series = this.#series(ref.field, ref.key);
     const value = aggregate(series, ref.agg, now, this.startTime);
     const unit = ref.agg === "change" ? "%" : ref.unit;
-    const text15 = value === void 0 ? "\u2014" : formatNumber(value, unit, ref.digits);
+    const text16 = value === void 0 ? "\u2014" : formatNumber(value, unit, ref.digits);
     const trend = ref.better && TREND_AGGS.has(ref.agg) && series.values >= 2 ? formatTrend(series.first, series.last, ref.better, ref.unit) : void 0;
-    return { text: text15, value, ...trend ? { trend } : {} };
+    return { text: text16, value, ...trend ? { trend } : {} };
   }
   #headline(ref, now) {
-    const { text: text15, trend, value } = this.#value(ref, now);
-    return value === void 0 ? void 0 : { text: text15, ...ref.label ? { label: ref.label } : {}, ...trend ? { trend } : {} };
+    const { text: text16, trend, value } = this.#value(ref, now);
+    return value === void 0 ? void 0 : { text: text16, ...ref.label ? { label: ref.label } : {}, ...trend ? { trend } : {} };
   }
   #block(block, now) {
     switch (block.kind) {
@@ -11212,8 +11397,8 @@ var ChartRuntime = class {
       case "stat":
         return {
           items: block.items.map((item3) => {
-            const { text: text15, trend } = this.#value(item3, now);
-            return { label: item3.label, text: text15, ...trend ? { trend } : {} };
+            const { text: text16, trend } = this.#value(item3, now);
+            return { label: item3.label, text: text16, ...trend ? { trend } : {} };
           }),
           kind: "stat"
         };
@@ -11223,8 +11408,8 @@ var ChartRuntime = class {
         const labels = keyLabels(entries.map(([k]) => k));
         return {
           items: entries.map(([k, s2], i) => {
-            const text15 = cut2(s2.text ?? (s2.values ? formatNumber(s2.last) : s2.line?.trim() ?? ""), MAX_TEXT_CHARS);
-            return { label: labels[i] || k || block.label, text: text15, tone: gridTone(block.tones, text15) };
+            const text16 = cut2(s2.text ?? (s2.values ? formatNumber(s2.last) : s2.line?.trim() ?? ""), MAX_TEXT_CHARS);
+            return { label: labels[i] || k || block.label, text: text16, tone: gridTone(block.tones, text16) };
           }),
           kind: "grid",
           label: block.label
@@ -11298,8 +11483,8 @@ function keyLabels(keys2) {
   const short = keys2.map((k) => k.slice(k.lastIndexOf("/") + 1));
   return short.every(Boolean) && new Set(short).size === short.length ? short : keys2.slice();
 }
-function gridTone(tones, text15) {
-  const lower = text15.toLowerCase();
+function gridTone(tones, text16) {
+  const lower = text16.toLowerCase();
   for (const [status, tone] of Object.entries(tones)) {
     if (lower.includes(status.toLowerCase())) {
       return tone;
@@ -11366,8 +11551,8 @@ var OutputTap = class {
     const start = Math.min(Math.max(from, this.#start), end);
     return { end, open: this.#open, start, text: this.#text.slice(start - this.#start) };
   }
-  #append(text15) {
-    this.#text += text15;
+  #append(text16) {
+    this.#text += text16;
     const excess = this.#text.length - TAP_CAPACITY;
     if (excess > TAP_CAPACITY / 4) {
       this.#text = this.#text.slice(excess);
@@ -11607,9 +11792,9 @@ function lastLine(output) {
   const lines = withoutEscapes(output).split("\n");
   for (const line of lines.toReversed()) {
     const draws = line.split("\r");
-    const text15 = (draws.findLast((d) => d.trim()) ?? "").replace(/\s+/g, " ").trim();
-    if (text15) {
-      return text15;
+    const text16 = (draws.findLast((d) => d.trim()) ?? "").replace(/\s+/g, " ").trim();
+    if (text16) {
+      return text16;
     }
   }
   return "";
@@ -13024,8 +13209,8 @@ var CONTROL_CHARACTERS = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/gu;
 function commandDisplayText(command2) {
   return withVisibleControlCharacters(withoutShellWrapper(command2));
 }
-function withVisibleControlCharacters(text15) {
-  return text15.replace(
+function withVisibleControlCharacters(text16) {
+  return text16.replace(
     CONTROL_CHARACTERS,
     (character) => character === "\x7F" ? "\u2421" : String.fromCharCode(9216 + character.charCodeAt(0))
   );
@@ -13350,9 +13535,9 @@ function openAgents(host, focus) {
   let state = initialHub(agents2(), focus?.id);
   const stopTicking = tickWhileOpen(host, TICK_MS);
   const close = () => host.close(overlay2);
-  const sendSteer = async (a2, text15) => {
+  const sendSteer = async (a2, text16) => {
     await reportError(host.transcript, async () => {
-      const queued = await host.agents.steer(a2, text15);
+      const queued = await host.agents.steer(a2, text16);
       host.transcript.notice(
         queued ? `Steering queued for ${agentName(a2)}.` : `${agentName(a2)} is not taking steering now.`,
         queued ? "info" : "warning"
@@ -13565,7 +13750,7 @@ function briefFor(host, a2) {
 }
 function hubPreview(a2, now, brief) {
   const recent = (a2.log?.entries ?? []).slice(-RECENT);
-  const look = SUBAGENT_LOOK[a2.status];
+  const look2 = SUBAGENT_LOOK[a2.status];
   return [
     // A new node each time the selection moves: its timers need their true ages.
     agentNode(a2, now),
@@ -13573,7 +13758,7 @@ function hubPreview(a2, now, brief) {
       "kv",
       {
         items: facts([
-          ["Status", [{ s: look.tone, t: look.word }]],
+          ["Status", [{ s: look2.tone, t: look2.word }]],
           ["Model", a2.model],
           ["Time", elapsed(a2, now)],
           ["Tools", String(a2.toolCount)],
@@ -13625,7 +13810,7 @@ function stepItem(e, id, a2) {
 function stepPreview(e, a2, brief) {
   if (e.kind !== "tool") {
     const head2 = { assistant: "Answer", kickoff: "Task", note: "Note", think: "Thinking" }[e.kind];
-    const text15 = e.kind === "kickoff" && a2.goal ? brief ? `${a2.goal}
+    const text16 = e.kind === "kickoff" && a2.goal ? brief ? `${a2.goal}
 
 ---
 
@@ -13633,7 +13818,7 @@ ${brief}` : a2.goal : e.text;
     return [
       /* @__PURE__ */ jsx("text", { role: "omp.hub.title", text: head2 }, "title"),
       /* @__PURE__ */ jsx("text", { spans: [{ s: "dim mono", t: e.at }] }, "at"),
-      /* @__PURE__ */ jsx("md", { text: text15, ...optional2("tone", e.kind === "think" ? "muted" : void 0) }, "body")
+      /* @__PURE__ */ jsx("md", { text: text16, ...optional2("tone", e.kind === "think" ? "muted" : void 0) }, "body")
     ];
   }
   return [
@@ -14293,9 +14478,9 @@ async function git(cwd, ...args) {
   return stdout;
 }
 var KIND = { A: "added", C: "copied", D: "deleted", M: "modified", R: "renamed", T: "modified" };
-function parseStatus(text15) {
+function parseStatus(text16) {
   const state = { ahead: 0, behind: 0, files: [] };
-  const records2 = text15.split("\0");
+  const records2 = text16.split("\0");
   for (let i = 0; i < records2.length; i++) {
     const line = records2[i] ?? "";
     if (line.startsWith("# branch.head ")) {
@@ -14322,9 +14507,9 @@ function parseStatus(text15) {
   }
   return state;
 }
-function applyNumstat(files, text15) {
+function applyNumstat(files, text16) {
   const byPath = new Map(files.map((f) => [f.path, f]));
-  const records2 = text15.split("\0");
+  const records2 = text16.split("\0");
   for (let i = 0; i < records2.length; i++) {
     const [add, del2, ...rest] = (records2[i] ?? "").split("	");
     let path2 = rest.join("	");
@@ -14387,8 +14572,8 @@ function openChanges(host, focus) {
       return;
     }
     diffs.set(f.path, null);
-    void fileDiff(state.root, f).then((text15) => {
-      diffs.set(f.path, text15);
+    void fileDiff(state.root, f).then((text16) => {
+      diffs.set(f.path, text16);
       host.changed();
     });
   };
@@ -15216,8 +15401,8 @@ function batchQuery(refs) {
   const variables = {};
   const decls = [];
   const parts3 = refs.map((ref, i) => {
-    const [owner, name] = ref.repository.split("/");
-    variables[`o${i}`] = owner;
+    const [owner2, name] = ref.repository.split("/");
+    variables[`o${i}`] = owner2;
     variables[`r${i}`] = name;
     variables[`n${i}`] = ref.number;
     variables[`h${i}`] = `refs/pull/${ref.number}/head`;
@@ -15227,54 +15412,54 @@ function batchQuery(refs) {
   return { query: `query(${decls.join(", ")}) { ${parts3.join("\n")} }`, variables };
 }
 var batchAnswers = _catch(record(string2(), unknown()), {});
-var text3 = _catch(string2(), "");
+var text4 = _catch(string2(), "");
 var count = _catch(number2(), 0);
 var flag = _catch(boolean2(), false);
 var orEmpty = (schema2) => _catch(schema2, () => schema2.parse({}));
 var nodesOf = (node3) => pipe(_catch(object({ nodes: _catch(array(unknown()), []) }), { nodes: [] }), transform((c) => rowsOf(node3, c.nodes)));
-var actor = orEmpty(object({ login: text3 }));
+var actor = orEmpty(object({ login: text4 }));
 var checkNode = object({
-  __typename: text3,
-  context: text3,
-  state: text3,
-  targetUrl: text3,
-  description: text3,
-  createdAt: text3,
-  name: text3,
-  status: text3,
-  conclusion: text3,
-  startedAt: text3,
-  completedAt: text3,
-  detailsUrl: text3,
-  checkSuite: orEmpty(object({ workflowRun: orEmpty(object({ workflow: orEmpty(object({ name: text3 })) })) }))
+  __typename: text4,
+  context: text4,
+  state: text4,
+  targetUrl: text4,
+  description: text4,
+  createdAt: text4,
+  name: text4,
+  status: text4,
+  conclusion: text4,
+  startedAt: text4,
+  completedAt: text4,
+  detailsUrl: text4,
+  checkSuite: orEmpty(object({ workflowRun: orEmpty(object({ workflow: orEmpty(object({ name: text4 })) })) }))
 });
 var prNode = object({
-  id: text3,
-  title: text3,
-  url: text3,
-  body: text3,
-  state: text3,
+  id: text4,
+  title: text4,
+  url: text4,
+  body: text4,
+  state: text4,
   isDraft: flag,
-  mergeable: text3,
-  mergeStateStatus: text3,
-  reviewDecision: text3,
+  mergeable: text4,
+  mergeStateStatus: text4,
+  reviewDecision: text4,
   additions: count,
   deletions: count,
   changedFiles: count,
-  createdAt: text3,
-  updatedAt: text3,
-  mergedAt: text3,
-  closedAt: text3,
-  headRefName: text3,
-  baseRefName: text3,
-  headRefOid: text3,
+  createdAt: text4,
+  updatedAt: text4,
+  mergedAt: text4,
+  closedAt: text4,
+  headRefName: text4,
+  baseRefName: text4,
+  headRefOid: text4,
   viewerCanUpdate: flag,
   author: actor,
-  autoMergeRequest: orEmpty(object({ mergeMethod: text3 })),
+  autoMergeRequest: orEmpty(object({ mergeMethod: text4 })),
   baseRef: orEmpty(object({ compare: orEmpty(object({ behindBy: _catch(nullable(number2()), null) })) })),
-  labels: nodesOf(object({ name: text3 })),
-  reviewRequests: nodesOf(object({ requestedReviewer: orEmpty(object({ login: text3, name: text3 })) })),
-  latestReviews: nodesOf(object({ author: actor, state: text3 })),
+  labels: nodesOf(object({ name: text4 })),
+  reviewRequests: nodesOf(object({ requestedReviewer: orEmpty(object({ login: text4, name: text4 })) })),
+  latestReviews: nodesOf(object({ author: actor, state: text4 })),
   commits: nodesOf(object({ commit: orEmpty(object({ statusCheckRollup: orEmpty(object({ contexts: nodesOf(checkNode) })) })) }))
 });
 var repoNode = object({
@@ -15371,7 +15556,7 @@ function checksSummary(checks2) {
   ];
   return parts3.filter(([n]) => n).map(([n, label]) => `${n} ${label}`).join(", ");
 }
-var STATE = { CLOSED: "closed", MERGED: "merged", OPEN: "open" };
+var STATE2 = { CLOSED: "closed", MERGED: "merged", OPEN: "open" };
 var MERGEABLE = { CONFLICTING: "conflicting", MERGEABLE: "mergeable" };
 function parsePullRequest(ref, repo) {
   const read = repoNode.safeParse(repo);
@@ -15424,7 +15609,7 @@ function parsePullRequest(ref, repo) {
     mergedAt: p3.mergedAt || null,
     reviewDecision: p3.reviewDecision || null,
     reviewers: [...reviews].map(([login, state]) => ({ login, state })),
-    state: STATE[p3.state] ?? "open",
+    state: STATE2[p3.state] ?? "open",
     title: p3.title,
     updatedAt: p3.updatedAt,
     url: p3.url || ref.url
@@ -15438,24 +15623,24 @@ var ACTIVITY_QUERY = `query($o: String!, $r: String!, $n: Int!) {
       comments(first: 20) { nodes { author { login } body createdAt url } } } }
     commits(last: 30) { nodes { commit { oid messageHeadline committedDate url author { name user { login } } } } }
   } } }`;
-var commentNode = object({ author: actor, body: text3, createdAt: text3, url: text3 });
+var commentNode = object({ author: actor, body: text4, createdAt: text4, url: text4 });
 var activityAnswer = object({
   repository: object({
     pullRequest: object({
       comments: nodesOf(commentNode),
-      reviews: nodesOf(object({ author: actor, state: text3, body: text3, submittedAt: text3, url: text3 })),
+      reviews: nodesOf(object({ author: actor, state: text4, body: text4, submittedAt: text4, url: text4 })),
       reviewThreads: nodesOf(
         object({
           isResolved: flag,
           isOutdated: flag,
-          path: text3,
+          path: text4,
           line: _catch(nullable(number2()), null),
           comments: nodesOf(commentNode)
         })
       ),
       commits: nodesOf(
         object({
-          commit: orEmpty(object({ messageHeadline: text3, committedDate: text3, url: text3, author: orEmpty(object({ name: text3, user: actor })) }))
+          commit: orEmpty(object({ messageHeadline: text4, committedDate: text4, url: text4, author: orEmpty(object({ name: text4, user: actor })) }))
         })
       )
     })
@@ -15498,7 +15683,7 @@ function parseActivity(data) {
   ];
   return items.sort((a2, b) => Date.parse(a2.at) - Date.parse(b.at));
 }
-var fileRow = object({ filename: text3, previous_filename: text3, status: text3, additions: count, deletions: count, patch: text3 });
+var fileRow = object({ filename: text4, previous_filename: text4, status: text4, additions: count, deletions: count, patch: text4 });
 function parseFiles(rows2) {
   return rowsOf(fileRow, Array.isArray(rows2) ? rows2 : []).map((r) => ({
     additions: r.additions,
@@ -16403,7 +16588,7 @@ function color(d) {
 
 // node_modules/unist-util-visit-parents/lib/index.js
 var empty2 = [];
-var CONTINUE = true;
+var CONTINUE2 = true;
 var EXIT = false;
 var SKIP2 = "skip";
 function visitParents(tree, test, visitor, reverse) {
@@ -16473,7 +16658,7 @@ function toResult(value) {
     return value;
   }
   if (typeof value === "number") {
-    return [CONTINUE, value];
+    return [CONTINUE2, value];
   }
   return value === null || value === void 0 ? empty2 : [value];
 }
@@ -17844,7 +18029,7 @@ function createRow() {
 }
 
 // node_modules/hast-util-to-mdast/lib/handlers/text.js
-function text4(state, node3) {
+function text5(state, node3) {
   const result = { type: "text", value: node3.value };
   state.patch(node3, result);
   return result;
@@ -17869,7 +18054,7 @@ var nodeHandlers = {
   comment,
   doctype: ignore,
   root,
-  text: text4
+  text: text5
 };
 var handlers = {
   // Ignore:
@@ -19455,12 +19640,12 @@ function linkReference(node3, _, state, info) {
   let subexit = state.enter("label");
   const tracker = state.createTracker(info);
   let value = tracker.move("[");
-  const text15 = state.containerPhrasing(node3, {
+  const text16 = state.containerPhrasing(node3, {
     before: value,
     after: "]",
     ...tracker.current()
   });
-  value += tracker.move(text15 + "][");
+  value += tracker.move(text16 + "][");
   subexit();
   const stack = state.stack;
   state.stack = stack.filter(function(d) {
@@ -19475,7 +19660,7 @@ function linkReference(node3, _, state, info) {
   subexit();
   state.stack = stack;
   exit3();
-  if (type === "full" || !text15 || text15 !== reference) {
+  if (type === "full" || !text16 || text16 !== reference) {
     value += tracker.move(reference + "]");
   } else if (type === "shortcut") {
     value = value.slice(0, -1);
@@ -19676,7 +19861,7 @@ function peek2(_, _1, state) {
 }
 
 // node_modules/mdast-util-to-markdown/lib/handle/text.js
-function text5(node3, parent, state, info) {
+function text6(node3, parent, state, info) {
   const siblings = parent ? parent.children : [];
   const index2 = siblings.indexOf(node3);
   return state.safe(node3.value, {
@@ -19723,7 +19908,7 @@ var handle2 = {
   paragraph,
   root: root2,
   strong: strong2,
-  text: text5,
+  text: text6,
   thematicBreak
 };
 
@@ -24853,7 +25038,7 @@ function point2(point5) {
 // node_modules/hast-util-to-parse5/lib/index.js
 var emptyOptions4 = {};
 var own9 = {}.hasOwnProperty;
-var one4 = zwitch("type", { handlers: { root: root3, element: element3, text: text6, comment: comment2, doctype } });
+var one4 = zwitch("type", { handlers: { root: root3, element: element3, text: text7, comment: comment2, doctype } });
 function toParse5(tree, options) {
   const settings2 = options || emptyOptions4;
   const space2 = settings2.space;
@@ -24887,7 +25072,7 @@ function doctype(node3) {
   patch3(node3, result);
   return result;
 }
-function text6(node3) {
+function text7(node3) {
   const result = {
     nodeName: "#text",
     value: node3.value,
@@ -29419,22 +29604,22 @@ var defaultTreeAdapter = {
       node3.parentNode = null;
     }
   },
-  insertText(parentNode, text15) {
+  insertText(parentNode, text16) {
     if (parentNode.childNodes.length > 0) {
       const prevNode = parentNode.childNodes[parentNode.childNodes.length - 1];
       if (defaultTreeAdapter.isTextNode(prevNode)) {
-        prevNode.value += text15;
+        prevNode.value += text16;
         return;
       }
     }
-    defaultTreeAdapter.appendChild(parentNode, defaultTreeAdapter.createTextNode(text15));
+    defaultTreeAdapter.appendChild(parentNode, defaultTreeAdapter.createTextNode(text16));
   },
-  insertTextBefore(parentNode, text15, referenceNode) {
+  insertTextBefore(parentNode, text16, referenceNode) {
     const prevNode = parentNode.childNodes[parentNode.childNodes.indexOf(referenceNode) - 1];
     if (prevNode && defaultTreeAdapter.isTextNode(prevNode)) {
-      prevNode.value += text15;
+      prevNode.value += text16;
     } else {
-      defaultTreeAdapter.insertBefore(parentNode, defaultTreeAdapter.createTextNode(text15), referenceNode);
+      defaultTreeAdapter.insertBefore(parentNode, defaultTreeAdapter.createTextNode(text16), referenceNode);
     }
   },
   adoptAttributes(recipient, attrs) {
@@ -32903,7 +33088,7 @@ var parseOptions = { sourceCodeLocationInfo: true, scriptingEnabled: false };
 function raw(tree, options) {
   const document3 = documentMode(tree);
   const one5 = zwitch("type", {
-    handlers: { root: root4, element: element4, text: text7, comment: comment3, doctype: doctype2, raw: handleRaw },
+    handlers: { root: root4, element: element4, text: text8, comment: comment3, doctype: doctype2, raw: handleRaw },
     unknown: unknown3
   });
   const state = {
@@ -32956,7 +33141,7 @@ function element4(node3, state) {
   all7(node3.children, state);
   endTag(node3, state);
 }
-function text7(node3, state) {
+function text8(node3, state) {
   if (state.parser.tokenizer.state > 4) {
     state.parser.tokenizer.state = 0;
   }
@@ -33420,7 +33605,7 @@ function transform2(state, node3) {
         return root5(state, unsafe2);
       }
       case "text": {
-        return text8(state, unsafe2);
+        return text9(state, unsafe2);
       }
       default:
     }
@@ -33487,7 +33672,7 @@ function root5(state, unsafe2) {
   patch4(node3, unsafe2);
   return node3;
 }
-function text8(_, unsafe2) {
+function text9(_, unsafe2) {
   const value = typeof unsafe2.value === "string" ? unsafe2.value : "";
   const node3 = { type: "text", value };
   patch4(node3, unsafe2);
@@ -33765,27 +33950,27 @@ var emailAutolink = {
   tokenize: tokenizeEmailAutolink,
   previous: previousEmail
 };
-var text9 = {};
+var text10 = {};
 function gfmAutolinkLiteral() {
   return {
-    text: text9
+    text: text10
   };
 }
 var code4 = 48;
 while (code4 < 123) {
-  text9[code4] = emailAutolink;
+  text10[code4] = emailAutolink;
   code4++;
   if (code4 === 58) code4 = 65;
   else if (code4 === 91) code4 = 97;
 }
-text9[43] = emailAutolink;
-text9[45] = emailAutolink;
-text9[46] = emailAutolink;
-text9[95] = emailAutolink;
-text9[72] = [emailAutolink, protocolAutolink];
-text9[104] = [emailAutolink, protocolAutolink];
-text9[87] = [emailAutolink, wwwAutolink];
-text9[119] = [emailAutolink, wwwAutolink];
+text10[43] = emailAutolink;
+text10[45] = emailAutolink;
+text10[46] = emailAutolink;
+text10[95] = emailAutolink;
+text10[72] = [emailAutolink, protocolAutolink];
+text10[104] = [emailAutolink, protocolAutolink];
+text10[87] = [emailAutolink, wwwAutolink];
+text10[119] = [emailAutolink, wwwAutolink];
 function tokenizeEmailAutolink(effects, ok3, nok) {
   const self2 = this;
   let dot;
@@ -34165,7 +34350,7 @@ function resolveAllAttention(events, context) {
             },
             end
           };
-          const text15 = {
+          const text16 = {
             type: use > 1 ? "strongText" : "emphasisText",
             start: {
               ...events[open][1].end
@@ -34193,9 +34378,9 @@ function resolveAllAttention(events, context) {
           if (events[open][1].end.offset - events[open][1].start.offset) {
             nextEvents = push(nextEvents, [["enter", events[open][1], context], ["exit", events[open][1], context]]);
           }
-          nextEvents = push(nextEvents, [["enter", group, context], ["enter", openingSequence, context], ["exit", openingSequence, context], ["enter", text15, context]]);
+          nextEvents = push(nextEvents, [["enter", group, context], ["enter", openingSequence, context], ["exit", openingSequence, context], ["enter", text16, context]]);
           nextEvents = push(nextEvents, resolveAll(context.parser.constructs.insideSpan.null, events.slice(open + 1, index2), context));
-          nextEvents = push(nextEvents, [["exit", text15, context], ["enter", closingSequence, context], ["exit", closingSequence, context], ["exit", group, context]]);
+          nextEvents = push(nextEvents, [["exit", text16, context], ["enter", closingSequence, context], ["exit", closingSequence, context], ["exit", group, context]]);
           let offset = 0;
           if (events[index2][1].end.offset - events[index2][1].start.offset) {
             offset = 2;
@@ -35697,13 +35882,13 @@ function resolveHeadingAtx(events, context) {
       start: events[contentStart][1].start,
       end: events[contentEnd][1].end
     };
-    const text15 = {
+    const text16 = {
       type: "chunkText",
       start: events[contentStart][1].start,
       end: events[contentEnd][1].end,
       contentType: "text"
     };
-    splice(events, contentStart, contentEnd - contentStart + 1, [["enter", content5, context], ["enter", text15, context], ["exit", text15, context], ["exit", content5, context]]);
+    splice(events, contentStart, contentEnd - contentStart + 1, [["enter", content5, context], ["enter", text16, context], ["exit", text16, context], ["exit", content5, context]]);
   }
   return events;
 }
@@ -36505,7 +36690,7 @@ function resolveToLabelEnd(events, context) {
       ...events[close][1].end
     }
   };
-  const text15 = {
+  const text16 = {
     type: "labelText",
     start: {
       ...events[open + offset + 2][1].end
@@ -36516,9 +36701,9 @@ function resolveToLabelEnd(events, context) {
   };
   media2 = [["enter", group, context], ["enter", label, context]];
   media2 = push(media2, events.slice(open + 1, open + offset + 3));
-  media2 = push(media2, [["enter", text15, context]]);
+  media2 = push(media2, [["enter", text16, context]]);
   media2 = push(media2, resolveAll(context.parser.constructs.insideSpan.null, events.slice(open + offset + 4, close - 3), context));
-  media2 = push(media2, [["exit", text15, context], events[close - 2], events[close - 1], ["exit", label, context]]);
+  media2 = push(media2, [["exit", text16, context], events[close - 2], events[close - 1], ["exit", label, context]]);
   media2 = push(media2, events.slice(close + 1));
   media2 = push(media2, [["exit", group, context]]);
   splice(events, open, events.length, media2);
@@ -37010,7 +37195,7 @@ function resolveToSetextUnderline(events, context) {
   const editMap = new EditMap();
   let index2 = events.length;
   let content5;
-  let text15;
+  let text16;
   let definition3;
   while (index2--) {
     if (events[index2][0] === "enter") {
@@ -37019,7 +37204,7 @@ function resolveToSetextUnderline(events, context) {
         break;
       }
       if (events[index2][1].type === "paragraph") {
-        text15 = index2;
+        text16 = index2;
       }
     } else {
       if (events[index2][1].type === "content") {
@@ -37039,9 +37224,9 @@ function resolveToSetextUnderline(events, context) {
       ...events[events.length - 1][1].end
     }
   };
-  events[text15][1].type = "setextHeadingText";
+  events[text16][1].type = "setextHeadingText";
   if (definition3) {
-    editMap.add(text15, 0, [["enter", heading5, context]]);
+    editMap.add(text16, 0, [["enter", heading5, context]]);
     editMap.add(definition3 + 1, 0, [["exit", events[content5][1], context]]);
     events[content5][1].end = {
       ...events[definition3][1].end
@@ -37407,17 +37592,17 @@ function gfmStrikethrough(options) {
               start: Object.assign({}, events[open][1].start),
               end: Object.assign({}, events[index2][1].end)
             };
-            const text15 = {
+            const text16 = {
               type: "strikethroughText",
               start: Object.assign({}, events[open][1].end),
               end: Object.assign({}, events[index2][1].start)
             };
-            const nextEvents = [["enter", strikethrough2, context], ["enter", events[open][1], context], ["exit", events[open][1], context], ["enter", text15, context]];
+            const nextEvents = [["enter", strikethrough2, context], ["enter", events[open][1], context], ["exit", events[open][1], context], ["enter", text16, context]];
             const insideSpan2 = context.parser.constructs.insideSpan.null;
             if (insideSpan2) {
               splice(nextEvents, nextEvents.length, 0, resolveAll(insideSpan2, events.slice(open + 1, index2), context));
             }
-            splice(nextEvents, nextEvents.length, 0, [["exit", text15, context], ["enter", events[index2][1], context], ["exit", events[index2][1], context], ["exit", strikethrough2, context]]);
+            splice(nextEvents, nextEvents.length, 0, [["exit", text16, context], ["enter", events[index2][1], context], ["exit", events[index2][1], context], ["exit", strikethrough2, context]]);
             splice(events, open - 1, index2 - open + 3, nextEvents);
             index2 = open + nextEvents.length - 2;
             break;
@@ -38356,7 +38541,7 @@ var resolver = {
   resolveAll: createResolver()
 };
 var string3 = initializeFactory("string");
-var text10 = initializeFactory("text");
+var text11 = initializeFactory("text");
 function initializeFactory(field) {
   return {
     resolveAll: createResolver(field === "text" ? resolveAllLineSuffixes : void 0),
@@ -38365,10 +38550,10 @@ function initializeFactory(field) {
   function initializeText(effects) {
     const self2 = this;
     const constructs2 = this.parser.constructs[field];
-    const text15 = effects.attempt(constructs2, start, notText);
+    const text16 = effects.attempt(constructs2, start, notText);
     return start;
     function start(code7) {
-      return atBreak(code7) ? text15(code7) : notText(code7);
+      return atBreak(code7) ? text16(code7) : notText(code7);
     }
     function notText(code7) {
       if (code7 === null) {
@@ -38382,7 +38567,7 @@ function initializeFactory(field) {
     function data(code7) {
       if (atBreak(code7)) {
         effects.exit("data");
-        return text15(code7);
+        return text16(code7);
       }
       effects.consume(code7);
       return data;
@@ -38504,7 +38689,7 @@ __export(constructs_exports, {
   flowInitial: () => flowInitial,
   insideSpan: () => insideSpan,
   string: () => string4,
-  text: () => text11
+  text: () => text12
 });
 var document2 = {
   [42]: list7,
@@ -38544,7 +38729,7 @@ var string4 = {
   [38]: characterReference,
   [92]: characterEscape
 };
-var text11 = {
+var text12 = {
   [-5]: lineEnding,
   [-4]: lineEnding,
   [-3]: lineEnding,
@@ -38909,7 +39094,7 @@ function parse4(options) {
     flow: create5(flow2),
     lazy: {},
     string: create5(string3),
-    text: create5(text10)
+    text: create5(text11)
   };
   return parser;
   function create5(initial) {
@@ -39457,7 +39642,7 @@ function compiler(options) {
     const siblings = node3.children;
     let tail = siblings[siblings.length - 1];
     if (!tail || tail.type !== "text") {
-      tail = text15();
+      tail = text16();
       tail.position = {
         start: point4(token.start),
         // @ts-expect-error: we’ll add `end` later.
@@ -39716,7 +39901,7 @@ function compiler(options) {
       position: void 0
     };
   }
-  function text15() {
+  function text16() {
     return {
       type: "text",
       value: "",
@@ -40008,13 +40193,13 @@ function image2(state, node3) {
 
 // node_modules/mdast-util-to-hast/lib/handlers/inline-code.js
 function inlineCode3(state, node3) {
-  const text15 = { type: "text", value: node3.value.replace(/\r?\n|\r/g, " ") };
-  state.patch(node3, text15);
+  const text16 = { type: "text", value: node3.value.replace(/\r?\n|\r/g, " ") };
+  state.patch(node3, text16);
   const result = {
     type: "element",
     tagName: "code",
     properties: {},
-    children: [text15]
+    children: [text16]
   };
   state.patch(node3, result);
   return state.applyData(node3, result);
@@ -40301,7 +40486,7 @@ function trimLine(value, start, end) {
 }
 
 // node_modules/mdast-util-to-hast/lib/handlers/text.js
-function text12(state, node3) {
+function text13(state, node3) {
   const result = { type: "text", value: trimLines(String(node3.value)) };
   state.patch(node3, result);
   return state.applyData(node3, result);
@@ -40343,7 +40528,7 @@ var handlers2 = {
   table: table2,
   tableCell: tableCell2,
   tableRow: tableRow2,
-  text: text12,
+  text: text13,
   thematicBreak: thematicBreak3,
   toml: ignore2,
   yaml: ignore2,
@@ -42033,7 +42218,7 @@ function holdsDetails(n) {
 }
 function autolink2(mdast, links) {
   const host = links.repo?.match(/^https?:\/\/[^/]+/)?.[0] ?? "https://github.com";
-  const link3 = (text15, url) => ({ children: [{ type: "text", value: text15 }], type: "link", url });
+  const link3 = (text16, url) => ({ children: [{ type: "text", value: text16 }], type: "link", url });
   const list9 = [
     ...links.repo ? [[/(?<![\w&/#])#(\d+)\b/g, (_, n) => link3(`#\u2060${n}`, `${links.repo}/issues/${n}`)]] : [],
     [/(?<![\w/@.])@([a-z\d](?:[a-z\d-]{0,38}))\b(?!\.\w)/gi, (all8, login) => link3(all8, `${host}/${login}`)]
@@ -42064,9 +42249,9 @@ function parts(nodes, links) {
   const out = [];
   let run6 = [];
   const flush = () => {
-    const text15 = run6.length ? markdown(run6, links) : "";
-    if (text15) {
-      out.push({ kind: "md", text: text15 });
+    const text16 = run6.length ? markdown(run6, links) : "";
+    if (text16) {
+      out.push({ kind: "md", text: text16 });
     }
     run6 = [];
   };
@@ -42701,7 +42886,7 @@ function openPrSheet(host, focus) {
   const view = new PrView(
     {
       changed: () => host.changed(),
-      notice: (text15, tone) => host.notice(text15, tone),
+      notice: (text16, tone) => host.notice(text16, tone),
       open: openUrl,
       prs: host.prs,
       reveal: (id) => host.reveal(id),
@@ -42947,12 +43132,12 @@ function callsOf(raw2) {
     return [];
   }
 }
-function noticeLine(text15) {
-  const line = firstLine2(text15);
+function noticeLine(text16) {
+  const line = firstLine2(text16);
   return /^\[[A-Z][A-Z -]*:\s*(?<said>[^\]]*)\]?$/.exec(line)?.groups?.["said"]?.trim() || line;
 }
-function firstLine2(text15) {
-  return (text15.split("\n").find((l) => l.trim()) ?? "").trim();
+function firstLine2(text16) {
+  return (text16.split("\n").find((l) => l.trim()) ?? "").trim();
 }
 function readTranscriptPage(id, after, limit, db = stateDbPath()) {
   return readStateDb(db, (conn) => {
@@ -43025,8 +43210,8 @@ function supersededSegments(conn) {
   }
   const superseded = [];
   for (const { value } of receipts) {
-    const text15 = attempt(() => decodeJson(value));
-    const receipt = text15.kind === "ok" ? lineageReceipt.safeParse(text15.value) : void 0;
+    const text16 = attempt(() => decodeJson(value));
+    const receipt = text16.kind === "ok" ? lineageReceipt.safeParse(text16.value) : void 0;
     if (!receipt?.success) {
       continue;
     }
@@ -43083,8 +43268,8 @@ var sessionRow = object({
   pinned: optional(unknown()),
   preview: text
 });
-function flat2(text15) {
-  return (text15 ?? "").replace(/^\[[A-Z][A-Z -]+\][^\n]*\n?/gm, "").replace(/\s+/g, " ").trim();
+function flat2(text16) {
+  return (text16 ?? "").replace(/^\[[A-Z][A-Z -]+\][^\n]*\n?/gm, "").replace(/\s+/g, " ").trim();
 }
 function storedSessions(limit = 400, db = stateDbPath()) {
   let conn;
@@ -43570,8 +43755,8 @@ function thoughtTitle(item3) {
 import { basename as basename2 } from "node:path";
 var DAY = 864e5;
 var SNIPPET = 160;
-function snippet(text15, max = SNIPPET) {
-  const flat3 = text15.replace(/```[\s\S]*?(```|$)/g, " [code] ").replace(/^@image:\S+/gm, "").replace(/\[The user attached [^\]]*\]/g, "").replace(/\[([^\]\n]+)\]\((?:[^)\s]+)\)/g, "$1").replace(/^\s{0,3}(?:#{1,6}\s+|>\s?|[-*+]\s+|\d+[.)]\s+)/gm, "").replace(/`([^`\n]+)`/g, "$1").replace(/(\*\*|__)(.+?)\1/g, "$2").replace(/\s+/g, " ").trim();
+function snippet(text16, max = SNIPPET) {
+  const flat3 = text16.replace(/```[\s\S]*?(```|$)/g, " [code] ").replace(/^@image:\S+/gm, "").replace(/\[The user attached [^\]]*\]/g, "").replace(/\[([^\]\n]+)\]\((?:[^)\s]+)\)/g, "$1").replace(/^\s{0,3}(?:#{1,6}\s+|>\s?|[-*+]\s+|\d+[.)]\s+)/gm, "").replace(/`([^`\n]+)`/g, "$1").replace(/(\*\*|__)(.+?)\1/g, "$2").replace(/\s+/g, " ").trim();
   return clip(flat3, { max });
 }
 function rowDetail(s2) {
@@ -43664,7 +43849,7 @@ function sessionDetail(d) {
     nodes.push(/* @__PURE__ */ jsx("text", { spans: [{ s: "error", t: `Could not read this session: ${preview4.error ?? "unknown error"}` }], wrap: "word" }, "error"));
     return { blocks: blocks2, nodes };
   }
-  preview4.rows.forEach((row2, i) => nodes.push(block(`m${i}`, rowNode(row2), row2.kind === "note" && row2.tone === "error" ? "error" : void 0)));
+  preview4.rows.forEach((row2, i) => nodes.push(block(`m${i}`, rowNode2(row2), row2.kind === "note" && row2.tone === "error" ? "error" : void 0)));
   if (preview4.loadingMore) {
     nodes.push(block(MORE, /* @__PURE__ */ jsx("text", { spans: [{ s: "dim", t: "Loading more\u2026" }] }, "t")));
   } else if (preview4.error) {
@@ -43707,7 +43892,7 @@ function stepOf(row2) {
   stepLines.set(row2, line);
   return line;
 }
-function rowNode(row2) {
+function rowNode2(row2) {
   switch (row2.kind) {
     case "user":
       return [
@@ -44226,19 +44411,19 @@ async function interruptTurn(gw2, sid) {
   const execution_generation = await currentGeneration(gw2, sid);
   await rpc(gw2, "session.interrupt", { session_id: sid, execution_generation });
 }
-async function steerTurn(gw2, sid, text15) {
+async function steerTurn(gw2, sid, text16) {
   try {
     const execution_generation = await currentGeneration(gw2, sid);
-    const r = await rpc(gw2, "session.steer", { session_id: sid, execution_generation, text: text15 });
+    const r = await rpc(gw2, "session.steer", { session_id: sid, execution_generation, text: text16 });
     return r && "status" in r && r.status === "queued" ? { ok: true } : { ok: false };
   } catch (e) {
     return errorText(e).includes("stale_generation") ? { ok: false } : { error: errorText(e), ok: false };
   }
 }
-async function redirectTurn(gw2, sid, text15) {
+async function redirectTurn(gw2, sid, text16) {
   try {
     const execution_generation = await currentGeneration(gw2, sid);
-    const r = await rpc(gw2, "session.redirect", { session_id: sid, execution_generation, text: text15 });
+    const r = await rpc(gw2, "session.redirect", { session_id: sid, execution_generation, text: text16 });
     return r && "status" in r && (r.status === "redirected" || r.status === "queued") ? { ok: true } : { ok: false };
   } catch (e) {
     return errorText(e).includes("stale_generation") ? { ok: false } : { error: errorText(e), ok: false };
@@ -44246,30 +44431,30 @@ async function redirectTurn(gw2, sid, text15) {
 }
 
 // src/commands/control.ts
-var preview3 = (text15) => text15.length > 60 ? `${text15.slice(0, 57)}\u2026` : text15;
-async function steer2(host, text15) {
-  if (!text15) {
+var preview3 = (text16) => text16.length > 60 ? `${text16.slice(0, 57)}\u2026` : text16;
+async function steer2(host, text16) {
+  if (!text16) {
     return host.notice("Usage: /steer <guidance for the active turn>", "warning");
   }
   if (!host.busy || !host.sid) {
-    host.enqueue(text15);
-    return host.notice(`No active turn \u2014 queued as next prompt: ${preview3(text15)}`);
+    host.enqueue(text16);
+    return host.notice(`No active turn \u2014 queued as next prompt: ${preview3(text16)}`);
   }
-  const r = await steerTurn(host.gw, host.sid, text15);
+  const r = await steerTurn(host.gw, host.sid, text16);
   if (r.ok) {
-    return host.steered ? host.steered(text15) : host.notice(`Steer queued for the active turn: ${preview3(text15)}`);
+    return host.steered ? host.steered(text16) : host.notice(`Steer queued for the active turn: ${preview3(text16)}`);
   }
   if (r.error) {
     return host.notice(`/steer failed: ${r.error}`, "error");
   }
-  host.enqueue(text15);
+  host.enqueue(text16);
   host.notice("Turn ended before the steer landed \u2014 queued as next prompt", "warning");
 }
-function queue(host, text15) {
-  if (!text15) {
+function queue(host, text16) {
+  if (!text16) {
     return host.notice(`${host.queued} queued message${host.queued === 1 ? "" : "s"}`);
   }
-  host.submit(text15);
+  host.submit(text16);
 }
 async function stop(host) {
   if (!host.sid) {
@@ -44312,8 +44497,8 @@ async function tools(host, arg) {
     host.notice(`/tools failed: ${errorText(e)}`, "error");
   }
 }
-async function side(host, text15, kind) {
-  if (!text15) {
+async function side(host, text16, kind) {
+  if (!text16) {
     return host.notice(kind === "bg" ? "Usage: /bg <prompt>" : "Usage: /btw <question>", "warning");
   }
   if (!host.sid) {
@@ -44322,11 +44507,11 @@ async function side(host, text15, kind) {
   try {
     const r = await rpc(host.gw, kind === "bg" ? "prompt.background" : "prompt.btw", {
       session_id: host.sid,
-      text: text15
+      text: text16
     });
     if (r?.task_id) {
       host.notice(
-        kind === "bg" ? `Background task ${r.task_id} started: ${preview3(text15)}` : `btw ${r.task_id}: answering from a snapshot of this conversation`
+        kind === "bg" ? `Background task ${r.task_id} started: ${preview3(text16)}` : `btw ${r.task_id}: answering from a snapshot of this conversation`
       );
     }
   } catch (e) {
@@ -44426,7 +44611,7 @@ var isBrowserAction = oneOf(["connect", "disconnect", "status"]);
 async function browser(host, arg) {
   const [first2 = "status", ...rest] = words2(arg);
   const action = first2.toLowerCase();
-  const note = (text15, tone) => host.transcript.notice(text15, tone);
+  const note = (text16, tone) => host.transcript.notice(text16, tone);
   if (!isBrowserAction(action)) {
     return note("Usage: /browser [status|connect [url]|disconnect]", "warning");
   }
@@ -44641,23 +44826,23 @@ function lastTurnRewind(snapshot3) {
 var textPart2 = strictObject({ type: _enum(["input_text", "output_text", "text"]), text: string2() });
 function retryText(content5) {
   const parts3 = typeof content5 === "string" ? [content5] : Array.isArray(content5) ? content5 : [null];
-  let text15 = "";
+  let text16 = "";
   for (const part of parts3) {
     const textOf2 = typeof part === "string" ? part : textPart2.safeParse(part).data?.text;
     if (textOf2 === void 0) {
       return null;
     }
-    text15 += textOf2;
+    text16 += textOf2;
   }
-  return text15.trim() ? text15 : "";
+  return text16.trim() ? text16 : "";
 }
 function retryTurnRewind(snapshot3) {
   const target2 = lastUserTurn(snapshot3);
-  const text15 = target2 ? retryText(target2.content) : "";
-  if (text15 === null) {
+  const text16 = target2 ? retryText(target2.content) : "";
+  if (text16 === null) {
     throw new Error("/retry: retry does not support media or unknown content parts");
   }
-  return target2 && text15 ? { target_message_id: target2.row_id } : null;
+  return target2 && text16 ? { target_message_id: target2.row_id } : null;
 }
 
 // src/commands/session.ts
@@ -44684,8 +44869,8 @@ async function rewind(host, intent) {
     return host.notice(`Undid ${plural(removed, "message")}.`);
   }
   const target2 = result["target_message"];
-  const text15 = retryText(typeof target2 === "object" && target2 !== null && "content" in target2 ? target2.content : void 0);
-  return text15 ? host.send(text15) : host.notice("Nothing to retry.");
+  const text16 = retryText(typeof target2 === "object" && target2 !== null && "content" in target2 ? target2.content : void 0);
+  return text16 ? host.send(text16) : host.notice("Nothing to retry.");
 }
 function compressReport(summary4) {
   const head2 = summary4?.headline ? `${summary4.noop ? "" : "\u2713 "}${summary4.headline}` : "\u2713 Transcript compressed.";
@@ -44725,11 +44910,11 @@ async function compress(host, arg) {
     return host.notice(Array.isArray(result["lines"]) ? result["lines"].join("\n") : "Nothing to preview.");
   }
   const summary4 = result.summary;
-  const num5 = (v) => typeof v === "number" && v > 0 ? v : void 0;
+  const num6 = (v) => typeof v === "number" && v > 0 ? v : void 0;
   const kept = result.status === "noop" || result.status === "aborted" || Boolean(summary4?.noop || summary4?.aborted || summary4?.refused_would_grow);
   if (result.status !== "pending") {
     const line = lineTokens(summary4?.token_line ?? "");
-    host.compressing(kept ? "none" : { after: num5(result["after_tokens"]) ?? line.after, before: num5(result["before_tokens"]) ?? line.before });
+    host.compressing(kept ? "none" : { after: num6(result["after_tokens"]) ?? line.after, before: num6(result["before_tokens"]) ?? line.before });
   }
   if (result.status !== "noop") {
     await host.reload();
@@ -44810,8 +44995,8 @@ async function rollback(host, arg) {
       return host.notice("Usage: /rollback diff <checkpoint>", "warning");
     }
     const r2 = await rpc(host.gw, "rollback.diff", { hash: rest[0], session_id: host.sid });
-    const text15 = [r2?.stat?.trim(), r2?.diff?.trim()].filter(Boolean).join("\n\n");
-    return text15 ? host.panel("Rollback diff", text15) : host.notice("No changes since this checkpoint.");
+    const text16 = [r2?.stat?.trim(), r2?.diff?.trim()].filter(Boolean).join("\n\n");
+    return text16 ? host.panel("Rollback diff", text16) : host.notice("No changes since this checkpoint.");
   }
   const file2 = rest.join(" ").trim();
   const r = await rpc(host.gw, "rollback.restore", {
@@ -45023,14 +45208,14 @@ function copyAnswer(host, arg) {
   if (n !== void 0 && !(n >= 1)) {
     return host.transcript.notice("Usage: /copy [n] (n counts answers from the first)", "warning");
   }
-  const answers = host.transcript.entries.flatMap((e) => e.kind === "turn" && answerText(e) ? [answerText(e)] : []);
-  const at = n === void 0 ? answers.length : Math.min(n, answers.length);
-  const text15 = answers[at - 1];
-  if (!text15) {
+  const answers2 = host.transcript.entries.flatMap((e) => e.kind === "turn" && answerText(e) ? [answerText(e)] : []);
+  const at = n === void 0 ? answers2.length : Math.min(n, answers2.length);
+  const text16 = answers2[at - 1];
+  if (!text16) {
     return host.transcript.notice("No answer to copy yet.", "warning");
   }
-  copyToClipboard(text15);
-  host.transcript.notice(`Copied ${n === void 0 ? "the last answer" : `answer ${at}`} (${text15.length} characters).`);
+  copyToClipboard(text16);
+  host.transcript.notice(`Copied ${n === void 0 ? "the last answer" : `answer ${at}`} (${text16.length} characters).`);
 }
 function historyText(entries, arg) {
   const preview4 = Math.max(80, Number.parseInt(arg, 10) || 400);
@@ -45164,10 +45349,10 @@ async function openHelp(host) {
             { grow: 1, head: "Description", id: "action" }
           ],
           role: "omp.hotkeys.table",
-          rows: (c.pairs ?? []).map(([command2 = "", text15 = ""], i) => ({
+          rows: (c.pairs ?? []).map(([command2 = "", text16 = ""], i) => ({
             // The `(usage: …)` tail is `/help <command>`'s business; the table keeps the summary.
             cells: {
-              action: [{ t: text15.replace(/\s*\(usage: .+\)\s*$/, "") }],
+              action: [{ t: text16.replace(/\s*\(usage: .+\)\s*$/, "") }],
               command: [{ s: "mono", t: command2 }]
             },
             id: String(i)
@@ -45277,14 +45462,21 @@ var SurfaceHost = class {
 };
 
 // src/surface/actions.ts
+function cardRow(value) {
+  const at = value.lastIndexOf(":");
+  return [value.slice(0, at), value.slice(at + 1)];
+}
 var ACTIONS = {
+  // A live connect card's Connect on an MCP row: the gateway installs it.
+  "connect-approve": (value, cx) => cx.connect.approve(...cardRow(value)),
   // A connect card's Continue.
   "connect-continue": (value, cx) => cx.connect.continue(value),
-  // `<card>:<app>`: the card names the row, as call ids repeat.
-  "connect-open": (value, cx) => {
-    const at = value.lastIndexOf(":");
-    cx.connect.open(value.slice(0, at), value.slice(at + 1));
-  },
+  // A connect card's Authorize: the app's link in the browser.
+  "connect-open": (value, cx) => cx.connect.open(...cardRow(value)),
+  // A live connect card's Try again on a failed or expired link.
+  "connect-retry": (value, cx) => cx.connect.retry(...cardRow(value)),
+  // A live connect card's Skip on one app.
+  "connect-skip": (value, cx) => cx.connect.skip(...cardRow(value)),
   "open-agent": (value, cx) => cx.openAgent(value),
   "open-process": (value, cx) => cx.openProcess(value),
   // A connect card's Authorize: the app's link in the browser.
@@ -45601,35 +45793,93 @@ var STYLES = css`
     max-width: 360px;
   }
 
-  /* The connect card's buttons: Authorize per app, Continue at the foot. */
-  [data-role='hermes.connect.open'],
-  [data-role='hermes.connect.continue'] {
+  /* The connect card (Hermes Desktop's): one row per app in the UI face, each verb the same small
+     ringed button in a fixed lane at the row's end, Not now a quiet word beside it, Continue a
+     ringed button at the foot. An answer in flight is the same box, dimmed and inert. */
+  [data-role='hermes.connect.row'],
+  [data-role='hermes.connect.foot'],
+  [data-role='hermes.connect.note'] {
+    font: 400 13px/22px var(--sans) !important;
+  }
+
+  [data-role='hermes.connect.row'] {
+    min-height: 30px;
+  }
+
+  /* What an MCP row runs or contacts, under its name, in full. */
+  [data-role='hermes.connect.launch'] {
+    margin: -4px 0 4px 22px;
+    font: 400 11.5px/16px var(--mono) !important;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+
+  /* The mark's lane is one width, so a spinner does not push its row's name over. */
+  [data-role='hermes.connect.row'] > :is(.sf-icon, .sf-spinner) {
     flex: none;
-    padding: 2px 10px !important;
-    border-radius: 999px;
-    box-shadow: inset 0 0 0 1px var(--l3);
+    width: 14px;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  [data-role='hermes.connect.foot'] {
+    margin-top: 4px;
+    padding-top: 6px;
+    box-shadow: inset 0 1px 0 var(--l2);
+  }
+
+  [data-role='hermes.connect.foot'] > .sf-text,
+  [data-role='hermes.connect.note'] {
+    font-size: 12.5px !important;
+  }
+
+  :is(
+      [data-role='hermes.connect.open'],
+      [data-role='hermes.connect.approve'],
+      [data-role='hermes.connect.retry'],
+      [data-role='hermes.connect.continue'],
+      [data-role='hermes.connect.skip'],
+      [data-role='hermes.connect.busy']
+    ) {
+    flex: none;
+    justify-content: center;
+    min-width: 76px;
+    padding: 1px 10px !important;
+    border-radius: 6px;
     font: 500 12px/20px var(--sans) !important;
     cursor: pointer;
   }
 
-  [data-role='hermes.connect.open'] {
+  :is([data-role='hermes.connect.open'], [data-role='hermes.connect.approve'], [data-role='hermes.connect.retry']) {
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sf-p-accent, var(--sf-c-accent)) 35%, transparent);
+    background: color-mix(in srgb, var(--sf-p-accent, var(--sf-c-accent)) 10%, transparent);
     color: var(--sf-p-accent, var(--sf-c-accent)) !important;
   }
 
   [data-role='hermes.connect.continue'] {
-    background: var(--t1);
-    color: var(--card) !important;
-    box-shadow: none;
+    box-shadow: inset 0 0 0 1px var(--l3);
+    color: var(--t1) !important;
   }
 
-  [data-role='hermes.connect.open']:hover,
-  [data-role='hermes.connect.continue']:hover {
-    opacity: 0.85;
+  [data-role='hermes.connect.skip'] {
+    min-width: 0;
+    padding: 1px 6px !important;
+    color: var(--t2) !important;
   }
 
-  [data-role='hermes.connect.row'] {
-    min-height: 28px;
-    font: 400 13px/22px var(--sans) !important;
+  [data-role='hermes.connect.busy'] {
+    box-shadow: inset 0 0 0 1px var(--l2);
+    color: var(--t3) !important;
+    cursor: default;
+  }
+
+  :is([data-role='hermes.connect.open'], [data-role='hermes.connect.approve'], [data-role='hermes.connect.retry'], [data-role='hermes.connect.continue']):hover {
+    background: color-mix(in srgb, var(--sf-p-accent, var(--sf-c-accent)) 18%, transparent);
+  }
+
+  [data-role='hermes.connect.skip']:hover {
+    background: var(--l2);
+    color: var(--t1) !important;
   }
 
   /* An image the next prompt carries: Tern's omp chip (thumbnail, name, size) with a ✕ after
@@ -46150,7 +46400,7 @@ var STYLES = css`
 
 // node_modules/@hermes/shared/src/slash.ts
 var SLASH_COMMAND_RE = /^\/[^\s/]*(?:\s|$)/;
-var looksLikeSlashCommand = (text15) => SLASH_COMMAND_RE.test(text15);
+var looksLikeSlashCommand = (text16) => SLASH_COMMAND_RE.test(text16);
 var str4 = (value) => typeof value === "string" ? value : void 0;
 function parseCommandDispatch(raw2) {
   if (!raw2 || typeof raw2 !== "object" || Array.isArray(raw2)) {
@@ -46176,17 +46426,17 @@ function parseCommandDispatch(raw2) {
 
 // node_modules/@hermes/shared/src/slash-input.ts
 var INLINE_SLASH_RE = /\s\/([a-zA-Z][\w-]*)?$/;
-var inlineSlashTrigger = (text15) => {
-  const match = INLINE_SLASH_RE.exec(text15);
+var inlineSlashTrigger = (text16) => {
+  const match = INLINE_SLASH_RE.exec(text16);
   if (!match) {
     return null;
   }
   const query = match[1] ?? "";
-  return { query, start: text15.length - query.length - 1 };
+  return { query, start: text16.length - query.length - 1 };
 };
 var applyCompletion = (value, rowText2, compReplace) => {
-  const text15 = value[compReplace - 1] === "/" && rowText2.startsWith("/") ? rowText2.slice(1) : rowText2;
-  return value.slice(0, compReplace) + text15;
+  const text16 = value[compReplace - 1] === "/" && rowText2.startsWith("/") ? rowText2.slice(1) : rowText2;
+  return value.slice(0, compReplace) + text16;
 };
 var completionToApplyOnSubmit = (value, rowText2, compReplace, isLocalCommand = () => false) => {
   const typed = value.trim();
@@ -46335,8 +46585,8 @@ function shape(error) {
   };
 }
 function detailLine(raw2) {
-  const text15 = raw2.replace(/\s+/g, " ").trim();
-  return text15 ? `Details: ${text15.length > DETAIL_LIMIT ? `${text15.slice(0, DETAIL_LIMIT - 1)}\u2026` : text15}` : null;
+  const text16 = raw2.replace(/\s+/g, " ").trim();
+  return text16 ? `Details: ${text16.length > DETAIL_LIMIT ? `${text16.slice(0, DETAIL_LIMIT - 1)}\u2026` : text16}` : null;
 }
 var VERSION_SKEW_RE = /Extra inputs are not permitted|^unknown method:/;
 var UNAVAILABLE_METHOD_RE = /^unknown method: (\S+) — not available on this Hermes backend$/;
@@ -46348,44 +46598,44 @@ function isVersionSkew(code7, message) {
 }
 var ROWS = [
   [
-    (code7, text15) => (code7 === RPC_SESSION_NOT_FOUND || code7 === void 0) && /session not found/i.test(text15),
+    (code7, text16) => (code7 === RPC_SESSION_NOT_FOUND || code7 === void 0) && /session not found/i.test(text16),
     () => "This chat is no longer attached to the backend (it was idle or the backend restarted). Your history is saved: type /resume to reopen it."
   ],
   [
-    (_code, text15) => text15 === "session_read_only",
+    (_code, text16) => text16 === "session_read_only",
     () => "This chat is stored history Hermes can show but not continue, so your message was not run. Use /new to start a new chat."
   ],
   [
-    (_code, text15) => text15 === "session_has_children",
+    (_code, text16) => text16 === "session_has_children",
     () => "This chat has child sessions (such as subagent runs) that deleting it would remove too, so it was not deleted."
   ],
   [
-    (_code, text15) => /^gateway not (?:connected|running)\b/.test(text15),
+    (_code, text16) => /^gateway not (?:connected|running)\b/.test(text16),
     () => "Hermes is not connected right now, so that was not sent. It reconnects automatically; wait a moment and try again."
   ],
-  [(_code, text15) => UNAVAILABLE_METHOD_RE.exec(text15), (m) => `This Hermes backend does not provide ${m?.[1] ?? "?"}, so that was not done.`],
+  [(_code, text16) => UNAVAILABLE_METHOD_RE.exec(text16), (m) => `This Hermes backend does not provide ${m?.[1] ?? "?"}, so that was not done.`],
   [
-    (_code, text15) => text15.trim() === "launch_credentials_unavailable",
+    (_code, text16) => text16.trim() === "launch_credentials_unavailable",
     () => "This chat can't use the API key it was started with any more (it changed or was removed), so that was not done. A chat never switches to a different key on its own. Type /new to start a new chat on your current key."
   ],
   [
-    (_code, text15) => /^request timed out after (\d+)s/.exec(text15),
+    (_code, text16) => /^request timed out after (\d+)s/.exec(text16),
     (m) => `Hermes did not answer within ${m?.[1] ?? "?"}s. Try again; if it keeps happening, report the last lines of the gateway log.`
   ]
 ];
 function describeRpcError(error) {
   const { code: code7, message } = shape(error);
-  const text15 = message ?? (typeof error === "string" && error.trim() ? error : "request failed");
-  if (isVersionSkew(code7, text15)) {
+  const text16 = message ?? (typeof error === "string" && error.trim() ? error : "request failed");
+  if (isVersionSkew(code7, text16)) {
     return "Tern and the Hermes backend are out of sync (different versions). Run `hermes update`, then start `hermes tern` again.";
   }
   for (const [match, say] of ROWS) {
-    const m = match(code7, text15);
+    const m = match(code7, text16);
     if (m) {
       return say(m === true ? null : m);
     }
   }
-  return text15;
+  return text16;
 }
 function isUnsupportedCommand(error) {
   return shape(error).data?.reason === "unsupported_command";
@@ -46435,8 +46685,8 @@ function commandEnvelope(raw2) {
     warning: "warning" in legacy && typeof legacy.warning === "string" ? legacy.warning : void 0
   };
 }
-async function runSlash(text15, cx, resolve5 = true) {
-  const [typed = "", ...rest] = text15.slice(1).split(/\s+/);
+async function runSlash(text16, cx, resolve5 = true) {
+  const [typed = "", ...rest] = text16.slice(1).split(/\s+/);
   const name = typed.toLowerCase();
   const arg = rest.join(" ");
   const local = localCommand(name);
@@ -46475,7 +46725,7 @@ async function runSlash(text15, cx, resolve5 = true) {
   }
   const title = `/${name}${arg ? ` ${arg}` : ""}`;
   try {
-    const r = await rpc(cx.gw, "slash.exec", { command: text15.slice(1), session_id: sid });
+    const r = await rpc(cx.gw, "slash.exec", { command: text16.slice(1), session_id: sid });
     if (stale()) {
       return;
     }
@@ -46552,8 +46802,8 @@ var REFUSALS = [
   ["command_failed", "the command could not start"]
 ];
 function shellError(error) {
-  const text15 = errorText(error);
-  return REFUSALS.find(([code7]) => text15.includes(code7))?.[1] ?? describeRpcError(error);
+  const text16 = errorText(error);
+  return REFUSALS.find(([code7]) => text16.includes(code7))?.[1] ?? describeRpcError(error);
 }
 async function shellExec(gw2, sid, command2) {
   const r = await rpc(gw2, "shell.exec", { command: command2, session_id: sid });
@@ -46569,11 +46819,11 @@ function shellLines(r) {
     ...r.code !== 0 || !out ? [{ failed: r.code !== 0, text: `exit ${r.code}` }] : []
   ];
 }
-function typedCommands(text15, pasted = []) {
-  return [...text15.matchAll(new RegExp(INTERPOLATION_RE.source, "g"))].filter((m) => !pasted.some((p3) => p3.includes(m[0])));
+function typedCommands(text16, pasted = []) {
+  return [...text16.matchAll(new RegExp(INTERPOLATION_RE.source, "g"))].filter((m) => !pasted.some((p3) => p3.includes(m[0])));
 }
-async function interpolate(gw2, sid, text15, pasted = []) {
-  const matches2 = typedCommands(text15, pasted);
+async function interpolate(gw2, sid, text16, pasted = []) {
+  const matches2 = typedCommands(text16, pasted);
   const results = await Promise.all(
     matches2.map(async (m) => {
       const r = await shellExec(gw2, sid, m[1] ?? "");
@@ -46582,7 +46832,7 @@ async function interpolate(gw2, sid, text15, pasted = []) {
   );
   return matches2.reduceRight(
     (acc, m, i) => acc.slice(0, m.index) + (results[i] ?? "") + acc.slice((m.index ?? 0) + m[0].length),
-    text15
+    text16
   );
 }
 
@@ -46638,13 +46888,13 @@ function automationNode(a2, now, focused) {
   return parts3.length ? /* @__PURE__ */ jsx("row", { align: "center", gap: "sm", role: "hermes.automation", wrap: true, children: parts3 }, "automation") : null;
 }
 function goalPart(g, onOpen, focused) {
-  const look = GOAL_LOOK[g.state];
+  const look2 = GOAL_LOOK[g.state];
   const judged = g.verdict ? `
 Last check: ${g.verdict}${g.reason ? ` \xB7 ${g.reason}` : ""}` : "";
   return pill({
     children: [
-      /* @__PURE__ */ jsx("icon", { name: look.icon, tone: look.tone }, "icon"),
-      /* @__PURE__ */ jsx("text", { role: "hermes.automation.label", text: look.label, wrap: "none" }, "label"),
+      /* @__PURE__ */ jsx("icon", { name: look2.icon, tone: look2.tone }, "icon"),
+      /* @__PURE__ */ jsx("text", { role: "hermes.automation.label", text: look2.label, wrap: "none" }, "label"),
       // The judge's reason can run long: the tooltip and the sheet carry it, the line stays one line.
       /* @__PURE__ */ jsx("text", { grow: 1, role: "hermes.automation.what", text: g.title, truncate: "end", wrap: "none" }, "what"),
       g.maxTurns > 0 ? /* @__PURE__ */ jsx("meter", { size: "sm", style: "bar", thresholds: { bad: 0.9, warn: 0.75 }, value: Math.min(1, g.turns / g.maxTurns) }, "turns") : null,
@@ -46655,12 +46905,12 @@ Last check: ${g.verdict}${g.reason ? ` \xB7 ${g.reason}` : ""}` : "";
     onClick: onOpen,
     role: ITEM,
     seg: false,
-    title: `${look.label}: ${g.title}
+    title: `${look2.label}: ${g.title}
 ${turnsText(g)}${g.detail ? ` \xB7 ${g.detail}` : ""}${judged}
 Click for details and controls`
   });
 }
-function loopPart(l, owner, onOpen, now, focused) {
+function loopPart(l, owner2, onOpen, now, focused) {
   const paused = l.state === "paused";
   const when = loopWhen(l);
   return pill({
@@ -46669,7 +46919,7 @@ function loopPart(l, owner, onOpen, now, focused) {
       /* @__PURE__ */ jsx("text", { role: "hermes.automation.label", text: paused ? "Loop paused" : "Loop", wrap: "none" }, "label"),
       /* @__PURE__ */ jsx("text", { grow: 1, role: "hermes.automation.what", text: l.prompt, truncate: "end", wrap: "none" }, "what"),
       /* @__PURE__ */ jsx("text", { role: "hermes.automation.when", spans: [{ s: "muted", t: `${l.cadence} \xB7 ${when}` }], wrap: "none" }, "cadence"),
-      l.dueAt !== void 0 ? /* @__PURE__ */ jsx("elapsed", { age: countdownAge(owner, l.dueAt, now), format: "short", role: "hermes.automation.count" }, "countdown") : null
+      l.dueAt !== void 0 ? /* @__PURE__ */ jsx("elapsed", { age: countdownAge(owner2, l.dueAt, now), format: "short", role: "hermes.automation.count" }, "countdown") : null
     ],
     focused,
     key: "loop",
@@ -46750,7 +47000,7 @@ function goalBody(g) {
     ] : []
   ];
 }
-function loopBody(l, owner, now) {
+function loopBody(l, owner2, now) {
   const facts2 = [
     kv("Cadence", l.cadence),
     kv("Runs", l.runs),
@@ -46763,7 +47013,7 @@ function loopBody(l, owner, now) {
       /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", children: [
         /* @__PURE__ */ jsx("icon", { name: "timer", tone: "accent" }, "i"),
         /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: "Next run in" }] }, "t"),
-        /* @__PURE__ */ jsx("elapsed", { age: countdownAge(owner, l.dueAt, now), format: "short" }, "countdown")
+        /* @__PURE__ */ jsx("elapsed", { age: countdownAge(owner2, l.dueAt, now), format: "short" }, "countdown")
       ] }, "next")
     ] : [],
     ...l.times > 0 ? [/* @__PURE__ */ jsx("meter", { label: [{ s: "muted", t: "runs" }], style: "bar", total: [{ t: `${l.fired}/${l.times}` }], value: Math.min(1, l.fired / l.times) }, "runs")] : [],
@@ -46888,7 +47138,7 @@ function serverRequest(req) {
 }
 
 // src/prompts/parse.ts
-var text13 = (v) => typeof v === "string" ? v : "";
+var text14 = (v) => typeof v === "string" ? v : "";
 var strings3 = (v) => Array.isArray(v) ? v.filter((x) => typeof x === "string") : [];
 var APPROVAL_CHOICES = /* @__PURE__ */ new Set(["once", "session", "always", "deny"]);
 var isApprovalChoice = (c) => APPROVAL_CHOICES.has(c);
@@ -46923,8 +47173,8 @@ function approvalOf(req, { params: p3 }) {
   }
   return {
     choices: [...allowed],
-    command: text13(p3.command),
-    description: text13(p3.description),
+    command: text14(p3.command),
+    description: text14(p3.description),
     kind: "approval",
     req,
     requestId: typeof p3.request_id === "string" ? p3.request_id : void 0,
@@ -46939,33 +47189,33 @@ function questionsOf(raw2) {
     if (!q2 || typeof q2 !== "object" || !("qid" in q2) || !("question" in q2)) {
       return [];
     }
-    const question = text13(q2.question).trim();
-    return question ? [{ choices: "choices" in q2 ? strings3(q2.choices) : [], multi: "multi_select" in q2 && q2.multi_select === true, qid: text13(q2.qid), question }] : [];
+    const question = text14(q2.question).trim();
+    return question ? [{ choices: "choices" in q2 ? strings3(q2.choices) : [], multi: "multi_select" in q2 && q2.multi_select === true, qid: text14(q2.qid), question }] : [];
   });
 }
 function lockedAnswers(preset) {
-  const answers = {};
+  const answers2 = {};
   if (preset && typeof preset === "object") {
     for (const qid in preset) {
       const v = Reflect.get(preset, qid);
       if (typeof v === "string" || v === null) {
-        answers[qid] = v;
+        answers2[qid] = v;
       }
     }
   }
-  return answers;
+  return answers2;
 }
 function maskedOf(req, method, p3) {
   return {
-    command: text13(p3.command),
-    envVar: text13(p3.env_var),
-    hint: text13(p3.hint),
+    command: text14(p3.command),
+    envVar: text14(p3.env_var),
+    hint: text14(p3.hint),
     kind: "masked",
-    manager: text13(p3.display_name) || text13(p3.backend),
+    manager: text14(p3.display_name) || text14(p3.backend),
     method,
-    prompt: text13(p3.prompt),
+    prompt: text14(p3.prompt),
     req,
-    site: text13(p3.site) || text13(p3.origin)
+    site: text14(p3.site) || text14(p3.origin)
   };
 }
 
@@ -47394,7 +47644,7 @@ var AppActions = class {
       router: cx.router,
       setCompacting: (on, opts) => this.setCompacting(on, opts),
       state: cx.state,
-      submit: (text15) => this.submit(text15, true, "queue"),
+      submit: (text16) => this.submit(text16, true, "queue"),
       transcript
     };
   }
@@ -47403,8 +47653,8 @@ var AppActions = class {
     return this.#copied.value;
   }
   /** A Copy button: `text` to the clipboard, and its button reads Copied for a moment. */
-  copy = (text15, id) => {
-    copyToClipboard(text15);
+  copy = (text16, id) => {
+    copyToClipboard(text16);
     this.#copied.set(id);
   };
   /** Clears the Copied timer. */
@@ -47425,24 +47675,27 @@ var AppActions = class {
    */
   submit(raw2, draft = true, busy = draft ? this.#cx.state.busyMode : "queue", pasted = []) {
     const { attachments, composer: composer2, transcript } = this.#cx;
-    const text15 = raw2.trim();
-    if (draft && attachments.uploading && !text15.startsWith("/")) {
+    const text16 = raw2.trim();
+    if (draft && attachments.uploading && !text16.startsWith("/")) {
       composer2.set(raw2, { pasted });
       transcript.notice("An image is still attaching. Send again in a moment.", "warning");
       return;
     }
-    if (!text15 && !(draft && attachments.items.length)) {
+    if (!text16 && !(draft && attachments.items.length)) {
       return;
     }
-    if (text15.startsWith("/")) {
-      void runSlash(text15, this.slash);
+    if (text16.startsWith("/")) {
+      void runSlash(text16, this.slash);
       return;
     }
-    if (text15.startsWith("!") && text15.slice(1).trim() && !pasted.some((p3) => text15.startsWith(p3.trim().split("\n")[0] ?? ""))) {
-      void this.#shell(text15.slice(1).trim());
+    if (text16.startsWith("!") && text16.slice(1).trim() && !pasted.some((p3) => text16.startsWith(p3.trim().split("\n")[0] ?? ""))) {
+      void this.#shell(text16.slice(1).trim());
       return;
     }
-    this.#cx.router.route({ images: draft ? attachments.take() : [], kind: "typed", pasted, text: text15 }, busy);
+    if (draft) {
+      this.#cx.connect.yieldOpen();
+    }
+    this.#cx.router.route({ images: draft ? attachments.take() : [], kind: "typed", pasted, text: text16 }, busy);
   }
   /** What the router's gates read: the session, the switch in flight, the turn, the compaction and the startup image. */
   gates() {
@@ -47459,9 +47712,9 @@ var AppActions = class {
   /** Puts a prompt that did not go back into the composer, before any text there, with its images. */
   restore(prompt) {
     const { composer: composer2 } = this.#cx;
-    const text15 = shownText(prompt);
-    composer2.set(text15 && composer2.text ? `${text15}
-${composer2.text}` : text15 || composer2.text, {
+    const text16 = shownText(prompt);
+    composer2.set(text16 && composer2.text ? `${text16}
+${composer2.text}` : text16 || composer2.text, {
       pasted: [...composer2.pasted, ...prompt.kind === "typed" ? prompt.pasted : []]
     });
     this.#cx.attachments.restore(prompt.images);
@@ -47968,9 +48221,9 @@ function compactingNode(c, now) {
   });
 }
 function effortChip(r, on) {
-  const text15 = effortText(r.effort, r.effortWire);
+  const text16 = effortText(r.effort, r.effortWire);
   const glyph = r.effort === "none" ? "off" : r.effortWire || r.effort || DEFAULT_EFFORT;
-  const clamp2 = text15.includes("\u2192") ? ` (this route sends ${r.effortWire})` : "";
+  const clamp2 = text16.includes("\u2192") ? ` (this route sends ${r.effortWire})` : "";
   return /* @__PURE__ */ jsxs(
     "row",
     {
@@ -47979,10 +48232,10 @@ function effortChip(r, on) {
       onClick: on.onEffort,
       ...optional2("onMenu", on.onEffortMenu),
       role: "omp.composer.effort",
-      title: `Reasoning effort: ${text15}${r.effort ? clamp2 : " (the default)"} \xB7 click to cycle  \u21E7\u21E5 \xB7 right-click to choose or save as default`,
+      title: `Reasoning effort: ${text16}${r.effort ? clamp2 : " (the default)"} \xB7 click to cycle  \u21E7\u21E5 \xB7 right-click to choose or save as default`,
       children: [
         /* @__PURE__ */ jsx("effort", { level: glyph }, "glyph"),
-        /* @__PURE__ */ jsx("text", { spans: [{ ...optional2("s", r.effort ? void 0 : "muted"), t: text15 }], wrap: "none" }, "level")
+        /* @__PURE__ */ jsx("text", { spans: [{ ...optional2("s", r.effort ? void 0 : "muted"), t: text16 }], wrap: "none" }, "level")
       ]
     },
     "effort"
@@ -48080,8 +48333,8 @@ function imageChip(a2, i, onRemove) {
 }
 
 // src/transcript/messages.ts
-function userEntry(id, { text: text15, at = Date.now(), steered = false, attachments = [] }) {
-  return { at, id, kind: "user", text: text15, ...steered ? { steered } : {}, ...attachments.length ? { attachments } : {} };
+function userEntry(id, { text: text16, at = Date.now(), steered = false, attachments = [] }) {
+  return { at, id, kind: "user", text: text16, ...steered ? { steered } : {}, ...attachments.length ? { attachments } : {} };
 }
 function failure(error, code7) {
   const http = /^HTTP (\d{3}):\s*/.exec(error);
@@ -48109,36 +48362,36 @@ function displayNotice(kind, metadata) {
 }
 var INTERNAL_FOOTER = "[INTERNAL NOTIFICATION \u2014 generated by the Hermes gateway";
 function internalNotice(content5) {
-  const text15 = content5.trim();
-  if (text15.startsWith("[ASYNC DELEGATION BATCH COMPLETE")) {
+  const text16 = content5.trim();
+  if (text16.startsWith("[ASYNC DELEGATION BATCH COMPLETE")) {
     return "Subagents finished";
   }
-  if (text15.startsWith("[ASYNC DELEGATION COMPLETE")) {
+  if (text16.startsWith("[ASYNC DELEGATION COMPLETE")) {
     return "Subagent finished";
   }
-  if (text15.startsWith("[ASYNC DELEGATION TASK FAILED")) {
+  if (text16.startsWith("[ASYNC DELEGATION TASK FAILED")) {
     return "Subagent failed";
   }
-  if (text15.startsWith("[Continuing toward your standing goal]")) {
+  if (text16.startsWith("[Continuing toward your standing goal]")) {
     return "Continuing toward the goal";
   }
-  const wakeup = /^\[\/loop wakeup #(\d+)(?:, ([^\]]+))?\]/.exec(text15);
+  const wakeup = /^\[\/loop wakeup #(\d+)(?:, ([^\]]+))?\]/.exec(text16);
   if (wakeup) {
     return `Loop run #${wakeup[1]}${wakeup[2] ? ` \xB7 ${wakeup[2]}` : ""}`;
   }
-  const watch2 = /^\[IMPORTANT: Background process \S+ matched watch pattern "([^"]*)"/.exec(text15);
+  const watch2 = /^\[IMPORTANT: Background process \S+ matched watch pattern "([^"]*)"/.exec(text16);
   if (watch2) {
     return `Watcher matched "${watch2[1]}"`;
   }
-  if (/^\[Background process \S+ heartbeat/.test(text15)) {
+  if (/^\[Background process \S+ heartbeat/.test(text16)) {
     return "Background command still running";
   }
-  const done = /^\[IMPORTANT: Background process \S+ ([^(]+?) \(exit code ([^)\s]+)/.exec(text15);
+  const done = /^\[IMPORTANT: Background process \S+ ([^(]+?) \(exit code ([^)\s]+)/.exec(text16);
   if (done) {
     const how = done[1] === "completed normally" ? "finished" : done[1];
     return `Background command ${how}${done[2] === "0" ? "" : ` (exit ${done[2]})`}`;
   }
-  return text15.includes(INTERNAL_FOOTER) ? "Hermes notice" : void 0;
+  return text16.includes(INTERNAL_FOOTER) ? "Hermes notice" : void 0;
 }
 function continuation(prev) {
   if (prev?.kind !== "turn") {
@@ -48156,11 +48409,11 @@ function continuation(prev) {
 var STEER_OPEN = "[OUT-OF-BAND USER MESSAGE";
 var STEER_CLOSE = "[/OUT-OF-BAND USER MESSAGE]";
 function steerText(content5) {
-  const text15 = content5.trim();
-  if (!text15.startsWith(STEER_OPEN)) {
+  const text16 = content5.trim();
+  if (!text16.startsWith(STEER_OPEN)) {
     return void 0;
   }
-  const body = text15.slice(text15.indexOf("]") + 1);
+  const body = text16.slice(text16.indexOf("]") + 1);
   const end = body.lastIndexOf(STEER_CLOSE);
   return (end >= 0 ? body.slice(0, end) : body).trim();
 }
@@ -48176,20 +48429,20 @@ var BOX = /[─-╿]/;
 var RULE2 = /^\s*\+[-=+]{3,}\+?\s*$/;
 var COLUMNS = /^\s{0,4}[^\s•\-*>#`|][^\n]*?\S {2,}\S/;
 var ESC3 = String.fromCharCode(27);
-function isPreformatted(text15) {
-  if (text15.includes(`${ESC3}[`) || BOX.test(text15)) {
+function isPreformatted(text16) {
+  if (text16.includes(`${ESC3}[`) || BOX.test(text16)) {
     return true;
   }
-  const lines = text15.split("\n").filter((l) => l.trim());
+  const lines = text16.split("\n").filter((l) => l.trim());
   if (lines.some((l) => RULE2.test(l))) {
     return true;
   }
   const aligned = lines.filter((l) => COLUMNS.test(l)).length;
   return aligned >= 3 && aligned >= lines.length / 2;
 }
-function hardBreaks(text15) {
+function hardBreaks(text16) {
   let fenced = false;
-  return text15.split("\n").map((line, i, all8) => {
+  return text16.split("\n").map((line, i, all8) => {
     if (/^\s*(```|~~~)/.test(line)) {
       fenced = !fenced;
       return line;
@@ -48247,11 +48500,11 @@ function build(title, inline, body) {
   const lines = body.filter((l) => l.trim());
   if (lower.includes("rate limit")) {
     const items = limits(inline || lines.join(" | "));
-    return items.length ? { items, kind: "limits", title: name } : text14(name, inline, lines);
+    return items.length ? { items, kind: "limits", title: name } : text15(name, inline, lines);
   }
   if (lower.includes("context breakdown")) {
     const items = lines.flatMap((l) => crumb(l) ?? []);
-    return items.length ? { items, kind: "breakdown", note: /_\((.*?)\)_/.exec(inline)?.[1], title: name } : text14(name, inline, lines);
+    return items.length ? { items, kind: "breakdown", note: /_\((.*?)\)_/.exec(inline)?.[1], title: name } : text15(name, inline, lines);
   }
   if (lower.includes("session") || lower.includes("token usage")) {
     const rows2 = [];
@@ -48267,7 +48520,7 @@ function build(title, inline, body) {
         rows2.push(p3);
       }
     }
-    return rows2.length || context ? { context, kind: "session", rows: rows2, title: name } : text14(name, inline, lines);
+    return rows2.length || context ? { context, kind: "session", rows: rows2, title: name } : text15(name, inline, lines);
   }
   if (lower.includes("credit")) {
     const rows2 = [];
@@ -48280,11 +48533,11 @@ function build(title, inline, body) {
         notes.push(l.trim());
       }
     }
-    return rows2.length ? { kind: "credits", notes, rows: rows2, title: name } : text14(name, inline, lines);
+    return rows2.length ? { kind: "credits", notes, rows: rows2, title: name } : text15(name, inline, lines);
   }
-  return text14(name, inline, lines);
+  return text15(name, inline, lines);
 }
-function text14(title, inline, lines) {
+function text15(title, inline, lines) {
   return { kind: "text", text: [inline, ...lines].filter(Boolean).join("\n"), title };
 }
 function parseUsage(raw2) {
@@ -48325,8 +48578,8 @@ function slashBody(e) {
   }
   return [textBody(e.text, "body")];
 }
-function textBody(text15, key2) {
-  return isPreformatted(text15) ? /* @__PURE__ */ jsx("ansi", { text: text15 }, key2) : /* @__PURE__ */ jsx("md", { children: hardBreaks(text15) }, key2);
+function textBody(text16, key2) {
+  return isPreformatted(text16) ? /* @__PURE__ */ jsx("ansi", { text: text16 }, key2) : /* @__PURE__ */ jsx("md", { children: hardBreaks(text16) }, key2);
 }
 function heading4(icon, title, note) {
   return /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", children: [
@@ -48592,8 +48845,8 @@ function workingNode2(turn, now) {
 }
 var LIVE_MAX = 120;
 function liveText(label) {
-  const text15 = label.length > LIVE_MAX ? `${label.slice(0, LIVE_MAX - 1)}\u2026` : label;
-  return shimmerText({ key: "label", role: "hermes.work.live", text: text15 });
+  const text16 = label.length > LIVE_MAX ? `${label.slice(0, LIVE_MAX - 1)}\u2026` : label;
+  return shimmerText({ key: "label", role: "hermes.work.live", text: text16 });
 }
 function latestFailed(items) {
   const last = items.findLast((i) => i.kind === "tool");
@@ -48779,7 +49032,8 @@ function turnNode(turn, id, cx) {
   }
   const last = pieces(turn.blocks).at(-1);
   const compacting = last?.kind === "block" && last.block.kind === "compaction" && last.block.compaction.state.status === "running";
-  if (live && !compacting && (!last || last.kind === "block" && last.block.kind !== "text" || last.kind === "work" && latestFailed(last.items))) {
+  const asking = last?.kind === "block" && last.block.kind === "tool" && liveOpen(last.block.call.connect);
+  if (live && !compacting && !asking && (!last || last.kind === "block" && last.block.kind !== "text" || last.kind === "work" && latestFailed(last.items))) {
     children3.push(thinkingRow());
   }
   const end = turn.end;
@@ -48851,13 +49105,13 @@ function steerNode(b, state) {
     ] }, "how")
   ] }, b.id);
 }
-function copyButton(text15, id, role, title, cx) {
+function copyButton(text16, id, role, title, cx) {
   const copied = cx.copied === id;
   return /* @__PURE__ */ jsx(
     "icon",
     {
       name: copied ? "check" : "copy",
-      onClick: () => cx.copy(text15, id),
+      onClick: () => cx.copy(text16, id),
       role,
       title: copied ? "Copied" : title
     },
@@ -49074,12 +49328,12 @@ var Agents = class {
     }
   }
   /** Queues steering text into a running agent; the owner answers `queued` or `rejected`. */
-  async steer(a2, text15) {
+  async steer(a2, text16) {
     const sid = this.#host.sid;
     if (!sid) {
       return false;
     }
-    const r = await rpc(this.#host.gw, "subagent.steer", { session_id: sid, subagent_id: a2.id, text: text15 });
+    const r = await rpc(this.#host.gw, "subagent.steer", { session_id: sid, subagent_id: a2.id, text: text16 });
     return r?.status === "queued";
   }
   /** Interrupts a running agent; its partial result still returns to the parent. */
@@ -49102,8 +49356,8 @@ var Agents = class {
    * Applies an async-delegation completion (the model text of its `message.start`,
    * tools/process_registry_notifications.py) to the rows whose log never told their outcome.
    */
-  settle(text15) {
-    const done = completionOutcomes(text15);
+  settle(text16) {
+    const done = completionOutcomes(text16);
     if (!done) {
       return;
     }
@@ -49234,7 +49488,7 @@ var Agents = class {
   }
   /** Reads `a`'s log from disk (else its tail over the gateway); true when it changed. */
   async #readLog(a2, ticket, force = false) {
-    let text15;
+    let text16;
     const path2 = this.#logPath(a2);
     if (path2) {
       const read = await readLogFile(path2, force ? void 0 : this.#sizes.get(path2));
@@ -49245,7 +49499,7 @@ var Agents = class {
         case "ok":
           this.#sizes.set(path2, read.size);
           this.#missing.delete(path2);
-          text15 = read.text;
+          text16 = read.text;
           break;
         case "same":
           return false;
@@ -49265,24 +49519,24 @@ var Agents = class {
       }
     }
     const sid = this.#host.sid;
-    if (text15 === void 0 && this.#listed.has(a2.id) && sid) {
+    if (text16 === void 0 && this.#listed.has(a2.id) && sid) {
       try {
         const r = await rpc(this.#host.gw, "subagent.tail", { session_id: sid, subagent_id: a2.id });
         if (!ticket.isCurrent()) {
           return false;
         }
         if (r?.available && typeof r.text === "string") {
-          text15 = r.truncated ? mergeTail(this.#tails.get(a2.id) ?? "", r.text) : r.text;
-          this.#tails.set(a2.id, text15);
+          text16 = r.truncated ? mergeTail(this.#tails.get(a2.id) ?? "", r.text) : r.text;
+          this.#tails.set(a2.id, text16);
         }
       } catch {
-        text15 = void 0;
+        text16 = void 0;
       }
     }
-    if (text15 === void 0) {
+    if (text16 === void 0) {
       return false;
     }
-    applyLog(a2, parseLiveLog(text15));
+    applyLog(a2, parseLiveLog(text16));
     return true;
   }
   /** Marks the card showing `a` changed (#poll and #readLog changed its row), and tells when it ended. */
@@ -49305,8 +49559,8 @@ async function manifestLog(delegationId, index2, env2 = process.env) {
   const home = env2["HERMES_HOME"] || join9(homedir10(), ".hermes");
   for (const root7 of [join9(home, "delegation_cache", "live"), join9(home, "cache", "delegation", "live")]) {
     try {
-      const text15 = await readFile2(join9(root7, delegationId, "manifest.json"), "utf8");
-      const tasks = record2(text15.replace(/^\uFEFF/, ""))?.["tasks"];
+      const text16 = await readFile2(join9(root7, delegationId, "manifest.json"), "utf8");
+      const tasks = record2(text16.replace(/^\uFEFF/, ""))?.["tasks"];
       const log = Array.isArray(tasks) ? record2(tasks.find((t) => record2(t)?.["index"] === index2))?.["log"] : void 0;
       if (typeof log === "string" && log) {
         return log;
@@ -49701,6 +49955,7 @@ var Theme = class {
 
 // src/connections/watcher.ts
 var NO_CARD_MS = 3e4;
+var UNKNOWN_OPERATION = 4004;
 var ConnectWatcher = class {
   #host;
   /** Where the card files are; unset: the plugin's data folder, read at each poll. */
@@ -49713,6 +49968,10 @@ var ConnectWatcher = class {
   #seen = /* @__PURE__ */ new Set();
   /** Connect calls that drew no card, and when: not read again for NO_CARD_MS. */
   #noCard = /* @__PURE__ */ new WeakMap();
+  /** The minutes each open live card's hint last showed. */
+  #minutes = /* @__PURE__ */ new WeakMap();
+  /** Calls whose result already had its say over a `stopped` card. */
+  #finals = /* @__PURE__ */ new WeakSet();
   /** `dir`: the plugin's data folder the card files are under (tests point it at their own). */
   constructor(host, { dir: dir2 } = {}) {
     this.#host = host;
@@ -49725,11 +49984,50 @@ var ConnectWatcher = class {
   watch() {
     this.#poller.poke();
   }
-  /** A connect card's Continue: tell the agent which apps the user authorized, as the tool asks. */
+  /** `connection.request`: the gateway opened an operation for session `session`; its card goes on the call that opened it. */
+  request(payload, session2) {
+    const drawn = this.#byOp(record2(payload)?.["op_id"]);
+    if (drawn) {
+      this.#apply(drawn, payload);
+      return;
+    }
+    const sid = session2 || this.#host.sid();
+    const live = sid ? liveCard(payload, sid) : void 0;
+    if (live) {
+      this.#draw(live);
+    } else {
+      this.#undrawable(payload, sid);
+    }
+  }
+  /** A resume's `pending_connection`: the operation still open on the session, drawn as its request was. */
+  restore(payload, session2) {
+    if (payload) {
+      this.request(payload, session2);
+    }
+  }
+  /** `connection.update`: a row moved or the operation settled. */
+  update(payload, session2) {
+    const op = record2(payload)?.["op_id"];
+    const call = this.#byOp(op);
+    if (call) {
+      this.#apply(call, payload);
+      return;
+    }
+    const sid = session2 || this.#host.sid();
+    const live = sid ? liveCard(payload, sid) : void 0;
+    if (live && !live.card.settled) {
+      this.#draw(live);
+    }
+  }
+  /** A connect card's Continue: a live card's tool returns now; a card file tells the agent which apps the user authorized. */
   continue(ref) {
     const call = this.#call(ref);
     const card = call?.connect;
     if (!call || !card || card.told || card.settled) {
+      return;
+    }
+    if (card.op) {
+      this.#answer(call, CONTINUE, answers.continue());
       return;
     }
     this.#host.transcript.mutateCall(call, () => {
@@ -49741,17 +50039,54 @@ var ConnectWatcher = class {
     }
     this.#host.changed();
   }
+  /**
+   * A typed message while a live card waits ends the wait, as the desktop's composer does: else
+   * the message waits behind the blocked tool until its deadline.
+   */
+  yieldOpen() {
+    for (const call of this.#host.transcript.calls(CONNECT_TOOL)) {
+      if (liveOpen(call.connect)) {
+        this.#answer(call, CONTINUE, answers.continue());
+      }
+    }
+  }
   /** A connect card's Authorize: the app's link in the browser, and its row waits on the browser now. */
   open(ref, name) {
     const call = this.#call(ref);
     const card = call?.connect;
     const target2 = card?.targets.find((t) => t.name === name);
-    if (!call || !card || !target2?.url) {
+    if (!call || !card || !target2?.url || card.settled) {
       return;
     }
     this.#host.openUrl(target2.url);
     this.#host.transcript.mutateCall(call, () => card.opened = [.../* @__PURE__ */ new Set([...card.opened, name])]);
     this.#host.changed();
+    if (card.op) {
+      void rpc(this.#host.gw, "connectors.operation.wake", opParams(card.op)).catch(() => void 0);
+    }
+  }
+  /** A live card's Skip on app `name`. */
+  skip(ref, name) {
+    this.#row(ref, name, (call, target2) => this.#answer(call, `skip:${name}`, answers.skip(target2)));
+  }
+  /** A live card's Connect on MCP app `name`: the gateway starts its install. */
+  approve(ref, name) {
+    this.#row(ref, name, (call, target2) => verbOf(target2) === "approve" && this.#answer(call, `approve:${name}`, answers.approve(target2)));
+  }
+  /** A live card's Try again on app `name`, whose link failed or expired: the gateway mints a new one. */
+  retry(ref, name) {
+    this.#row(ref, name, (call, target2, op) => {
+      if (verbOf(target2) === "retry") {
+        this.#host.transcript.mutateCall(call, (c) => c.connect && (c.connect = { ...c.connect, opened: c.connect.opened.filter((n) => n !== name) }));
+        this.#send(
+          call,
+          `retry:${name}`,
+          () => rpc(this.#host.gw, "connectors.connect", retryParams(op, name)),
+          `Could not start ${target2.title} again`,
+          (reply2) => this.#apply(call, reply2)
+        );
+      }
+    });
   }
   /** Stops the poll for good. */
   dispose() {
@@ -49761,6 +50096,10 @@ var ConnectWatcher = class {
     let open = false;
     const now = Date.now();
     for (const call of this.#host.transcript.calls(CONNECT_TOOL)) {
+      if (call.connect?.op) {
+        open = this.#tickLive(call) || open;
+        continue;
+      }
       const missed = this.#noCard.get(call);
       if (call.connect?.settled || call.outcome.kind === "running" || missed !== void 0 && now - missed < NO_CARD_MS) {
         continue;
@@ -49789,9 +50128,164 @@ var ConnectWatcher = class {
     }
     this.#open = open;
   }
-  /** The connect card `ref` names (its file, or its call id when it has none). */
+  /**
+   * One live card's poll: settled by its call's result once the tool returned (the settling frame
+   * may not have come), else its status read again. True while it is open.
+   */
+  #tickLive(call) {
+    const card = call.connect;
+    if (card?.op && card.settled === "stopped" && call.result !== void 0) {
+      this.#final(call, card.op);
+      return false;
+    }
+    if (!card?.op || card.settled) {
+      return false;
+    }
+    const minutes = minutesLeft(card.op, Date.now());
+    if (this.#minutes.get(call) !== minutes) {
+      this.#minutes.set(call, minutes);
+      this.#host.transcript.mutateCall(call, () => void 0);
+      this.#host.changed();
+    }
+    if (call.result !== void 0) {
+      this.#apply(call, call.result);
+      if (!call.connect?.settled) {
+        this.#settle(call, "stopped");
+      }
+      return false;
+    }
+    const op = card.op;
+    rpc(this.#host.gw, "connectors.operation.status", opParams(op)).then(
+      (frame) => this.#apply(call, frame),
+      (error) => {
+        if (rpcErrorCode(error) === UNKNOWN_OPERATION && call.connect?.op?.id === op.id) {
+          this.#settle(call, "stopped");
+        }
+      }
+    );
+    return true;
+  }
+  /** Draws `live` on its call: the one its tool call id names, else a row for it, as the desktop upserts one. */
+  #draw({ callId, card }) {
+    const { transcript } = this.#host;
+    const named2 = callId ? transcript.call(toolCallId(callId)) : void 0;
+    const stale = named2 !== void 0 && named2.outcome.kind !== "running";
+    let call = stale ? void 0 : named2 ?? transcript.lastCall((c) => c.name === CONNECT_TOOL && c.outcome.kind === "running" && !c.connect);
+    if (!call) {
+      const id = callId && !stale ? callId : `connect-${card.op.id}`;
+      transcript.toolStart({ args: { action: "connect", connectors: card.targets.map((t) => t.name) }, name: CONNECT_TOOL, tool_id: id });
+      call = transcript.call(toolCallId(id));
+    }
+    if (!call) {
+      this.#undrawable(void 0, card.op.session);
+      return;
+    }
+    transcript.mutateCall(call, (c) => c.connect = card);
+    this.#open = true;
+    this.watch();
+    this.#host.changed();
+  }
+  /** A request the pane cannot draw: it says so, and answers Continue so the tool does not wait out its deadline. */
+  #undrawable(payload, sid) {
+    const op = record2(payload)?.["op_id"];
+    const answered2 = typeof op === "string" && op && sid;
+    this.#host.transcript.notice(
+      answered2 ? "Hermes asked for a connection card this pane cannot draw, so the pane answered Continue: the tool carries on without it. Connect apps in Hermes Desktop or the Nous Portal." : "Hermes asked for a connection card this pane cannot read. Its tool waits until the card times out; press Esc twice to stop it.",
+      "warning"
+    );
+    this.#host.changed();
+    if (answered2) {
+      const params = respondParams({ deadlineAt: 0, id: op, seq: 0, session: sid }, answers.continue());
+      void rpc(this.#host.gw, "connection.respond", params).catch((error) => this.#failed("Could not answer the connection card", error));
+    }
+  }
+  /** Applies a frame of its operation to `call`'s card, when it moves something. */
+  #apply(call, frame) {
+    const card = call.connect;
+    const next2 = card && applyFrame(card, frame);
+    if (next2) {
+      this.#host.transcript.mutateCall(call, (c) => c.connect = next2);
+      this.#host.changed();
+    }
+  }
+  /**
+   * The tool's result over a card the pane settled as `stopped` by itself (its status read found no
+   * operation: the gateway drops it just before the tool returns). The result is the gateway's own
+   * account of how the rows ended, so it replaces the pane's guess, once.
+   */
+  #final(call, op) {
+    const card = call.connect;
+    const final2 = this.#finals.has(call) ? void 0 : resultCard(call);
+    this.#finals.add(call);
+    if (card && final2 && record2(call.result)?.["op_id"] === op.id) {
+      const before = new Map(card.targets.map((t) => [t.name, t]));
+      const targets = final2.targets.map((t) => ({ ...t, url: t.url ?? before.get(t.name)?.url }));
+      this.#host.transcript.mutateCall(call, (c) => c.connect = { ...card, settled: final2.settled, targets });
+      this.#host.changed();
+    }
+  }
+  /** Settles `call`'s live card by the pane's own word (`stopped`): nothing moves it any more until the tool's result (#final). */
+  #settle(call, reason) {
+    const card = call.connect;
+    if (card?.op && !card.settled) {
+      this.#host.transcript.mutateCall(call, (c) => c.connect = { ...card, settled: reason });
+      this.#host.changed();
+    }
+  }
+  /** Runs `act` on row `name` of the open live card `ref`. */
+  #row(ref, name, act) {
+    const call = this.#call(ref);
+    const card = call?.connect;
+    const target2 = card?.targets.find((t) => t.name === name);
+    if (call && card?.op && target2 && !card.settled) {
+      act(call, target2, card.op);
+    }
+  }
+  /** `connection.respond` for `call`'s card (`row`: `<verb>:<app>`, or CONTINUE); the gateway's frames move the rows. */
+  #answer(call, row2, answer) {
+    const op = call.connect?.op;
+    if (op) {
+      this.#send(call, row2, () => rpc(this.#host.gw, "connection.respond", respondParams(op, answer)), "Could not answer the connection card");
+    }
+  }
+  /**
+   * Starts one answer of `call`'s card, unless that row's last one is still in flight; a refusal is a
+   * notice. The row is on the card's `sending` meanwhile, so its button says so.
+   */
+  #send(call, row2, start, failure3, then) {
+    const app2 = row2.slice(row2.indexOf(":") + 1);
+    if (!call.connect || call.connect.sending?.some((r) => r === row2 || row2 !== CONTINUE && r.endsWith(`:${app2}`))) {
+      return;
+    }
+    this.#sending(call, row2, true);
+    void start().then(
+      (reply2) => then?.(reply2),
+      (error) => this.#failed(failure3, error)
+    ).finally(() => this.#sending(call, row2, false));
+  }
+  /** Puts row `row` of `call`'s card on its `sending` list, or takes it off. */
+  #sending(call, row2, on) {
+    this.#host.transcript.mutateCall(call, (c) => {
+      const card = c.connect;
+      if (card) {
+        const rest = (card.sending ?? []).filter((r) => r !== row2);
+        c.connect = { ...card, sending: on ? [...rest, row2] : rest.length ? rest : void 0 };
+      }
+    });
+    this.#host.changed();
+  }
+  /** An answer the gateway refused or never got: a notice, and the card stays as the gateway left it. */
+  #failed(what, error) {
+    this.#host.transcript.notice(`${what}: ${errorText(error)}`, "warning");
+    this.#host.changed();
+  }
+  /** The call whose live card is operation `op`. */
+  #byOp(op) {
+    return typeof op === "string" && op ? this.#host.transcript.calls(CONNECT_TOOL).findLast((c) => c.connect?.op?.id === op) : void 0;
+  }
+  /** The connect card `ref` names (its operation, its file, or its call id when it has neither). */
   #call(ref) {
-    return this.#host.transcript.calls(CONNECT_TOOL).findLast((c) => (c.connect?.key ?? c.id) === ref);
+    return this.#host.transcript.calls(CONNECT_TOOL).findLast((c) => cardRef(c) === ref);
   }
 };
 
@@ -49921,8 +50415,8 @@ async function withClipboardImage(use, env2 = process.env, extract = extractClip
     await rm(dir2, { force: true, recursive: true });
   }
 }
-function imagePathOf(text15, cwd) {
-  let raw2 = text15.trim();
+function imagePathOf(text16, cwd) {
+  let raw2 = text16.trim();
   if (!raw2 || raw2.includes("\n")) {
     return void 0;
   }
@@ -49975,12 +50469,12 @@ var Attachments = class {
     return Boolean(this.#startup);
   }
   /** A paste that is an image (no text: the clipboard's; one image path: that file); false for text. */
-  paste(text15) {
-    if (!text15.trim()) {
+  paste(text16) {
+    if (!text16.trim()) {
       void this.fromClipboard(true);
       return true;
     }
-    const path2 = imagePathOf(text15, this.#host.cwd());
+    const path2 = imagePathOf(text16, this.#host.cwd());
     if (path2) {
       void this.#attach(path2, basename4(path2));
       return true;
@@ -50225,8 +50719,8 @@ function stackQuery(refs) {
   const variables = {};
   const decls = [];
   const parts3 = refs.map((ref, i) => {
-    const [owner, name] = ref.repository.split("/");
-    variables[`o${i}`] = owner;
+    const [owner2, name] = ref.repository.split("/");
+    variables[`o${i}`] = owner2;
     variables[`r${i}`] = name;
     variables[`n${i}`] = ref.number;
     decls.push(`$o${i}: String!, $r${i}: String!, $n${i}: Int!`);
@@ -50338,8 +50832,8 @@ function github(token = tokens(), hosts = githubHosts()) {
       ...init.body ? { "Content-Type": "application/json" } : {}
     };
     const res = await send(new URL(url(trusted)), new URL(trusted.rest).origin, { ...init, headers });
-    const text15 = await res.text();
-    const json = text15 ? decodeJson(text15) : void 0;
+    const text16 = await res.text();
+    const json = text16 ? decodeJson(text16) : void 0;
     if (!res.ok) {
       const { message } = failure2.parse(json);
       throw new GitHubError(message ? `GitHub: ${message}` : `GitHub answered ${res.status}`, res.status);
@@ -50668,9 +51162,9 @@ var PullRequests = class {
     }
     for (const [host, list9] of byHost) {
       const { query, variables } = stackQuery(list9.slice(0, BATCH2).map((e) => e.ref));
-      let answers;
+      let answers2;
       try {
-        answers = batchAnswers.parse(await this.#gh.graphql(host, query, variables));
+        answers2 = batchAnswers.parse(await this.#gh.graphql(host, query, variables));
       } catch (error) {
         if (NO_STACK_FIELD.test(errorText(error))) {
           this.#noStacks.add(host);
@@ -50679,7 +51173,7 @@ var PullRequests = class {
       }
       const asked2 = /* @__PURE__ */ new Set();
       for (const [i, e] of list9.slice(0, BATCH2).entries()) {
-        const n = stackNumber(answers[`p${i}`]);
+        const n = stackNumber(answers2[`p${i}`]);
         const key2 = n === void 0 ? void 0 : stackKey(host, e.ref.repository, n);
         if (!key2 || asked2.has(key2)) {
           continue;
@@ -50724,12 +51218,12 @@ var PullRequests = class {
         const chunk = list9.slice(i, i + BATCH2);
         const { query, variables } = batchQuery(chunk.map((e) => e.ref));
         try {
-          const answers = batchAnswers.parse(await this.#gh.graphql(host, query, variables));
+          const answers2 = batchAnswers.parse(await this.#gh.graphql(host, query, variables));
           if (!ticket.isCurrent()) {
             return;
           }
           chunk.forEach((e, j) => {
-            const pr = parsePullRequest(e.ref, answers[`p${j}`]);
+            const pr = parsePullRequest(e.ref, answers2[`p${j}`]);
             e.pr = pr ?? e.pr;
             e.error = pr ? void 0 : "GitHub has no such pull request, or this token cannot see it.";
           });
@@ -50929,7 +51423,7 @@ var Completion = class {
   }
 };
 function slashItems(items, typed) {
-  const word = (text15) => text15.replace(/^\//, "").split(/\s/)[0]?.toLowerCase() ?? "";
+  const word = (text16) => text16.replace(/^\//, "").split(/\s/)[0]?.toLowerCase() ?? "";
   if (HIDDEN_COMMANDS.has(word(typed))) {
     return [];
   }
@@ -51332,6 +51826,9 @@ function adoptSteps(host) {
         }
       }
     },
+    // A connect card the session's tool still waits on comes back on its call (after the turn's
+    // rows: a row the history lacks is added to the running turn).
+    { adopt: ({ r, ref }) => host.connect.restore(r.pending_connection, ref.live) },
     { adopt: () => host.changed() }
   ];
 }
@@ -52034,41 +52531,41 @@ var CONTEXT_REF = new RegExp(`^(?:\\S+ )?@(file|folder|url|image):${VALUE}`, "gm
 var IMAGE_FILE = /\.(png|jpe?g|gif|webp)$/i;
 var unquote2 = (v) => /^([`"']).*\1$/.test(v) ? v.slice(1, -1) : v;
 function splitPrompt(raw2) {
-  let text15 = raw2;
+  let text16 = raw2;
   let hinted = [];
-  const hints = HINTS.exec(text15);
+  const hints = HINTS.exec(text16);
   if (hints) {
     const paths = [...(hints[1] ?? "").matchAll(/^\[Image attached(?: at)?: (?<path>.+)\]$/gm)].flatMap((m) => m.groups?.["path"] ?? []);
     const placeholders = (hints[2] ?? "").split("[screenshot]").length - 1;
     if (placeholders === 0 || placeholders === paths.length) {
-      text15 = text15.slice(0, hints.index);
+      text16 = text16.slice(0, hints.index);
       hinted = paths;
     }
   }
   const refs = [];
-  text15 = text15.replace(IMAGE_LINE, (_line, value) => {
+  text16 = text16.replace(IMAGE_LINE, (_line, value) => {
     refs.push(unquote2(value));
     return "";
   });
   if (refs.length) {
-    text15 = text15.replace(SCREENSHOT_LINE, "");
+    text16 = text16.replace(SCREENSHOT_LINE, "");
   }
   const files = [];
-  const marker2 = ATTACHED_CONTEXT.exec(text15);
+  const marker2 = ATTACHED_CONTEXT.exec(text16);
   if (marker2) {
-    const context = text15.slice(marker2.index + marker2[0].length);
-    text15 = text15.slice(0, marker2.index);
+    const context = text16.slice(marker2.index + marker2[0].length);
+    text16 = text16.slice(0, marker2.index);
     for (const m of context.matchAll(CONTEXT_REF)) {
       const ref = `@${m[1]}:${m[2]}`;
       const end = context.indexOf("\n", m.index);
       const line = context.slice(m.index, end < 0 ? void 0 : end);
       const disk = /available on disk at `([^`]+)`/.exec(line)?.[1];
-      if (!text15.includes(ref) && !files.some((f) => f.ref === ref)) {
+      if (!text16.includes(ref) && !files.some((f) => f.ref === ref)) {
         files.push({ ref, ...disk ? { path: disk } : {} });
       }
     }
   }
-  return { files, images: [...refs, ...hinted], text: text15.replace(CONTEXT_WARNINGS, "").replace(/\n{3,}/g, "\n\n").trim() };
+  return { files, images: [...refs, ...hinted], text: text16.replace(CONTEXT_WARNINGS, "").replace(/\n{3,}/g, "\n\n").trim() };
 }
 function promptAttachments(parts3, exists = existsSync5) {
   const local = (p3) => p3.startsWith("/") && exists(p3);
@@ -52103,8 +52600,8 @@ function history({ kept, messages, compactions, id }) {
   let todos2;
   for (const m of messages) {
     const at = typeof m.timestamp === "number" ? m.timestamp * 1e3 : 0;
-    const text15 = typeof m.text === "string" ? m.text : typeof m.content === "string" ? m.content : "";
-    const steered = m.role === "user" ? m.display_kind === "steer" ? text15.trim() : steerText(text15) : void 0;
+    const text16 = typeof m.text === "string" ? m.text : typeof m.content === "string" ? m.content : "";
+    const steered = m.role === "user" ? m.display_kind === "steer" ? text16.trim() : steerText(text16) : void 0;
     while (at > 0 && marks[0] && marks[0].at <= at) {
       due2.push(marks[0]);
       marks.shift();
@@ -52117,19 +52614,19 @@ function history({ kept, messages, compactions, id }) {
     if (m.role === "user") {
       turn = void 0;
       promptAt = at;
-      const notice = displayNotice(m.display_kind, m.display_metadata) ?? internalNotice(text15);
+      const notice = displayNotice(m.display_kind, m.display_metadata) ?? internalNotice(text16);
       if (notice) {
         pendingContinued = notice;
       } else {
         pendingContinued = void 0;
-        entries.push(storedUser(id("u"), steered ?? text15, at));
+        entries.push(storedUser(id("u"), steered ?? text16, at));
       }
       continue;
     }
     if (m.role === "system") {
       turn = void 0;
-      if (text15.trim()) {
-        entries.push({ id: id("n"), kind: "notice", text: text15, tone: "info" });
+      if (text16.trim()) {
+        entries.push({ id: id("n"), kind: "notice", text: text16, tone: "info" });
       }
       continue;
     }
@@ -52154,10 +52651,10 @@ function history({ kept, messages, compactions, id }) {
         const surface = record2(meta3?.["error_surface"]);
         const error = str5(meta3?.["error"]) ?? str5(surface?.["message"]);
         const card = error ? failure(error, surface?.["code"]) : turn.end.status === "error" ? turn.end : {};
-        endTurn(turn, { ...card, hint: text15.trim() || void 0, status: "error" });
+        endTurn(turn, { ...card, hint: text16.trim() || void 0, status: "error" });
         continue;
       }
-      const reply2 = typeof m["display_content"] === "string" ? m["display_content"] : text15;
+      const reply2 = typeof m["display_content"] === "string" ? m["display_content"] : text16;
       const notes = Array.isArray(m["display_commentary"]) ? m["display_commentary"].filter((n) => typeof n === "string" && Boolean(n.trim())) : [];
       const flat3 = (s2) => s2.replace(/\s+/g, " ").trim();
       if (!reply2.trim() || flat3(notes.join("\n\n")) !== flat3(reply2)) {
@@ -52231,13 +52728,13 @@ function storedThought(m) {
 function detailsText(details) {
   let blocks2 = details;
   if (typeof blocks2 === "string") {
-    const text15 = blocks2.trim();
-    if (!text15.startsWith("[") && !text15.startsWith("{")) {
-      return text15;
+    const text16 = blocks2.trim();
+    if (!text16.startsWith("[") && !text16.startsWith("{")) {
+      return text16;
     }
-    blocks2 = parseJson(text15);
+    blocks2 = parseJson(text16);
     if (blocks2 === void 0) {
-      return text15;
+      return text16;
     }
   }
   const out = [];
@@ -52247,9 +52744,9 @@ function detailsText(details) {
       continue;
     }
     const summary4 = Array.isArray(r["summary"]) ? r["summary"].map((s2) => typeof s2 === "string" ? s2 : str5(record2(s2)?.["text"]) ?? "").join("\n\n") : r["summary"];
-    const text15 = [summary4, r["thinking"], r["content"], r["text"]].map(str5).find(Boolean)?.trim();
-    if (text15 && !out.includes(text15)) {
-      out.push(text15);
+    const text16 = [summary4, r["thinking"], r["content"], r["text"]].map(str5).find(Boolean)?.trim();
+    if (text16 && !out.includes(text16)) {
+      out.push(text16);
     }
   }
   return out.join("\n\n");
@@ -52334,12 +52831,12 @@ var Transcript = class {
    * A steer the gateway took for the running turn: it shows inside that turn, where it was sent,
    * since the agent reads it before its next step. With no turn running it is a plain prompt.
    */
-  steer(text15, at = Date.now()) {
+  steer(text16, at = Date.now()) {
     const turn = this.live;
     if (!turn) {
-      return this.user({ at, text: text15 });
+      return this.user({ at, text: text16 });
     }
-    turn.blocks.push({ at, id: this.id("s"), kind: "steer", text: text15 });
+    turn.blocks.push({ at, id: this.id("s"), kind: "steer", text: text16 });
     turn.rev++;
   }
   /** A prompt bubble at the end. */
@@ -52350,9 +52847,9 @@ var Transcript = class {
    * A queued prompt the shared gateway just started. Its message.start came first, so the bubble
    * goes before the turn it opened while that turn is still empty; else at the end.
    */
-  started(text15, at = Date.now(), attachments = []) {
+  started(text16, at = Date.now(), attachments = []) {
     const live = this.live;
-    const notice = attachments.length ? void 0 : internalNotice(text15);
+    const notice = attachments.length ? void 0 : internalNotice(text16);
     if (notice) {
       if (live && !live.blocks.length) {
         live.continued = notice;
@@ -52363,18 +52860,18 @@ var Transcript = class {
       return;
     }
     if (live && !live.blocks.length && this.#entries.at(-1) === live) {
-      this.#entries.splice(-1, 0, userEntry(this.id("u"), { at, attachments, text: text15 }));
+      this.#entries.splice(-1, 0, userEntry(this.id("u"), { at, attachments, text: text16 }));
       live.continued = void 0;
       live.rev++;
       return;
     }
-    this.user({ at, attachments, text: text15 });
+    this.user({ at, attachments, text: text16 });
   }
-  notice(text15, tone = "info") {
-    this.push({ id: this.id("n"), kind: "notice", text: text15, tone });
+  notice(text16, tone = "info") {
+    this.push({ id: this.id("n"), kind: "notice", text: text16, tone });
   }
-  panel(title, text15) {
-    this.push({ id: this.id("p"), kind: "panel", text: text15, title });
+  panel(title, text16) {
+    this.push({ id: this.id("p"), kind: "panel", text: text16, title });
   }
   /** message.start: opens the live turn, unless one is already streaming. */
   messageStart(at = Date.now()) {
@@ -52406,16 +52903,16 @@ var Transcript = class {
     this.#continued = void 0;
     return turn;
   }
-  reasoning(text15, at = Date.now()) {
-    if (!text15) {
+  reasoning(text16, at = Date.now()) {
+    if (!text16) {
       return;
     }
     const turn = this.#open(at);
     const last = turn.blocks.at(-1);
     if (last?.kind === "thinking" && last.endedAt === void 0) {
-      last.text += text15;
+      last.text += text16;
     } else {
-      turn.blocks.push({ id: this.id("k"), kind: "thinking", startedAt: at, text: text15 });
+      turn.blocks.push({ id: this.id("k"), kind: "thinking", startedAt: at, text: text16 });
     }
     turn.rev++;
   }
@@ -52425,43 +52922,43 @@ var Transcript = class {
    * turn already shows is not a thought either. One that comes after its turn ended goes in that
    * turn.
    */
-  reasoningBlock(text15, at = Date.now()) {
+  reasoningBlock(text16, at = Date.now()) {
     const shown3 = this.#live ?? this.#ended;
-    const incoming = text15.trim();
+    const incoming = text16.trim();
     if (!incoming || shown3?.blocks.some((b) => b.kind === "thinking" && !b.label || b.kind === "text" && b.text.includes(incoming))) {
       return;
     }
     const turn = shown3 ?? this.#open(at);
-    turn.blocks.push({ endedAt: at, id: this.id("k"), kind: "thinking", startedAt: at, text: text15 });
+    turn.blocks.push({ endedAt: at, id: this.id("k"), kind: "thinking", startedAt: at, text: text16 });
     turn.rev++;
   }
   /** A Mixture-of-Agents reference model's answer: a sealed thought block of its own, under `label`. */
-  reference(label, text15, at = Date.now()) {
+  reference(label, text16, at = Date.now()) {
     const turn = this.#open(at);
     endThinking(turn, at);
-    turn.blocks.push({ endedAt: at, id: this.id("k"), kind: "thinking", label, startedAt: at, text: text15.trim() });
+    turn.blocks.push({ endedAt: at, id: this.id("k"), kind: "thinking", label, startedAt: at, text: text16.trim() });
     turn.rev++;
   }
-  text(text15, at = Date.now()) {
-    if (!text15) {
+  text(text16, at = Date.now()) {
+    if (!text16) {
       return;
     }
     const turn = this.#open(at);
     endThinking(turn, at);
     const last = turn.blocks.at(-1);
     if (last?.kind === "text") {
-      last.text += text15;
+      last.text += text16;
     } else {
-      turn.blocks.push({ id: this.id("x"), kind: "text", text: text15 });
+      turn.blocks.push({ id: this.id("x"), kind: "text", text: text16 });
     }
     turn.rev++;
   }
   /** Interim commentary: seals the streamed text so the next delta starts a new block. */
-  interim(text15, { alreadyStreamed }, at = Date.now()) {
+  interim(text16, { alreadyStreamed }, at = Date.now()) {
     const turn = this.#open(at);
     endThinking(turn, at);
-    if (!alreadyStreamed && text15.trim()) {
-      turn.blocks.push({ id: this.id("x"), kind: "text", text: text15 });
+    if (!alreadyStreamed && text16.trim()) {
+      turn.blocks.push({ id: this.id("x"), kind: "text", text: text16 });
     }
     turn.blocks.push({ id: this.id("x"), kind: "text", text: "" });
     turn.rev++;
@@ -52901,11 +53398,11 @@ var PromptQueue = class {
       host.transcript.notice("A queued prompt with images cannot steer the turn. It stays queued.", "warning");
       return host.changed();
     }
-    const { text: text15 } = prompt;
+    const { text: text16 } = prompt;
     const ahead = this.#held.slice(0, index2);
     this.#held.splice(index2, 1);
     host.changed();
-    void steerTurn(host.gw, sid, text15).then((r) => {
+    void steerTurn(host.gw, sid, text16).then((r) => {
       if (!ticket.isCurrent()) {
         if (!r.ok) {
           host.restore(prompt);
@@ -52914,7 +53411,7 @@ var PromptQueue = class {
         return host.changed();
       }
       if (r.ok) {
-        host.transcript.steer(text15);
+        host.transcript.steer(text16);
       } else {
         const at = Math.max(0, ...ahead.map((h2) => this.#held.indexOf(h2) + 1));
         this.#held.splice(at, 0, item3);
@@ -53155,7 +53652,7 @@ var PromptRouter = class {
       return;
     }
     const { images } = prompt;
-    const text15 = prompt.text || (images.length ? IMAGE_ONLY_PROMPT : "");
+    const text16 = prompt.text || (images.length ? IMAGE_ONLY_PROMPT : "");
     const attachments = images.map(({ mime, path: path2 }) => ({ mime, path: path2 }));
     const submission = newInputId();
     host.transcript.user({ attachments: userImages(images), text: display?.trim() || prompt.text });
@@ -53165,7 +53662,7 @@ var PromptRouter = class {
     rpc(host.gw, "prompt.submit", {
       session_id: sid,
       submission_id: submission,
-      text: text15,
+      text: text16,
       ...queued ? { queued } : {},
       ...attachments.length ? { attachments } : {}
     }).catch((error) => {
@@ -53210,7 +53707,7 @@ function chatStores(chat, { act, gw: gw2, launch: launch3, settings: settings2, 
   const prs = new PullRequests({ changed, cwd: () => session2.info?.cwd || null, sid: () => durable(session2.ref) });
   const prAside = new PrAside({
     changed,
-    notice: (text15, tone) => chat.notice(text15, tone),
+    notice: (text16, tone) => chat.notice(text16, tone),
     open: openUrl,
     prs,
     reveal: (id) => chat.reveal(id),
@@ -53229,7 +53726,7 @@ function chatStores(chat, { act, gw: gw2, launch: launch3, settings: settings2, 
   const timers = new Disposables();
   const presses = { esc: 0, exit: 0 };
   const sheets2 = new PromptSheets(chat);
-  const connect2 = new ConnectWatcher({ changed, openUrl, tell: (text15) => act().submit(text15, false), transcript });
+  const connect2 = new ConnectWatcher({ changed, gw: gw2, openUrl, sid: () => session2.ref.live, tell: (text16) => act().submit(text16, false), transcript });
   const reconnect = new Reconnect(chat);
   const warned = { protocol: false, status: void 0 };
   const notices = new NoticeStrip(chat);
@@ -53241,7 +53738,7 @@ function chatStores(chat, { act, gw: gw2, launch: launch3, settings: settings2, 
       cwd: () => session2.info?.cwd || launch3.cwd,
       gw: gw2,
       launchCwd: launch3.cwd,
-      note: (text15, tone) => transcript.notice(text15, tone),
+      note: (text16, tone) => transcript.notice(text16, tone),
       sid: () => session2.ref.live
     },
     { startup: launch3.image }
@@ -53303,7 +53800,7 @@ function chatStores(chat, { act, gw: gw2, launch: launch3, settings: settings2, 
       drain: () => queue2.drain(),
       gw: gw2,
       launch: launch3,
-      rename: (sid, text15) => title.rename(sid, text15),
+      rename: (sid, text16) => title.rename(sid, text16),
       shownElsewhere: (id) => viewer.shown(id),
       request: (req) => act().onRequest(req),
       sheets: sheets2,
@@ -53320,7 +53817,7 @@ function chatStores(chat, { act, gw: gw2, launch: launch3, settings: settings2, 
       markViewer: (now, before) => viewer.show(now, before),
       readBusyMode: () => void act().readBusyMode(),
       reportCwd: () => act().reportCwd(),
-      showThoughts: (sid) => showThoughts({ gw: gw2, notice: (text15, tone) => chat.notice(text15, tone), settings: settings2 }, sid)
+      showThoughts: (sid) => showThoughts({ gw: gw2, notice: (text16, tone) => chat.notice(text16, tone), settings: settings2 }, sid)
     })
   );
   const theme = new Theme({ palette: (palette) => surface().palette(palette), settings: settings2 }, saved.theme ?? "tern");
@@ -53407,7 +53904,7 @@ var App = class {
       surface: this.#surface
     };
     s2.theme.apply();
-    onCardFault(noticeSink((text15) => this.notice(text15, "warning")));
+    onCardFault(noticeSink((text16) => this.notice(text16, "warning")));
     if (this.#tern.caps.features.includes("blobs")) {
       s2.welcome.logo = this.#tern.blob(logo_default, "image/png");
     }
@@ -53472,8 +53969,8 @@ var App = class {
     this.#renders.request();
   }
   /** A notice in the transcript, rendered now. */
-  notice(text15, tone) {
-    this.transcript.notice(text15, tone);
+  notice(text16, tone) {
+    this.transcript.notice(text16, tone);
     this.changed();
   }
   /** An error nothing caught (a rejected promise no caller awaited): shown, so the pane lives on. */
@@ -53613,21 +54110,21 @@ var gatewayText = (key2, ...args) => {
 };
 
 // node_modules/@hermes/shared/src/gateway-canonical.ts
-function canonicalRequest(method, original, contract, text15 = gatewayText) {
+function canonicalRequest(method, original, contract, text16 = gatewayText) {
   const params = { ...original };
   if (method === "session.create") {
     delete params.cols;
     params.source = "tui";
     params.request_id ??= crypto.randomUUID();
     if (!contract?.sources.includes("tui")) {
-      throw new Error(text15("canonical.launch.noTuiPolicy"));
+      throw new Error(text16("canonical.launch.noTuiPolicy"));
     }
     if (!contract.parameters.includes("client_env")) {
       delete params.client_env;
     }
     const unsupported = Object.keys(params).filter((key2) => !contract.parameters.includes(key2));
     if (unsupported.length) {
-      throw new Error(text15("canonical.launch.unsupportedOptions", unsupported.join(", ")));
+      throw new Error(text16("canonical.launch.unsupportedOptions", unsupported.join(", ")));
     }
   }
   if (["prompt.submit", "session.steer", "session.redirect"].includes(method) && params.submission_id) {
@@ -53933,10 +54430,10 @@ var JsonRpcRequestChannel = class {
    * on it too (mirror it, record seq, …) or `null` when the text was not
    * JSON or not a JSON object (`null`, a scalar).
    */
-  handleFrame(text15) {
+  handleFrame(text16) {
     let frame;
     try {
-      frame = JSON.parse(text15);
+      frame = JSON.parse(text16);
     } catch {
       return null;
     }
@@ -54448,21 +54945,21 @@ var GatewayClient = class extends EventEmitter {
     this.publish(ev);
   }
   handleWebSocketFrame(raw2) {
-    const text15 = wireFrameText(raw2);
-    if (!text15) {
+    const text16 = wireFrameText(raw2);
+    if (!text16) {
       return;
     }
-    const frame = this.channel.handleFrame(text15);
+    const frame = this.channel.handleFrame(text16);
     if (!frame) {
-      this.protocolError("malformed websocket frame", text15, "(empty frame)");
+      this.protocolError("malformed websocket frame", text16, "(empty frame)");
       return;
     }
     if (frame.method === "event") {
-      this.mirrorEventToSidecar(text15);
+      this.mirrorEventToSidecar(text16);
     }
   }
-  protocolError(what, text15, emptyLabel) {
-    const preview4 = text15.trim().slice(0, MAX_LOG_PREVIEW) || emptyLabel;
+  protocolError(what, text16, emptyLabel) {
+    const preview4 = text16.trim().slice(0, MAX_LOG_PREVIEW) || emptyLabel;
     this.pushLog(`[protocol] ${what}: ${preview4}`);
     this.publish({ type: "gateway.protocol_error", payload: { preview: preview4 } });
   }
@@ -54524,7 +55021,7 @@ var GatewayClient = class extends EventEmitter {
       const ws = new WebSocketCtor(attachUrl, protocols);
       let settled2 = false;
       this.ws = ws;
-      this.channel.attach({ send: (text15) => ws.send(text15) });
+      this.channel.attach({ send: (text16) => ws.send(text16) });
       const connectPromise = new Promise((resolve5, reject) => {
         ws.addEventListener(
           "open",
@@ -54982,8 +55479,8 @@ var WatchApp = class {
       this.transcript.notice(`The session database is not readable here: ${String(error)}`, "warning");
     }
     onCardFault(
-      noticeSink((text15) => {
-        this.transcript.notice(text15, "warning");
+      noticeSink((text16) => {
+        this.transcript.notice(text16, "warning");
         this.changed();
       })
     );
@@ -55042,12 +55539,12 @@ var WatchApp = class {
       return false;
     }
     try {
-      const text15 = await readFile3(path2, "utf8");
-      if (text15.length === this.#logSize) {
+      const text16 = await readFile3(path2, "utf8");
+      if (text16.length === this.#logSize) {
         return false;
       }
-      this.#logSize = text15.length;
-      applyLog(this.#agent, parseLiveLog(text15));
+      this.#logSize = text16.length;
+      applyLog(this.#agent, parseLiveLog(text16));
       return true;
     } catch {
       return false;
@@ -55109,12 +55606,12 @@ var WatchApp = class {
     }
   }
   async #submit(raw2) {
-    const text15 = raw2.trim();
+    const text16 = raw2.trim();
     const a2 = this.#agent;
-    if (!text15) {
+    if (!text16) {
       return;
     }
-    if (text15 === "/stop") {
+    if (text16 === "/stop") {
       return this.#stop();
     }
     if (!isRunning(a2)) {
@@ -55125,7 +55622,7 @@ var WatchApp = class {
       const r = await rpc(this.#gw, "subagent.steer", {
         session_id: this.#spec.sid,
         subagent_id: a2.id,
-        text: text15
+        text: text16
       });
       this.transcript.notice(
         r?.status === "queued" ? `Steering sent: it reaches ${a2.name} after its current step.` : `${a2.name} is not taking steering now.`,
