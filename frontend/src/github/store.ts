@@ -6,14 +6,14 @@
 
 import type { Ticket } from '../core/epoch.js'
 import { errorText } from '../core/errors.js'
-import { type DurableSessionId, type PrKey, prKey, type StackKey, stackKey } from '../core/ids.js'
+import { type LiveSessionId, type PrKey, prKey, type StackKey, stackKey } from '../core/ids.js'
 import { Poller } from '../core/poller.js'
 import type { ToolCall } from '../model.js'
 
 import { type BranchTarget, branchPullRequest, branchTarget, parseStacks, type Stack, stackNumber, stackQuery } from './branch.js'
 import { type GitHub, github } from './client.js'
 import { type GitHubHosts, githubHosts, untrustedText } from './hosts.js'
-import { linkedFromResult, storedLinks } from './links.js'
+import { linkedFromResult } from './links.js'
 import {
   ACTIVITY_QUERY,
   type ActivityItem,
@@ -37,8 +37,10 @@ export const PENDING_MS = 30_000
 const BATCH = 20
 
 export interface PullRequestsHost {
-  /** The session the links belong to (the stored session id the link tools see, else its runtime id). */
-  sid(): DurableSessionId | null
+  /** The session the links belong to: its runtime id, what the plugin's method is called in. */
+  sid(): LiveSessionId | null
+  /** The links of session `sid`'s conversation, oldest first (links.ts). */
+  links(sid: LiveSessionId): Promise<PrRef[]>
   /** The session's working directory, for its branch's PR. */
   cwd(): string | null
   changed(): void
@@ -123,9 +125,10 @@ const MUTATIONS: Record<Exclude<PrAction, 'rerun'>, string> = {
 export class PullRequests {
   readonly #host: PullRequestsHost
   readonly #gh: GitHub
-  readonly #links: (sid: DurableSessionId) => PrRef[]
-  #sid: DurableSessionId | null = null
+  #sid: LiveSessionId | null = null
   #refs: PrRef[] = []
+  /** Bumped by each link result, so a read of the links that started before one drops its answer. */
+  #refsVersion = 0
   readonly #entries = new Map<PrKey, Entry>()
   #branch: { at: number; cwd: string; ref?: PrRef | undefined; target?: BranchTarget | undefined } | undefined
   /** Native stacks by key, from the PRs' stack membership. */
@@ -148,13 +151,11 @@ export class PullRequests {
   constructor(
     host: PullRequestsHost,
     gh: GitHub = github(),
-    links: (sid: DurableSessionId) => PrRef[] = sid => storedLinks(sid),
     branchOf: (cwd: string) => Promise<BranchTarget | undefined> = branchTarget,
     hosts: GitHubHosts = githubHosts()
   ) {
     this.#host = host
     this.#gh = gh
-    this.#links = links
     this.#branchOf = branchOf
     this.#hosts = hosts
   }
@@ -207,7 +208,7 @@ export class PullRequests {
     return this.#busy.has(key)
   }
 
-  /** A session was adopted (a resume, a switch): its stored links replace the old ones, and a read in flight drops its answer. */
+  /** A session was adopted (a resume, a switch): its links replace the old ones once read, and a read in flight drops its answer. */
   adopt() {
     const sid = this.#host.sid()
 
@@ -217,11 +218,12 @@ export class PullRequests {
 
     this.#poller.adopt(sid)
     this.#sid = sid
-    this.#refs = sid ? this.#links(sid) : []
+    this.#refs = []
     this.#branch = undefined
     this.#stacks.clear()
     this.#host.changed()
     this.poke()
+    this.relink()
   }
 
   /** A finished tool call: a link tool's result is the conversation's whole list. */
@@ -234,6 +236,7 @@ export class PullRequests {
 
     const before = this.#refs.map(prKey).join()
     this.#refs = linked
+    this.#refsVersion++
 
     if (linked.map(prKey).join() !== before) {
       this.#host.changed()
@@ -242,19 +245,25 @@ export class PullRequests {
   }
 
   /**
-   * Reads the stored links again. A subagent runs in a session of its own and links under this
-   * conversation (pull_requests.py), with no link result in this transcript.
+   * Reads the conversation's links again: on adopt, and when the plugin says they changed. A
+   * subagent runs in a session of its own and links under this conversation (pull_requests.py),
+   * with no link result in this transcript. A read that fails keeps the list.
    */
   relink() {
+    void this.#relink()
+  }
+
+  async #relink() {
     const sid = this.#host.sid()
 
     if (!sid || sid !== this.#sid) {
       return
     }
 
-    const linked = this.#links(sid)
+    const version = this.#refsVersion
+    const linked = await this.#host.links(sid).catch(() => undefined)
 
-    if (linked.map(prKey).join() !== this.#refs.map(prKey).join()) {
+    if (linked && sid === this.#sid && version === this.#refsVersion && linked.map(prKey).join() !== this.#refs.map(prKey).join()) {
       this.#refs = linked
       this.#host.changed()
       this.poke()

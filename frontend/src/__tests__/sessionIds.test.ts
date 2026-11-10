@@ -5,7 +5,7 @@ import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { durable, isLive, liveSessionId, NO_SESSION, prKey, stackKey, storedSessionId } from '../core/ids.js'
 import { snapshotIds } from '../wire/rpc.js'
@@ -14,14 +14,6 @@ import { FakeGateway, fakeTern, settle } from './fakes.js'
 
 process.env['HERMES_HOME'] = mkdtempSync(join(tmpdir(), 'hermes-tern-ids-'))
 
-const spy = vi.hoisted(() => ({
-  links: vi.fn((_sid: string) => [])
-}))
-
-vi.mock('../github/links.js', async importOriginal => ({
-  ...(await importOriginal<typeof import('../github/links.js')>()),
-  storedLinks: spy.links
-}))
 const { App } = await import('../app/chat.js')
 
 /** A session the gateway creates: runtime id `live-N`, and stored id `stored-N` unless `stored` is false. */
@@ -55,11 +47,8 @@ async function started(gw: FakeGateway) {
 
 const resumed = (gw: FakeGateway) => gw.sent('session.resume').map(p => p['session_id'])
 
-beforeEach(() => {
-  for (const fn of Object.values(spy)) {
-    fn.mockClear()
-  }
-})
+/** The sessions whose PR links the pane asked the plugin for. */
+const linksRead = (gw: FakeGateway) => gw.sent('plugin.hermes-tern.pull_requests.linked').map(p => p['session_id'])
 
 describe('a session with a stored id', () => {
   it('reads its runtime id for requests and its stored id for filing', async () => {
@@ -70,7 +59,7 @@ describe('a session with a stored id', () => {
     expect(app.session.ref.stored).toBe('stored-1')
     expect(app.session.ref).toEqual({ live: 'live-1', stored: 'stored-1' })
     expect(gw.sent('plugin.hermes-tern.viewer.set')).toMatchObject([{ pid: process.pid, session_id: 'live-1', stored: 'stored-1' }])
-    expect(spy.links.mock.calls).toEqual([['stored-1']])
+    expect(linksRead(gw)).toEqual(['live-1'])
   })
 
   it('files a resumed session under the stored id, and reads its compactions under the runtime id', async () => {
@@ -90,7 +79,7 @@ describe('a session with a stored id', () => {
     expect(gw.sent('plugin.hermes-tern.viewer.set').at(-1)).toMatchObject({ session_id: 'live-2', stored: 'stored-2' })
     expect(gw.sent('plugin.hermes-tern.viewer.clear')).toEqual([{ pid: process.pid, session_id: 'live-1', stored: 'stored-1' }])
     expect(gw.sent('session.transcript').map(p => p['session_id'])).toEqual(['live-2'])
-    expect(spy.links.mock.calls.at(-1)).toEqual(['stored-2'])
+    expect(linksRead(gw).at(-1)).toEqual('live-2')
   })
 
   it('tells the plugin on quit that this pane stops showing it', async () => {
@@ -166,7 +155,7 @@ describe('a session with no stored id', () => {
     expect(app.session.ref).toEqual({ live: 'live-1', stored: null })
     expect(gw.sent('plugin.hermes-tern.viewer.set')).toMatchObject([{ pid: process.pid, session_id: 'live-1' }])
     expect(gw.sent('plugin.hermes-tern.viewer.set')[0]).not.toHaveProperty('stored')
-    expect(spy.links.mock.calls).toEqual([['live-1']])
+    expect(linksRead(gw)).toEqual(['live-1'])
 
     app.quit()
     await done

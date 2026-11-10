@@ -70,4 +70,5 @@ def test_the_chart_task_has_a_plugin_namespaced_key(ctx):
 
 
 def test_the_chart_writer_is_a_plugin_rpc_method(ctx):
-    assert [a[0] for a, _ in ctx.of("register_rpc")] == ["charts.author", "viewer.set", "viewer.clear", "viewer.shown"]
+    assert [a[0] for a, _ in ctx.of("register_rpc")] == [
+        "charts.author", "pull_requests.linked", "viewer.set", "viewer.clear", "viewer.shown"]

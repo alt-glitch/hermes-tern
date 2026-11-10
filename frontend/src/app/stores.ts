@@ -15,11 +15,11 @@ import { dispatched } from '../commands/slash.js'
 import type { LaunchEnv } from '../config/env.js'
 import { ConnectWatcher } from '../connections/watcher.js'
 import { Disposables } from '../core/disposables.js'
-import { durable } from '../core/ids.js'
 import { Attachments } from '../draft/attachments.js'
 import { Composer } from '../draft/composer.js'
 import type { Presses } from '../draft/keys.js'
 import type { Warned } from '../gateway/handlers/chrome.js'
+import { linkedPullRequests, LINKS_CHANGED } from '../github/links.js'
 import { PullRequests } from '../github/store.js'
 import { Media } from '../media.js'
 import { Completion } from '../overlays/completion.js'
@@ -83,8 +83,6 @@ export function chatStores(chat: ChatPorts, { act, gw, launch, settings, surface
   const activity = new Activity()
   /** What the subagent, process and automation stores read of the app: the shown runtime id on each use. */
   const live = {
-    // A subagent ended: the PRs it linked are filed under this conversation (pull_requests.py).
-    agentEnded: () => prs.relink(),
     changed,
     gw,
     // A command's dispatch envelope from outside a typed command (a goal or loop sheet's button).
@@ -112,7 +110,13 @@ export function chatStores(chat: ChatPorts, { act, gw, launch, settings, surface
   /** The pills above the composer: the one holding the keys, and the todo panel's fold. */
   const hud = new Hud({ changed, open: pill => act().openPill(pill) })
   /** The conversation's PRs; links are stored under the stored session id the tools see. */
-  const prs = new PullRequests({ changed, cwd: () => session.info?.cwd || null, sid: () => durable(session.ref) })
+  const prs = new PullRequests({ changed, cwd: () => session.info?.cwd || null, links: sid => linkedPullRequests(gw, sid), sid: () => session.ref.live })
+  // A link tool changed this conversation's links (a subagent's, which this transcript never sees).
+  gw.on('event', (ev: { type: string }) => {
+    if (ev.type === LINKS_CHANGED) {
+      prs.relink()
+    }
+  })
   /** The pull request docked at the pane's right edge (the PR aside). */
   const prAside = new PrAside({
     changed,

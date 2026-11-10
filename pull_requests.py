@@ -13,6 +13,12 @@ session of its own; its links go to the conversation that delegated it:
 Nothing here calls GitHub: a link is the URL's host, repository and number. The frontend reads the
 rest from the GitHub API, with the user's token for that host.
 
+The frontend reads a conversation's links with the plugin RPC method
+``plugin.hermes-tern.pull_requests.linked`` ``{session_id}``, which answers ``{"linked": [...]}`` like
+``list_pull_requests``. When a link tool changes the list, the panes that show the conversation get the
+session event ``plugin.hermes-tern.pull_requests.changed`` and read it again: a subagent links from a
+session of its own, so the parent's pane sees no tool result for it.
+
 A link may name only github.com or a GitHub Enterprise host the user listed in the plugin's
 ``enterprise_hosts`` setting (``plugins.entries.hermes-tern.settings.enterprise_hosts``): the host
 comes from the model, and the frontend sends the enterprise token to it. The frontend checks the
@@ -38,6 +44,9 @@ logger = logging.getLogger(__name__)
 PLUGIN = "hermes-tern"
 TOOLSET = "hermes-tern"
 FILE = "pull-requests.json"
+# The plugin RPC method that reads a conversation's links, and the session event that says they changed.
+LINKED_METHOD = "pull_requests.linked"
+CHANGED_EVENT = "pull_requests.changed"
 
 GITHUB = "github.com"
 # The plugin setting that lists the GitHub Enterprise hosts the user trusts with GITHUB_ENTERPRISE_TOKEN.
@@ -274,6 +283,30 @@ def _public(links: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [{k: link[k] for k in ("url", "repository", "number", "host")} for link in links]
 
 
+def _linked(session_id: str) -> list[dict[str, Any]]:
+    """The links of session ``session_id``'s conversation, oldest first."""
+    if not session_id:
+        return []
+    path = data_file()
+    with _locked(path):
+        data = _read(path)
+        return _public(data["conversations"].get(_conversation(data, session_id), []))
+
+
+def _tell_viewers(data: dict[str, Any], root: str) -> None:
+    """Tells the panes that show conversation ``root`` that its links changed. The live session is
+    one of the conversation's ids (the root, or a later id compression gave it), so each is tried,
+    the root first, until one has viewers."""
+    if _ctx is None or not root:
+        return
+    for sid in [root, *(i for i, r in data["aliases"].items() if r == root and i != root)]:
+        try:
+            if _ctx.emit_to_session(sid, CHANGED_EVENT, {}):
+                return
+        except Exception:  # noqa: BLE001 - the links are saved; a pane that misses this reads them on its next adopt
+            logger.debug("hermes-tern: links of %s changed, not told to %s", root, sid, exc_info=True)
+
+
 # ── Handlers ───────────────────────────────────────────────────────────────────────────────────
 
 
@@ -301,6 +334,8 @@ def link_pull_request(args: dict[str, Any], session_id: str | None = None) -> st
         if not already:
             links.append({**target, "linked_at": time.time(), "session_id": sid, "cwd": _cwd()})
         _write(path, data)
+    if not already:
+        _tell_viewers(data, root)
     return tool_result({**target, "already_linked": already, "linked": _public(links)})
 
 
@@ -322,18 +357,22 @@ def unlink_pull_request(args: dict[str, Any], session_id: str | None = None) -> 
         if was:
             data["conversations"][root] = kept
         _write(path, data)
+    if was:
+        _tell_viewers(data, root)
     return tool_result({**target, "was_linked": was, "linked": _public(kept)})
 
 
 def list_pull_requests(_args: dict[str, Any], session_id: str | None = None) -> str:
     from tools.registry import tool_result
 
-    sid = _session(session_id)
-    path = data_file()
-    with _locked(path):
-        data = _read(path)
-        links = data["conversations"].get(_conversation(data, sid), []) if sid else []
-    return tool_result({"linked": _public(links)})
+    return tool_result({"linked": _linked(_session(session_id))})
+
+
+def linked(_params: dict, *, session_id: str | None = None, **_: Any) -> dict[str, Any]:
+    """The plugin RPC method: the links of the calling session's conversation."""
+    if not session_id:
+        raise ValueError("pull_requests.linked needs the session_id whose links it reads")
+    return {"linked": _linked(session_id)}
 
 
 def register(ctx) -> None:
@@ -347,3 +386,4 @@ def register(ctx) -> None:
         ctx.register_tool(name=name, toolset=TOOLSET, schema=schema, handler=handler, emoji="🔗",
                           description=schema["description"])
     ctx.register_system_prompt_section("hermes-tern.pull-requests", PROMPT)
+    ctx.register_rpc(LINKED_METHOD, linked)
