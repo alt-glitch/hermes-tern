@@ -23,7 +23,7 @@ const patch = (result: unknown, more: Partial<ToolCall> = {}) => call('patch', a
 const tool = (id: string, c: ToolCall): Extract<Block, { kind: 'tool' }> => ({ kind: 'tool', id: entryId(id), call: c })
 const text = (id: string): Block => ({ kind: 'text', id: entryId(id), text: id })
 const turn = (blocks: Block[]): TurnEntry => ({ kind: 'turn', id: entryId('turn'), rev: 0, startedAt: 0, end: { status: 'done', endedAt: 1000 }, blocks })
-const cx: TranscriptContext = { copy: () => undefined, now: 1000, welcome: { tip: '', version: '' } }
+const cx: TranscriptContext = { copy: () => undefined, now: 1000, welcome: { version: '' } }
 const nodes = (n: NodeJson): NodeJson[] => [n, ...(n.c ?? []).flatMap(nodes)]
 
 /** Real pinned V4A producer and gateway envelope, using the memory-backed fixture. */
@@ -67,7 +67,7 @@ describe('V4A retained partial-failure reports', () => {
 
   it('retains the actual partial report on replay, but not without its result', () => {
     const payload = gateway()
-    const replay = (content?: string) => history({ kept: [], compactions: [], id: entryId, messages: [
+    const replay = (content?: string) => history({ kept: [], id: entryId, messages: [
       { role: 'tool', name: 'patch', tool_call_id: 'p', args, ...(content ? { content } : {}) },
       { role: 'assistant', text: 'answer' }
     ] }).find(e => e.kind === 'turn')

@@ -61,7 +61,7 @@ describe('successful V4A retained lint', () => {
     const live = store.call(toolCallId('live'))
     if (!live) throw new Error('missing live patch')
     expect(plain(live)).toContain('Lint reported an error for x.py')
-    const replay = (content?: string) => history({ kept: [], compactions: [], id: entryId, messages: [
+    const replay = (content?: string) => history({ kept: [], id: entryId, messages: [
       { role: 'tool', name: 'patch', tool_call_id: 'saved', args, ...(content ? { content } : {}) }
     ] }).find(e => e.kind === 'turn')
     const saved = replay(JSON.stringify(result))?.blocks.find(b => b.kind === 'tool')

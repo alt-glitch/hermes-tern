@@ -13,7 +13,7 @@ import { canDrain, canSend, canSwitch, type GateState } from '../turn/router.js'
 
 import { FakeGateway, fakeTern, given, key, type Reply, settle } from './fakes.js'
 
-vi.mock('@tui/lib/history.js', () => ({ append: () => undefined, load: () => [] }))
+vi.mock('@hermes/shared/prompt-history', () => ({ append: () => undefined, load: () => [] }))
 
 process.env['HERMES_HOME'] = mkdtempSync(join(tmpdir(), 'hermes-tern-gates-'))
 
@@ -22,7 +22,7 @@ const { App } = await import('../app/chat.js')
 const S1 = liveSessionId('s1')
 
 /** The flags a gate state is made of; `sid` stands for a session (s1) against none. */
-const FLAGS = ['sid', 'switching', 'busy', 'compacting', 'awaitingStartup', 'canonical'] as const
+const FLAGS = ['sid', 'switching', 'busy', 'compacting', 'awaitingStartup'] as const
 
 type Flag = (typeof FLAGS)[number]
 
@@ -31,14 +31,13 @@ function state(on: ReadonlySet<Flag>): GateState {
   return {
     awaitingStartup: on.has('awaitingStartup'),
     busy: on.has('busy'),
-    canonical: on.has('canonical'),
     compacting: on.has('compacting'),
     sid: on.has('sid') ? S1 : null,
     switching: on.has('switching')
   }
 }
 
-/** Every combination of the flags: 64 states, each with the set of flags it has on. */
+/** Every combination of the flags: 32 states, each with the set of flags it has on. */
 const COMBINATIONS: ReadonlySet<Flag>[] = Array.from({ length: 2 ** FLAGS.length }, (_, n) => new Set(FLAGS.filter((_, i) => n & (2 ** i))))
 
 const name = (on: ReadonlySet<Flag>) => [...on].join('+') || 'nothing'
@@ -50,7 +49,7 @@ const GATES: { name: string; answer: (s: GateState) => unknown; reads: readonly 
   { answer: s => canSwitch(s).kind, name: 'canSwitch', reads: ['busy', 'compacting'] }
 ]
 
-describe('the gates, for every combination of session, switch, turn, compaction, startup image and gateway', () => {
+describe('the gates, for every combination of session, switch, turn, compaction and startup image', () => {
   it('canSend: no session or a switch holds; then a turn takes the busy path, a compaction queues behind, else send', () => {
     for (const on of COMBINATIONS) {
       const want = !on.has('sid') || on.has('switching') ? { kind: 'hold' } : { kind: on.has('busy') ? 'busy' : on.has('compacting') ? 'behind' : 'send', sid: S1 }
@@ -169,8 +168,8 @@ function held() {
 }
 
 /** The app on a fake Tern and gateway, session s1 shown. */
-function setup(replies: Record<string, Reply> = {}, { canonical = true } = {}) {
-  const gw = new FakeGateway({ canonical, replies })
+function setup(replies: Record<string, Reply> = {}) {
+  const gw = new FakeGateway({ replies })
   const tern = fakeTern({ cols: 100, draws: true })
   const app = new App(tern.session, gw.client, '1.0.0')
   void app.run()
@@ -228,18 +227,17 @@ describe('App: the working line', () => {
 describe("App: a send's {!cmd} expansion counts as a turn", () => {
   it("shows 'Running {!…}', and the turn's start, the labels, the drain, a switch and the commands all see it as busy", async () => {
     const shell = held()
-    const { app, emit, gw, press, type } = setup({ 'shell.exec': shell.reply }, { canonical: false })
+    const { app, emit, gw, press, type } = setup({ 'prompt.submit': () => ({ admission_id: 'a1', status: 'queued' }), 'shell.exec': shell.reply })
     await type('today is {!date}')
     await press('enter')
 
     expect(app.stores.activity.busy?.label).toBe('Running {!…}')
     expect(app.control().busy).toBe(true)
 
-    // The drain waits: a prompt behind it is held (a private gateway's queue), not sent.
+    // A prompt behind it goes into the gateway's queue, not into a turn of its own.
     await type('next')
     await press('enter')
-    expect(app.stores.queue.held).toMatchObject([{ text: 'next' }])
-    expect(gw.sent('prompt.submit')).toEqual([])
+    expect(gw.sent('prompt.submit')).toMatchObject([{ queued: true, text: 'next' }])
 
     // A session switch is refused.
     await app.newSession()
@@ -253,11 +251,15 @@ describe("App: a send's {!cmd} expansion counts as a turn", () => {
     await emit('message.delta', { text: 'hi' })
     expect(app.stores.activity.busy).toMatchObject({ label: 'Writing…', since })
 
-    // Expanded after the turn started: the prompt waits behind the turn, ahead of the one held
-    // meanwhile, and the turn keeps its row.
+    // Expanded after the turn started: the prompt goes into the gateway's queue behind the turn,
+    // and the turn keeps its row.
     shell.resolve({ code: 0, stderr: '', stdout: 'Monday\n' })
-    await vi.waitFor(() => expect(app.stores.queue.held).toMatchObject([{ text: 'today is Monday' }, { text: 'next' }]))
-    expect(gw.sent('prompt.submit')).toEqual([])
+    await vi.waitFor(() =>
+      expect(gw.sent('prompt.submit')).toMatchObject([
+        { queued: true, text: 'next' },
+        { queued: true, text: 'today is Monday' }
+      ])
+    )
     expect(app.stores.activity.busy).toMatchObject({ label: 'Writing…', since })
   })
 })

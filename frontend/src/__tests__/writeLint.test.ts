@@ -56,7 +56,7 @@ describe('write_file lint disclosure', () => {
     if (!live) throw new Error('missing live call')
     expect(live.outcome.kind).toBe('done')
     expect(JSON.stringify(tree(toolNode(live, 100)))).toContain(title)
-    const entries = history({ kept: [], compactions: [], id: entryId, messages: [
+    const entries = history({ kept: [], id: entryId, messages: [
       { role: 'tool', name: 'write_file', tool_call_id: 'saved', args: { path: 'x.py', content: 'x' }, content: JSON.stringify(result) }
     ] })
     const turn = entries.find(e => e.kind === 'turn')

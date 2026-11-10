@@ -7,13 +7,14 @@
 // drains.
 
 import type { ServerRequest } from '@hermes/shared/json-rpc-channel'
-import type { GatewayClient } from '@tui/gatewayClient.js'
-import type { AnyGatewayEvent } from '@tui/gatewayTypes.js'
+import type { GatewayClient } from '@hermes/shared/gateway-client'
+import type { AnyGatewayEvent } from '@hermes/shared/gateway-types'
 
 import type { LaunchEnv } from '../config/env.js'
+import { optional } from '../core/assert.js'
 import { errorText } from '../core/errors.js'
 import { durable, type DurableSessionId, isLive, type LiveSessionId, type StoredSessionId, storedSessionId } from '../core/ids.js'
-import { createParams } from '../hermes/create.js'
+import { missingCapabilities, tooOldNotice } from '../hermes/requirements.js'
 import type { OperationalSheets } from '../operations.js'
 import type { PromptSheets } from '../prompts/sheets.js'
 import type { Transcript } from '../transcript/store.js'
@@ -27,15 +28,15 @@ import { type EndReason, SessionViews } from './views.js'
 
 /** What the session lifecycle reaches of the app. */
 export interface LifecycleHost {
-  readonly gw: Pick<GatewayClient, 'holdAttach' | 'hydrateSharedPrompts' | 'isCanonical' | 'request' | 'settleAttach'>
+  readonly gw: Pick<GatewayClient, 'holdAttach' | 'hydrateSharedPrompts' | 'request' | 'settleAttach'>
   readonly state: SessionState
   readonly operations: Pick<OperationalSheets, 'adopt'>
   readonly transcript: Pick<Transcript, 'notice'>
   readonly sheets: Pick<PromptSheets, 'dropShared'>
   /** The launcher's session to resume (the pane's own after a restart), and the folder a new session starts in. */
-  readonly launch: Pick<LaunchEnv, 'restored' | 'resume' | 'sessionCwd'>
-  /** The pane's width, which a private gateway lays its output out for. */
-  cols(): number
+  readonly launch: Pick<LaunchEnv, 'create' | 'paneCwd' | 'restored' | 'resume' | 'sessionCwd'>
+  /** Whether another live pane shows conversation `id` (the plugin knows: viewers.py). */
+  shownElsewhere(id: StoredSessionId): Promise<boolean>
   /** Whether the view may move to another session now (not while a turn or a compaction runs). */
   canSwitch(): SwitchGate
   /** The launcher's --image still waits for the first session. */
@@ -98,11 +99,37 @@ export class SessionLifecycle {
     this.#deliver = deliver
   }
 
-  /** gateway.ready: a reconnect's reattaches the shown session; only a sessionless app bootstraps. */
+  /**
+   * gateway.ready: a reconnect's reattaches the shown session; only a sessionless app bootstraps.
+   * Neither happens on a gateway that lacks what this frontend needs: the pane says so instead.
+   */
   ready() {
-    const { stored } = this.#host.state.ref
+    void this.#ready()
+  }
 
-    void (stored ? this.reattach(stored) : this.#bootstrap())
+  async #ready() {
+    const host = this.#host
+
+    try {
+      const missing = await missingCapabilities(host.gw)
+
+      if (missing.length > 0) {
+        host.transcript.notice(tooOldNotice(missing), 'error')
+        host.changed()
+
+        return
+      }
+    } catch (error) {
+      // The socket went away under the question: the next gateway.ready asks again.
+      host.transcript.notice(`Could not read what the agent backend supports: ${errorText(error)}`, 'error')
+      host.changed()
+
+      return
+    }
+
+    const { stored } = host.state.ref
+
+    await (stored ? this.reattach(stored) : this.#bootstrap())
   }
 
   /** The gateway went away: the runtime session died with it, and nothing can answer the held requests. */
@@ -166,7 +193,7 @@ export class SessionLifecycle {
     return this.#views.leaveAll(endReason)
   }
 
-  /** The first session: HERMES_TUI_RESUME's, else a new one; then the launcher's startup image, if any. */
+  /** The first session: HERMES_TERN_RESUME's, else a new one; then the launcher's startup image, if any. */
   async #bootstrap() {
     const host = this.#host
     const resume = host.launch.resume
@@ -200,11 +227,31 @@ export class SessionLifecycle {
   async #restore(id: StoredSessionId) {
     const host = this.#host
     let r: Snapshot | undefined
+    // The launcher moved to the session's folder for the resume; a new session instead starts where the
+    // pane launched (a remote backend, which names no folder, still lets the gateway choose).
+    const fresh = () => this.newSession(undefined, host.launch.sessionCwd ? host.launch.paneCwd : '')
+    const since = this.#switches.since()
+
+    if (await host.shownElsewhere(id)) {
+      // The user switched (/new, a pick) while the plugin answered: that choice stands.
+      if (!since.isCurrent()) {
+        return
+      }
+
+      await fresh()
+      host.transcript.notice("Another pane shows this pane's last session; started a new one.", 'warning')
+
+      return
+    }
+
+    if (!since.isCurrent()) {
+      return
+    }
 
     try {
       r = await this.#resume(id)
     } catch (error) {
-      await this.newSession()
+      await fresh()
       // After the new session's adopt, which clears the transcript.
       host.transcript.notice(`Could not resume this pane's last session (${errorText(error)}); started a new one.`, 'warning')
 
@@ -233,7 +280,7 @@ export class SessionLifecycle {
   }
 
   /** Closes the open session and starts a fresh one with an empty transcript, named `title` if given. */
-  async newSession(title?: string) {
+  async newSession(title?: string, cwd: string = this.#host.launch.sessionCwd) {
     if (this.#refuseSwitch()) {
       return
     }
@@ -255,11 +302,8 @@ export class SessionLifecycle {
         return
       }
 
-      const r: Snapshot = await rpc(
-        host.gw,
-        'session.create',
-        createParams({ canonical: host.gw.isCanonical, cols: host.cols(), cwd: host.launch.sessionCwd })
-      )
+      // The launch flags (`hermes tern -m … --yolo -s …`, HERMES_TERN_CREATE) are the session's creation policy.
+      const r: Snapshot = await rpc(host.gw, 'session.create', { ...host.launch.create, ...optional('cwd', cwd || undefined) })
 
       if (!this.#switches.current(token)) {
         // A later switch won; nothing will ever show this session.
@@ -329,7 +373,7 @@ export class SessionLifecycle {
         }
       }
 
-      const r: Snapshot = await rpc(host.gw, 'session.resume', { cols: host.cols(), session_id: id })
+      const r: Snapshot = await rpc(host.gw, 'session.resume', { session_id: id })
 
       if (!this.#switches.current(token)) {
         this.#views.superseded(r)

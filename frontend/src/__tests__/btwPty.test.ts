@@ -12,7 +12,7 @@ import { App } from '../app/chat.js'
 
 import { FakeGateway, fakeTern, given, key, settle } from './fakes.js'
 
-vi.mock('@tui/lib/history.js', () => ({ append: () => undefined, load: () => [] }))
+vi.mock('@hermes/shared/prompt-history', () => ({ append: () => undefined, load: () => [] }))
 
 /** Quote a single argument in the shell command required by util-linux script -c. */
 function shellQuote(text: string): string {

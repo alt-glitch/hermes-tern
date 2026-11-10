@@ -40,7 +40,7 @@ describe('web extraction entry failures', () => {
     expect(errors(detail).map(n => n.p?.['spans'])).toEqual(text)
     expect(JSON.stringify(errors([root]))).not.toContain('original.example')
     let n = 0
-    const historyEntries = history({ kept: [], compactions: [], id: p => entryId(`${p}${++n}`), messages: [
+    const historyEntries = history({ kept: [], id: p => entryId(`${p}${++n}`), messages: [
       { role: 'user', text: 'fetch' },
       { role: 'tool', name: 'web_extract', tool_call_id: 'f', args: {}, content: raw }
     ] })

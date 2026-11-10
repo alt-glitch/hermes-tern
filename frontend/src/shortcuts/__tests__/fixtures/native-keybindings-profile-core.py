@@ -12,7 +12,7 @@ import subprocess
 import sys
 from tempfile import TemporaryDirectory
 
-PIN = "22063fc099ec9ad8357d7f8f6e6248a0400680d3"
+PIN = "b3746e35ddd32079697728e2df57a9d78f1e9e32"
 source = Path.cwd() / ".hermes-src"
 if not (source / "tui_gateway" / "server.py").is_file():
     raise RuntimeError("Missing pinned Hermes source. Run node scripts/hermes-src.mjs.")

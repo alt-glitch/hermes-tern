@@ -7,7 +7,7 @@ import type { PickerItem } from '@stencil-hq/tern'
 
 import { optional } from '../../core/assert.js'
 import { clip, plural } from '../../core/text.js'
-import { sessionLabel, type StoredSession } from '../../hermes/sessionIndex.js'
+import { type ListedSession, sessionLabel } from '../../hermes/sessionList.js'
 import { ageShort } from '../../view/format.js'
 
 const DAY = 86_400_000
@@ -36,7 +36,7 @@ export function snippet(text: string, max = SNIPPET): string {
  * The row's second line. Under a title it is the first prompt; with no title the label already
  * is the prompt's first sentence, so the line goes on from there.
  */
-export function rowDetail(s: Pick<StoredSession, 'preview' | 'title'>): string {
+export function rowDetail(s: Pick<ListedSession, 'preview' | 'title'>): string {
   if (s.title) {
     return snippet(s.preview)
   }
@@ -47,12 +47,12 @@ export function rowDetail(s: Pick<StoredSession, 'preview' | 'title'>): string {
 }
 
 /** One list row. `elsewhere`: the session ran outside the pane's project, so its folder shows. */
-export function itemOf(s: StoredSession, now: number, running: boolean, elsewhere: boolean): PickerItem {
+export function itemOf(s: ListedSession, now: number, elsewhere: boolean): PickerItem {
   const detail = rowDetail(s)
 
   return {
     badges: [
-      ...(running ? [{ text: 'running', tone: 'accent' as const }] : []),
+      ...(s.running ? [{ text: 'running', tone: 'accent' as const }] : []),
       ...(s.pinned ? [{ text: 'pinned' }] : []),
       ...(s.branch ? [{ text: s.branch, title: `Branch ${s.branch}` }] : []),
       ...(elsewhere && s.cwd ? [{ text: basename(s.cwd), title: s.cwd }] : [])

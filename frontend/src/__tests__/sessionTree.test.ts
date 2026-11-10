@@ -1,115 +1,105 @@
-import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { DatabaseSync } from 'node:sqlite'
-
 import { describe, expect, it, vi } from 'vitest'
 
 import { liveSessionId, storedSessionId } from '../core/ids.js'
-import { type BranchFamily, branchFamily, type BranchNode, treeRows } from '../hermes/sessionTree.js'
+import { BRANCH_LINEAGE_GAP, type BranchFamily, branchFamily, type BranchNode, treeRows } from '../hermes/sessionTree.js'
 import type { Overlay } from '../overlays/overlay.js'
 import { openBranchTree, type TreeHost } from '../overlays/tree.js'
 import { Transcript } from '../transcript/store.js'
 
-import { key, must, tree } from './fakes.js'
+import { FakeGateway, key, must, tree } from './fakes.js'
 
-type Row = [id: string, parent: string | null, config: string, endReason: string | null, started: number, title: string, messages?: number]
-
-function db(sessions: readonly Row[]): string {
-  const path = join(mkdtempSync(join(tmpdir(), 'tern-tree-')), 'state.db')
-  const conn = new DatabaseSync(path)
-  conn.exec(`CREATE TABLE sessions (id TEXT PRIMARY KEY, source TEXT, parent_session_id TEXT, model_config TEXT,
-    archived INTEGER DEFAULT 0, end_reason TEXT, last_activity_at REAL, ended_at REAL, started_at REAL,
-    display_name TEXT, title TEXT, message_count INTEGER);
-    CREATE TABLE messages (id INTEGER PRIMARY KEY, session_id TEXT, role TEXT, content TEXT, timestamp REAL);`)
-  const add = conn.prepare(`INSERT INTO sessions (id, source, parent_session_id, model_config, end_reason, last_activity_at,
-    ended_at, started_at, title, message_count) VALUES (?,?,?,?,?,?,?,?,?,?)`)
-
-  for (const [id, parent, config, end, started, title, messages = 2] of sessions) {
-    add.run(id, config.includes('_delegate_from') ? 'subagent' : 'tui', parent, config, end, started + 5, end ? started + 1 : null, started, title, messages)
-  }
-
-  conn.prepare('INSERT INTO messages (session_id, role, content, timestamp) VALUES (?,?,?,?)').run('root', 'user', 'Fix the build', 1)
-  conn.close()
-
-  return path
-}
-
-/**
- * A conversation compressed once (root → tip), two branches of it (one made from the continuation),
- * a branch of a branch, a subagent run, a reset segment, and an older branch known only by its
- * parent ending 'branched'.
- */
-const FAMILY: Row[] = [
-  ['root', null, '{}', 'compression', 100, 'Fix the build', 4],
-  ['tip', 'root', '{}', null, 200, '', 30],
-  ['b1', 'tip', '{"_branched_from":"tip"}', null, 300, 'Try plan B'],
-  ['b2', 'root', '{"_branched_from":"root"}', null, 250, 'Try plan C'],
-  ['b1a', 'b1', '{"_branched_from":"b1"}', null, 400, 'Plan B, smaller'],
-  ['agent', 'b1', '{"_delegate_from":"b1"}', null, 410, 'subagent'],
-  ['reset', 'b2', '{"_reset_from":"b2"}', null, 420, 'Reset segment'],
-  ['old', null, '{}', 'branched', 10, 'Legacy parent'],
-  ['old-b', 'old', '{}', null, 20, 'Legacy branch']
-]
+const row = (id: string, started: number) => ({
+  id,
+  last_active_at: started + 5,
+  last_reply: `${id} reply`,
+  message_count: 4,
+  preview: `${id} prompt`,
+  session_id: id,
+  source: 'tui',
+  started_at: started,
+  title: id
+})
 
 const shape = (f: BranchFamily) => ({ at: f.at, nodes: f.nodes.map(n => [n.id, n.parent]) })
 
-describe('branchFamily', () => {
-  it("reads the whole family from any member, a continuation folded into its conversation's root", () => {
-    const path = db(FAMILY)
-    const want = {
-      nodes: [
-        ['root', null],
-        ['b2', 'root'],
-        ['b1', 'root'],
-        ['b1a', 'b1']
-      ]
+function gateway() {
+  return new FakeGateway({
+    replies: {
+      'session.list': p => p['scope'] === 'live'
+        ? { sessions: [{ ...row('current-live', 3), id: 'current-stored' }] }
+        : { sessions: [row('root', 1), row('b2', 2), row('current-stored', 3)] }
     }
+  })
+}
 
-    expect(shape(branchFamily('b1a', path))).toEqual({ at: 'b1a', ...want })
-    expect(shape(branchFamily('tip', path))).toEqual({ at: 'root', ...want })
-    // The conversation's facts come from its newest segment.
-    expect(branchFamily('root', path).nodes[0]).toMatchObject({ messages: 30, preview: 'Fix the build', title: 'Fix the build' })
+describe('branchFamily through the gateway', () => {
+  it('reads both picker scopes and folds duplicate stored/live identities without inventing branch edges', async () => {
+    const gw = gateway()
+    const family = await branchFamily('current-stored', gw.client)
+
+    expect(shape(family)).toEqual({ at: 'current-live', nodes: [['current-live', null], ['b2', null], ['root', null]] })
+    expect(gw.sent('session.list')).toEqual([
+      { limit: 200, picker: true, scope: 'live' },
+      { limit: 200, picker: true, scope: 'stored' }
+    ])
+    expect((await branchFamily('current-live', gw.client)).at).toBe('current-live')
   })
 
-  it("leaves out subagent runs and reset segments, and keeps a branch known only by its parent's end", () => {
-    const path = db(FAMILY)
+  it('uses the gateway-folded facts, first prompt and last reply', async () => {
+    const family = await branchFamily('current-stored', gateway().client)
 
-    expect(shape(branchFamily('reset', path))).toEqual({ at: 'reset', nodes: [['reset', null]] })
-    expect(shape(branchFamily('old-b', path))).toEqual({
-      at: 'old-b',
-      nodes: [
-        ['old', null],
-        ['old-b', 'old']
-      ]
+    expect(family.nodes[0]).toMatchObject({
+      id: 'current-live', lastActive: 8000, lastReply: 'current-live reply', messages: 4,
+      preview: 'current-live prompt', startedAt: 3000, title: 'current-live'
     })
   })
 
-  it('cuts a lineage that loops at its smallest id, whichever member reads it', () => {
-    const path = db([
-      ['y', 'x', '{"_branched_from":"x"}', null, 1, 'Y'],
-      ['x', 'y', '{"_branched_from":"y"}', null, 2, 'X']
-    ])
+  it('excludes explicit tool/subagent rows and empty litter, but keeps the empty current conversation', async () => {
+    const gw = new FakeGateway({ replies: { 'session.list': p => ({ sessions: p['scope'] === 'live' ? [] : [
+      { ...row('agent', 5), source: 'subagent' },
+      { ...row('tool', 4), source: 'tool' },
+      { ...row('empty', 3), message_count: 0 },
+      { ...row('current', 2), message_count: 0 },
+      row('stored', 1)
+    ] }) } })
 
-    const cut = [
-      ['x', null],
-      ['y', 'x']
-    ]
-
-    expect(shape(branchFamily('x', path))).toEqual({ at: 'x', nodes: cut })
-    expect(shape(branchFamily('y', path))).toEqual({ at: 'y', nodes: cut })
+    expect(shape(await branchFamily('current', gw.client))).toEqual({ at: 'current', nodes: [['current', null], ['stored', null]] })
   })
 
-  it('is empty for a session that is not stored, or no database', () => {
-    expect(branchFamily('nope', db(FAMILY))).toEqual({ at: null, nodes: [] })
-    expect(branchFamily('root', join(tmpdir(), 'no-such-dir', 'state.db'))).toEqual({ at: null, nodes: [] })
+  it('does not infer parents, compression, resets or archive status from uncontracted fields', async () => {
+    const gw = new FakeGateway({ replies: { 'session.list': p => ({ sessions: p['scope'] === 'live' ? [] : [
+      { ...row('x', 1), parent_session_id: 'y', model_config: { _branched_from: 'y' }, archived: true },
+      { ...row('y', 2), parent_session_id: 'x', end_reason: 'compression' }
+    ] }) } })
+
+    expect(shape(await branchFamily('x', gw.client))).toEqual({ at: 'x', nodes: [['y', null], ['x', null]] })
+    expect(shape(await branchFamily('y', gw.client))).toEqual({ at: 'y', nodes: [['y', null], ['x', null]] })
+  })
+
+  it('keeps available conversations when the current session is not listed', async () => {
+    const family = await branchFamily('not-listed', gateway().client)
+
+    expect(family.at).toBeNull()
+    expect(family.nodes).toHaveLength(3)
+  })
+
+  it('is empty when neither gateway scope has conversations', async () => {
+    const gw = new FakeGateway({ replies: { 'session.list': () => ({ sessions: [] }) } })
+
+    expect(await branchFamily('nope', gw.client)).toEqual({ at: null, nodes: [] })
+  })
+
+  it('reports a failed gateway read rather than claiming the conversation has no branches', async () => {
+    const gw = new FakeGateway({ replies: { 'session.list': () => { throw new Error('offline') } } })
+
+    await expect(branchFamily('root', gw.client)).rejects.toThrow('offline')
   })
 })
 
 const node = (id: string, parent: string | null, startedAt: number): BranchNode => ({
-  archived: false,
   id,
   lastActive: startedAt,
+  lastReply: `${id} reply`,
   messages: 2,
   parent,
   preview: '',
@@ -118,7 +108,7 @@ const node = (id: string, parent: string | null, startedAt: number): BranchNode 
 })
 
 describe('treeRows', () => {
-  it('puts each branch under its parent, siblings oldest first, with its depth and branch count', () => {
+  it('puts known branches under their parent, siblings oldest first, with depth and child count', () => {
     const rows = treeRows([node('b1a', 'b1', 4), node('b1', 'root', 3), node('root', null, 1), node('b2', 'root', 2)])
 
     expect(rows.map(r => [r.node.id, r.depth, r.children])).toEqual([
@@ -128,37 +118,50 @@ describe('treeRows', () => {
       ['b1a', 2, 0]
     ])
   })
+
+  it('keeps a forest when no branch ancestry is known', () => {
+    expect(treeRows([node('b', null, 2), node('a', null, 1)]).map(r => [r.node.id, r.depth, r.children])).toEqual([
+      ['a', 0, 0], ['b', 0, 0]
+    ])
+  })
 })
 
-function host(stored: string) {
+function host(stored = 'current-stored', gw = gateway()) {
   const opened: Overlay[] = []
   const transcript = new Transcript()
   const h = {
     changed: vi.fn(),
-    close: vi.fn((o: Overlay) => void opened.splice(opened.indexOf(o), 1)),
+    close: vi.fn((o: Overlay) => {
+      const at = opened.indexOf(o)
+      if (at >= 0) {
+        opened.splice(at, 1)
+        o.onClose?.()
+      }
+    }),
+    gw: gw.client,
     open: (o: Overlay) => void opened.push(o),
     resume: vi.fn(async () => undefined),
-    session: { info: null, ref: { live: liveSessionId('live-1'), stored: storedSessionId(stored) } },
+    session: { info: null, ref: { live: liveSessionId('current-live'), stored: storedSessionId(stored) } },
     transcript
   } satisfies TreeHost
 
   return { h, opened, transcript }
 }
 
-const FAKE: BranchFamily = { at: 'b1', nodes: [node('root', null, 1), node('b1', 'root', 3), node('b2', 'root', 2)] }
-
-describe('the branch tree', () => {
-  it('marks the open conversation and opens another with Enter', () => {
-    const { h, opened } = host('b1')
-
-    openBranchTree(h, () => FAKE)
+describe('the gateway conversation tree', () => {
+  it('opens immediately, marks the current row by its resume id, and opens another with Enter', async () => {
+    const { h, opened } = host()
+    const loading = openBranchTree(h)
     const sheet = must(opened[0])
-    const p = must(tree(sheet.node('layer.tree')).p)
+    expect(tree(sheet.node('layer.overlay-1')).p?.['state']).toBe('loading')
+    await loading
+    const p = must(tree(sheet.node('layer.overlay-1')).p)
 
     expect(p['layout']).toBe('tree')
-    expect(p['order']).toEqual(['root', 'b2', 'b1'])
-    expect(p['current']).toEqual(['b1'])
-    expect(p['selected']).toBe('b1')
+    expect(p['order']).toEqual(['root', 'b2', 'current-live'])
+    expect(p['current']).toEqual(['current-live'])
+    expect(p['selected']).toBe('current-live')
+    expect(p['subtitle']).toEqual([{ s: 'muted', t: `3 conversations. ${BRANCH_LINEAGE_GAP}` }])
 
     sheet.onKey(key('up'))
     sheet.onKey(key('enter'))
@@ -167,22 +170,66 @@ describe('the branch tree', () => {
     expect(opened).toEqual([])
   })
 
-  it('Enter on the open conversation only closes the sheet', () => {
-    const { h, opened } = host('b1')
-
-    openBranchTree(h, () => FAKE)
+  it('Enter on the open conversation only closes the sheet', async () => {
+    const { h, opened } = host()
+    await openBranchTree(h)
     must(opened[0]).onKey(key('enter'))
 
     expect(h.resume).not.toHaveBeenCalled()
     expect(opened).toEqual([])
   })
 
-  it('says so, and opens nothing, for a conversation with no branches', () => {
+  it('keeps a useful singleton tree without claiming there are no branches', async () => {
     const { h, opened, transcript } = host('solo')
+    await openBranchTree(h, async () => ({ at: 'solo', nodes: [node('solo', null, 1)] }))
+    const p = must(tree(must(opened[0]).node('layer.overlay-1')).p)
 
-    openBranchTree(h, () => ({ at: 'solo', nodes: [node('solo', null, 1)] }))
+    expect(p['total']).toBe(1)
+    expect(p['title']).toBe('Conversations')
+    expect(JSON.stringify(p['subtitle'])).toContain(BRANCH_LINEAGE_GAP)
+    expect(transcript.entries).toEqual([])
+  })
+
+  it('shows an empty gateway result without pretending to have read a database', async () => {
+    const { h, opened } = host()
+    await openBranchTree(h, async () => ({ at: null, nodes: [] }))
+    const p = must(tree(must(opened[0]).node('layer.overlay-1')).p)
+
+    expect(p['state']).toBe('ready')
+    expect(p['items']).toEqual([])
+    expect(p['empty']).toBe('No conversations are available from the gateway yet.')
+  })
+
+  it('reports gateway errors in the sheet and transcript', async () => {
+    const { h, opened, transcript } = host()
+    await openBranchTree(h, async () => { throw new Error('offline') })
+
+    expect(tree(must(opened[0]).node('layer.overlay-1')).p?.['state']).toBe('error')
+    expect(transcript.entries.at(-1)).toMatchObject({ kind: 'notice', text: 'Could not read conversations: offline' })
+  })
+
+  it('does not reopen a closed tree when its read completes', async () => {
+    const { h, opened } = host()
+    const pending = Promise.withResolvers<BranchFamily>()
+    const loading = openBranchTree(h, () => pending.promise)
+    must(opened[0]).onKey(key('escape'))
+    h.changed.mockClear()
+    pending.resolve({ at: 'solo', nodes: [node('solo', null, 1)] })
+    await loading
 
     expect(opened).toEqual([])
-    expect(transcript.entries.at(-1)).toMatchObject({ kind: 'notice', text: 'This conversation has no branches yet. /branch makes one.' })
+    expect(h.changed).not.toHaveBeenCalled()
+  })
+
+  it('drops a late read when the session changes', async () => {
+    const { h, opened } = host()
+    const pending = Promise.withResolvers<BranchFamily>()
+    const loading = openBranchTree(h, () => pending.promise)
+    h.session.ref = { live: liveSessionId('other-live'), stored: storedSessionId('other-stored') }
+    pending.resolve({ at: 'solo', nodes: [node('solo', null, 1)] })
+    await loading
+
+    expect(opened).toEqual([])
+    expect(h.resume).not.toHaveBeenCalled()
   })
 })

@@ -1,6 +1,6 @@
 // Canonical profile setting for Vim: only Hermes config.get owns the value.
 import type { ConfigGetResult } from '@hermes/shared/gateway-events'
-import type { GatewayClient } from '@tui/gatewayClient.js'
+import type { GatewayClient } from '@hermes/shared/gateway-client'
 
 import type { Composer } from './composer.js'
 

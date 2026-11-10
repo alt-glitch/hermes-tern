@@ -1,5 +1,5 @@
 import { node, Surface, View, ViewError } from '@stencil-hq/tern'
-import type { SessionInfo } from '@tui/types.js'
+import type { SessionInfo } from '@hermes/shared/gateway-types'
 import { describe, expect, it, vi } from 'vitest'
 
 import { liveSessionId } from '../../core/ids.js'

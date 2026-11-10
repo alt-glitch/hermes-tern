@@ -13,7 +13,7 @@ import { stub, tree } from './fakes.js'
 const timestamp = Date.parse('2026-10-28T13:05:00Z')
 const user = (): UserEntry => ({ at: timestamp, id: entryId('u'), kind: 'user', text: 'hello' })
 const cx = (hour12?: boolean): TranscriptContext => ({
-  copy: () => undefined, now: timestamp, welcome: { tip: '', version: '' },
+  copy: () => undefined, now: timestamp, welcome: { version: '' },
   ...(hour12 === undefined ? {} : { hour12 })
 })
 const timeString = Date.prototype.toLocaleTimeString
@@ -47,7 +47,7 @@ describe('negotiated transcript clock', () => {
     expect(await handshake).toBe(true)
     const frame = stub<Pick<FrameCx, 'session' | 'copies' | 'welcome' | 'gateway' | 'hour12'>>({
       session: { info: null, ref: { live: null, stored: null } },
-      copies: { copy: () => undefined }, welcome: { tip: '', version: '' },
+      copies: { copy: () => undefined }, welcome: { version: '' },
       hour12: () => session.caps.hour12
     })
     const view = transcriptContext(frame, timestamp)

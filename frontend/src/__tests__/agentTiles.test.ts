@@ -2,6 +2,7 @@ import type { NodeJson } from '@stencil-hq/tern'
 import { describe, expect, it } from 'vitest'
 
 import { agentHovercard, agentWaitNode } from '../agents/tiles.js'
+import { stepsOf } from '../agents/transcript.js'
 import { entryId, subagentKey, toolCallId } from '../core/ids.js'
 import type { Subagent, ToolCall, TurnEntry } from '../model.js'
 import { toolNode } from '../view/tools/shell.js'
@@ -29,7 +30,7 @@ describe('agent wait tiles', () => {
   it('shows the name, status dot, native spinner and true age, current tool and progress', () => {
     const n = wait([agent('a', {
       tool: 'read_file', toolPreview: 'Inspecting source',
-      log: { entries: [{ at: '12:00:00', kind: 'assistant', text: 'Found the entry point.' }] }
+      steps: stepsOf([{ row_kind: 'message', role: 'assistant', timestamp: 1, text: 'Found the entry point.' }])
     })])
 
     expect(role(n, 'omp.job.tiles')).toHaveLength(1)
@@ -43,7 +44,7 @@ describe('agent wait tiles', () => {
     expect(nodes(tile).some(x => x.k === 'text' && spanTexts(x.p?.['spans']).some(t => t.includes('●')))).toBe(true)
   })
 
-  it('uses tool preview when no log is available and queued tiles remain visible', () => {
+  it('uses tool preview when no transcript steps are available and queued tiles remain visible', () => {
     const n = wait([agent('a', { tool: 'terminal', toolPreview: 'Reading   package\n scripts' }), agent('q', { status: 'queued' })])
     expect(role(n, 'omp.job.tile')).toHaveLength(2)
     expect(words(n).join(' ')).toContain('Reading package scripts')
@@ -74,14 +75,14 @@ describe('agent wait tiles', () => {
   })
 
   it('shows only the latest two assistant/tool lines in chronological order, never private thoughts or results', () => {
-    const n = wait([agent('a', { log: { entries: [
-      { at: '12:00:00', kind: 'kickoff', text: 'hidden kickoff' },
-      { at: '12:00:01', kind: 'assistant', text: 'old progress' },
-      { at: '12:00:02', kind: 'assistant', text: '  Checking\n the\t model  ' },
-      { at: '12:00:03', kind: 'tool', name: 'read_file', args: '{"path":"model.ts","i":"Reading   model fields"}', status: 'ok', result: 'hidden result' },
-      { at: '12:00:04', kind: 'think', text: 'hidden thought' },
-      { at: '12:00:05', kind: 'note', text: 'hidden note' }
-    ] } })])
+    const n = wait([agent('a', { steps: stepsOf([
+      { row_kind: 'message', role: 'user', timestamp: 1, text: 'hidden kickoff' },
+      { row_kind: 'message', role: 'assistant', timestamp: 2, text: 'old progress' },
+      { row_kind: 'message', role: 'assistant', timestamp: 3, text: '  Checking\n the\t model  ' },
+      { row_kind: 'message', role: 'tool', timestamp: 4, name: 'read_file', context: '{"path":"model.ts","i":"Reading   model fields"}', text: 'hidden result' },
+      { row_kind: 'message', role: 'assistant', timestamp: 5, reasoning: 'hidden thought', text: '' },
+      { row_kind: 'message', role: 'system', timestamp: 6, text: 'hidden note' }
+    ]) })])
     const text = words(n).join(' ')
     expect(role(n, 'omp.job.tile.note').map(x => words(x).join(''))).toEqual(['Checking the model', 'Reading model fields'])
     expect(text).toContain('Checking the model')
@@ -93,12 +94,12 @@ describe('agent wait tiles', () => {
   })
 
   it('collapses adjacent duplicate progress and falls back to raw tool args when no intent is present', () => {
-    const n = wait([agent('a', { tool: 'terminal', toolPreview: 'Last update', log: { entries: [
-      { at: '12:00:00', kind: 'assistant', text: 'First update' },
-      { at: '12:00:01', kind: 'tool', name: 'terminal', args: 'git   diff\n --stat', status: 'running' },
-      { at: '12:00:02', kind: 'assistant', text: 'Last  update' },
-      { at: '12:00:03', kind: 'assistant', text: 'Last update' }
-    ] } })])
+    const n = wait([agent('a', { tool: 'terminal', toolPreview: 'Last update', steps: stepsOf([
+      { row_kind: 'message', role: 'assistant', timestamp: 1, text: 'First update' },
+      { row_kind: 'message', role: 'tool', timestamp: 2, name: 'terminal', context: 'git   diff\n --stat', text: 'hidden result' },
+      { row_kind: 'message', role: 'assistant', timestamp: 3, text: 'Last  update' },
+      { row_kind: 'message', role: 'assistant', timestamp: 4, text: 'Last update' }
+    ]) })])
     expect(role(n, 'omp.job.tile.note').map(x => words(x).join(''))).toEqual(['git diff --stat', 'Last update'])
   })
 
@@ -115,7 +116,7 @@ describe('agent wait tiles', () => {
   })
 
   it('caps each progress line at 160 characters including the ellipsis and never wraps it', () => {
-    const n = wait([agent('a', { log: { entries: [{ at: '12:00:00', kind: 'assistant', text: `  ${'x'.repeat(170)}\n tail  ` }] } })])
+    const n = wait([agent('a', { steps: stepsOf([{ row_kind: 'message', role: 'assistant', timestamp: 1, text: `  ${'x'.repeat(170)}\n tail  ` }]) })])
     const line = must(nodes(n).find(x => words(x).join('').startsWith('x') && x.k === 'text'))
     expect(words(line).join('')).toBe(`${'x'.repeat(159)}…`)
     expect(line.p).toMatchObject({ truncate: 'end', wrap: 'none' })
@@ -135,7 +136,7 @@ describe('agent wait tiles', () => {
     const child = agent('a', { tool: 'terminal' })
     const call = delegation([child])
     const turn: TurnEntry = { blocks: [{ call, id: call.id, kind: 'tool' }], end: { status: 'live' }, id: entryId('t'), kind: 'turn', rev: 0, startedAt: 0 }
-    const cx: TranscriptContext = { copy: () => undefined, now: 6000, welcome: { tip: '', version: '' } }
+    const cx: TranscriptContext = { copy: () => undefined, now: 6000, welcome: { version: '' } }
     const first = entryNode(turn, 'main.t', cx)
     expect(nodes(tree(first)).some(x => x.k === 'elapsed' && x.p?.['age'] === 5000)).toBe(true)
     cx.now = 12000

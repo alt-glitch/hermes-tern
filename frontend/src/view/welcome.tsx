@@ -1,23 +1,15 @@
-// The session's opening card (`omp.welcome`): the Hermes mark, the version,
-// and one discovery tip from hermes's tip catalog (`locales/en.yaml`, the
-// same pool the classic CLI shows at startup).
-
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
+// The session's opening card (`omp.welcome`): the Hermes mark and the version.
 
 import type { JSX } from '@stencil-hq/tern'
-
-import { decodeJson } from '../wire/json.js'
 
 /** What the welcome card shows. */
 export interface WelcomeContext {
   /** Blob id of the uploaded logo, when the terminal took it. */
   logo?: string
   version: string
-  tip: string
 }
 
-/** The session's opening card: logo lockup, version and a tip. */
+/** The session's opening card: logo lockup and version. */
 export function welcomeNode(key: string, cx: WelcomeContext): JSX.Element {
   return (
     <card key={key} role="omp.welcome">
@@ -30,50 +22,6 @@ export function welcomeNode(key: string, cx: WelcomeContext): JSX.Element {
           ) : null}
         </col>
       </row>
-      {cx.tip ? (
-        <row align="start" gap="sm" key="tip" role="omp.welcome.tip">
-          <icon key="icon" name="lightbulb" role="omp.welcome.tip-icon" />
-          <text key="text" role="omp.welcome.tip-text" text={cx.tip} wrap="word" />
-        </row>
-      ) : null}
     </card>
   )
-}
-
-const TIP_LINE = /^\s+t\d+:\s+"((?:[^"\\]|\\.)*)"\s*$/
-
-/** A random tip from hermes's English catalog under `root`; '' when it can't be read. */
-export function randomTip(root: string): string {
-  let text: string
-
-  try {
-    text = readFileSync(join(root, 'locales', 'en.yaml'), 'utf8')
-  } catch {
-    return ''
-  }
-
-  const start = text.search(/^tips:\s*$/m)
-
-  if (start < 0) {
-    return ''
-  }
-
-  const tips: string[] = []
-
-  for (const line of text.slice(start).split('\n').slice(1)) {
-    if (/^\S/.test(line)) {
-      break
-    }
-
-    const quoted = TIP_LINE.exec(line)?.[1]
-
-    // The tip is a Python string literal's body; as a JSON string it decodes its escapes.
-    const tip = quoted ? decodeJson(`"${quoted}"`) : undefined
-
-    if (typeof tip === 'string') {
-      tips.push(tip)
-    }
-  }
-
-  return tips[Math.floor(Math.random() * tips.length)] ?? ''
 }

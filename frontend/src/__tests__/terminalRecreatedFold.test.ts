@@ -20,7 +20,7 @@ const notice = 'Hermes reports the execution environment was recreated; backgrou
 const tool = (id: string, c: ToolCall): Extract<Block, { kind: 'tool' }> => ({ kind: 'tool', id: entryId(id), call: c })
 const text = (id: string): Block => ({ kind: 'text', id: entryId(id), text: id })
 const turn = (blocks: Block[]): TurnEntry => ({ kind: 'turn', id: entryId('turn'), rev: 0, startedAt: 0, end: { status: 'done', endedAt: 1000 }, blocks })
-const cx: TranscriptContext = { copy: () => undefined, now: 1000, welcome: { tip: '', version: '' } }
+const cx: TranscriptContext = { copy: () => undefined, now: 1000, welcome: { version: '' } }
 const nodes = (root: NodeJson): NodeJson[] => [root, ...(root.c ?? []).flatMap(nodes)]
 const make = (result: unknown, more: Partial<ToolCall> = {}) => call('terminal', { command: 'true' }, { result, ...more })
 
@@ -322,7 +322,7 @@ describe('retained terminal recreation attention', () => {
 
   it('shows retained replay signals and leaves missing replay data folded', () => {
     const { flagged } = producer()
-    const replay = (content?: string) => history({ kept: [], compactions: [], id: entryId, messages: [
+    const replay = (content?: string) => history({ kept: [], id: entryId, messages: [
       { role: 'tool', name: 'terminal', tool_call_id: 'term', args: { command: 'true' }, ...(content ? { content } : {}) },
       { role: 'assistant', text: 'answer' }
     ] }).find(e => e.kind === 'turn')

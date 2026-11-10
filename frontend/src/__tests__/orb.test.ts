@@ -1,5 +1,5 @@
 import type { Session, Surface } from '@stencil-hq/tern'
-import type { AnyGatewayEvent } from '@tui/gatewayTypes.js'
+import type { AnyGatewayEvent } from '@hermes/shared/gateway-types'
 import { describe, expect, it, vi } from 'vitest'
 
 import { OrbActivity, ThinkingOrb } from '../chrome/orb.js'

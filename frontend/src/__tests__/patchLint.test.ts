@@ -53,7 +53,7 @@ describe('replace patch lint disclosure', () => {
     if (!live) throw new Error('missing live patch')
     expect(live.outcome.kind).toBe('done')
     expect(JSON.stringify(tree(toolNode(live, 100)))).toContain(title)
-    const entries = history({ kept: [], compactions: [], id: entryId, messages: [
+    const entries = history({ kept: [], id: entryId, messages: [
       { role: 'tool', name: 'patch', tool_call_id: 'saved', args, content: JSON.stringify(result) }
     ] })
     const turn = entries.find(e => e.kind === 'turn')

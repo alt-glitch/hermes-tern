@@ -123,10 +123,6 @@ export function openRewind(host: RewindHost) {
   const session = host.control()
   const sid = session.sid
 
-  if (!session.canonical) {
-    return session.notice("Rewinding to an earlier prompt needs Hermes' shared gateway.", 'warning')
-  }
-
   if (!sid) {
     return session.notice('Nothing to rewind.')
   }

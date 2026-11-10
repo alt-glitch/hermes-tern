@@ -1,25 +1,24 @@
-// The session picker's preview loader: the selected session's first prompt, last reply and the
-// first page of its transcript, read once the selection rests (arrowing through the list reads
-// nothing), kept per session while the picker is open, and the next page read on request (the
-// preview reaching the end of what it holds). One read of a session runs at a time.
+// The session picker's preview loader: the newest page of the selected session's transcript, read
+// once the selection rests (arrowing through the list reads nothing), kept per session while the
+// picker is open, and the next (older) page read on request (the preview reaching the end of what
+// it holds). One read of a session runs at a time.
 
 import { errorText } from '../../core/errors.js'
-import type { PreviewRow, SessionEnds, TranscriptReader } from '../../hermes/sessionTranscript.js'
+import type { PreviewRow, TranscriptReader } from '../../hermes/sessionTranscript.js'
 
 /** One session's preview as loaded so far. */
 export interface Preview {
   status: 'error' | 'loading' | 'ready'
-  ends?: SessionEnds | undefined
   rows: PreviewRow[]
-  /** The cursor of the next page; null at the end, or before the first page. */
-  next: number | null
+  /** The cursor of the next (older) page; null after the oldest, or before the first page. */
+  next: string | null
   loadingMore: boolean
   /** Why the first page failed (status 'error'), or the last page after it. */
   error?: string | undefined
 }
 
 interface Entry extends Preview {
-  /** The keys of the rows kept, so a row a compaction copied forward shows once. */
+  /** The keys of the rows kept, so a row two pages both carry (a tool run kept whole) shows once. */
   seen: Set<string>
 }
 
@@ -102,9 +101,8 @@ export class PreviewLoader {
     this.#changed()
 
     try {
-      const [ends, page] = await Promise.all([this.#reader.ends(id), this.#reader.page(id, 0, this.#pageSize)])
+      const page = await this.#reader.page(id, null, this.#pageSize)
 
-      entry.ends = ends
       entry.status = 'ready'
       entry.next = page.next
       this.#keep(entry, page.rows)
@@ -126,6 +124,12 @@ export class PreviewLoader {
         const page = await this.#reader.page(id, entry.next, this.#pageSize)
 
         entry.next = page.next
+
+        if (page.reset) {
+          // The gateway started over from the newest page: the rows held are not its pages any more.
+          entry.rows = []
+          entry.seen.clear()
+        }
 
         if (this.#keep(entry, page.rows)) {
           break

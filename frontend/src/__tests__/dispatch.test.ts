@@ -5,7 +5,7 @@ import { mkdtempSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import type { AnyGatewayEvent } from '@tui/gatewayTypes.js'
+import type { AnyGatewayEvent } from '@hermes/shared/gateway-types'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { toolCallId } from '../core/ids.js'
@@ -13,6 +13,7 @@ import { IGNORED } from '../gateway/coverage.js'
 import { HANDLERS, type Outcome } from '../gateway/dispatch.js'
 import { agentHandlers } from '../gateway/handlers/agents.js'
 import { chromeHandlers } from '../gateway/handlers/chrome.js'
+import { connectionHandlers } from '../gateway/handlers/connections.js'
 import { processHandlers } from '../gateway/handlers/processes.js'
 import { promptHandlers } from '../gateway/handlers/prompts.js'
 import { sessionHandlers } from '../gateway/handlers/session.js'
@@ -44,13 +45,7 @@ vi.mock('../gateway/dispatch.js', async importOriginal => {
     }
   }
 })
-vi.mock('@tui/lib/history.js', () => ({ append: () => undefined, load: () => [] }))
-vi.mock('../hermes/sessionIndex.js', async importOriginal => ({
-  ...(await importOriginal<typeof import('../hermes/sessionIndex.js')>()),
-  lastReply: () => '',
-  storedSessions: () => []
-}))
-
+vi.mock('@hermes/shared/prompt-history', () => ({ append: () => undefined, load: () => [] }))
 const home = mkdtempSync(join(tmpdir(), 'hermes-tern-dispatch-'))
 process.env['HERMES_HOME'] = home
 
@@ -263,7 +258,7 @@ describe('what each event does to the pane', () => {
 
 describe('the handler tables', () => {
   it('name each event type once, and none of the ignored ones', () => {
-    const tables = [agentHandlers, chromeHandlers, processHandlers, promptHandlers, sessionHandlers, turnHandlers]
+    const tables = [agentHandlers, chromeHandlers, connectionHandlers, processHandlers, promptHandlers, sessionHandlers, turnHandlers]
     const names = tables.flatMap(table => Object.keys(table))
     const ignored: readonly string[] = IGNORED
 
@@ -294,7 +289,7 @@ describe('afterToolComplete', () => {
       agents: { scan: note('agents.scan') },
       connect: { watch: note('connect.watch') },
       processes: { poke: note('processes.poke') },
-      prs: { onCall: note('prs.onCall'), relink: note('prs.relink') },
+      prs: { onCall: note('prs.onCall') },
       showImage: note('media'),
       showArtifacts: note('artifacts'),
       sidebar: { poke: note('sidebar.poke') },
@@ -308,7 +303,7 @@ describe('afterToolComplete', () => {
 
   it('tells the image, the agents, the PRs, the sidebar, the connect cards and the processes, in that order', () => {
     expect(told('read_file')).toEqual(['media', 'artifacts', 'agents.scan'])
-    expect(told('delegate_task')).toEqual(['media', 'artifacts', 'agents.scan', 'prs.relink'])
+    expect(told('delegate_task')).toEqual(['media', 'artifacts', 'agents.scan'])
     expect(told('link_pull_request')).toEqual(['media', 'artifacts', 'agents.scan', 'prs.onCall'])
     expect(told('patch')).toEqual(['media', 'artifacts', 'agents.scan', 'sidebar.poke'])
     expect(told('manage_connections')).toEqual(['media', 'artifacts', 'agents.scan', 'connect.watch'])

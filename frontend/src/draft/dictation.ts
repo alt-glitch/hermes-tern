@@ -71,7 +71,7 @@ export class Dictation {
    */
   async enable(rawKey: unknown): Promise<boolean> {
     if (!this.#recorder) {
-      this.#host.note('Dictation runs in Hermes’ interpreter, which only `hermes tern` names (HERMES_PYTHON).', 'warning')
+      this.#host.note('Dictation needs the Hermes command supplied by `hermes tern` in HERMES_TERN_HERMES.', 'warning')
 
       return false
     }

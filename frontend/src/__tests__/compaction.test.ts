@@ -1,28 +1,15 @@
-import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { DatabaseSync } from 'node:sqlite'
-
-import type { TranscriptMessage } from '@hermes/shared/gateway-events'
+import type { StoredTranscriptRow, TranscriptMessage } from '@hermes/shared/gateway-events'
 import { describe, expect, it } from 'vitest'
 
-import { handoff, lineTokens, storedCompactions } from '../hermes/compactions.js'
+import { allCompactions, latestCompactions, lineTokens } from '../hermes/compactions.js'
 import type { Compaction, Entry, TurnEntry } from '../model.js'
 import { Transcript } from '../transcript/store.js'
 import { parts } from '../view/workLogModel.js'
 
-import { must } from './fakes.js'
+import { FakeGateway, must } from './fakes.js'
 
-const HANDOFF = [
-  '[CONTEXT COMPACTION — REFERENCE ONLY] Earlier turns were compacted into the summary below. Respond ONLY to the latest user message.',
-  '## Goal',
-  'Ship the parity pass.',
-  '',
-  '## Context Recovery',
-  "The 419 compacted message(s) remain fully preserved in session history. Use session_search(query='…').",
-  '',
-  '--- END OF CONTEXT SUMMARY — respond to the message below, not the summary above ---'
-].join('\n')
+const handoff = (at: number, summary: string): StoredTranscriptRow => ({ compacted_messages: 4, role: 'system', row_kind: 'compaction', text: summary, timestamp: at })
+const message = (at: number): StoredTranscriptRow => ({ role: 'user', row_kind: 'message', text: 'hi', timestamp: at })
 
 const lastTurn = (entries: readonly Entry[]) => must(entries.findLast((e): e is TurnEntry => e.kind === 'turn'))
 
@@ -34,43 +21,32 @@ const compactions = (t: Transcript): Compaction[] =>
     e.kind === 'compaction' ? [e.compaction] : e.kind === 'turn' ? e.blocks.flatMap(b => (b.kind === 'compaction' ? [b.compaction] : [])) : []
   )
 
-describe('the handoff summary', () => {
-  it('keeps what the agent remembers, not the instructions to it or the recovery note', () => {
-    expect(handoff(HANDOFF)).toEqual({ messages: 419, summary: '## Goal\nShip the parity pass.' })
-    // A summary merged into the next prompt starts after it.
-    expect(handoff(`look at this\n\n${HANDOFF}`).summary).toBe('## Goal\nShip the parity pass.')
-    expect(handoff(JSON.stringify([{ text: HANDOFF, type: 'text' }])).messages).toBe(419)
-    expect(handoff('just a prompt')).toEqual({})
-
-    const ranked = HANDOFF.replace(
-      '## Goal',
-      "## Historical Task Snapshot\nUser asked: 'hi'\nHistorical only; newer protected-tail messages after this summary win.\n\n## Goal"
-    ).replace('## Context Recovery', "## User Messages\n> hi (Every real user message from the compacted region, quoted verbatim.)\n\n## Context Recovery")
-    expect(handoff(ranked).summary).toBe("## Historical Task Snapshot\nUser asked: 'hi'\n\n## Goal\nShip the parity pass.\n\n## User Messages\n> hi")
-  })
-
+describe('stored compactions', () => {
   it("reads the token counts in Hermes' lines", () => {
     expect(lineTokens('💤 Resumed after 600s idle — compacting ~51,200 tokens before continuing.')).toEqual({ before: 51200 })
     expect(lineTokens('🗜️ Compacting context — summarizing earlier conversation so I can continue...')).toEqual({})
   })
-})
 
-describe('stored compactions', () => {
-  it("reads the summaries of the session and the ones it continues, once each, in order", () => {
-    const db = join(mkdtempSync(join(tmpdir(), 'tern-compaction-')), 'state.db')
-    const conn = new DatabaseSync(db)
-    conn.exec('CREATE TABLE messages (id INTEGER PRIMARY KEY, session_id TEXT, role TEXT, content TEXT, timestamp REAL, active INTEGER, compacted INTEGER)')
-    const add = conn.prepare('INSERT INTO messages (session_id, role, content, timestamp, active, compacted) VALUES (?,?,?,?,?,?)')
-    add.run('root', 'user', 'hello', 100, 0, 1)
-    add.run('tip', 'user', HANDOFF, 200, 1, 0)
-    // The same summary copied with the protected tail, and one an undo took back.
-    add.run('tip', 'user', HANDOFF, 201, 1, 0)
-    add.run('tip', 'user', HANDOFF.replace('parity', 'other'), 300, 0, 0)
-    add.run('elsewhere', 'user', HANDOFF, 150, 1, 0)
-    conn.close()
+  it('reads every compaction of a conversation page by page, newest page first, oldest first in the answer', async () => {
+    const pages = new Map<unknown, { rows: StoredTranscriptRow[]; next_cursor: string | null; reset: boolean }>([
+      [null, { next_cursor: 'p2', reset: true, rows: [handoff(300, 'c'), message(310)] }],
+      ['p2', { next_cursor: 'p3', reset: false, rows: [message(150), handoff(200, 'b')] }],
+      ['p3', { next_cursor: null, reset: false, rows: [handoff(100, 'a'), message(110)] }]
+    ])
+    const gw = new FakeGateway({ replies: { 'session.transcript': p => must(pages.get(p['cursor'])) } })
 
-    expect(storedCompactions('tip', db, () => ['tip', 'root'])).toEqual([{ at: 200_000, messages: 419, summary: '## Goal\nShip the parity pass.' }])
-    expect(storedCompactions('tip', join(db, 'missing'), () => ['tip'])).toEqual([])
+    expect(await allCompactions(gw.client, 's', () => true)).toEqual([
+      { at: 100_000, messages: 4, summary: 'a' },
+      { at: 200_000, messages: 4, summary: 'b' },
+      { at: 300_000, messages: 4, summary: 'c' }
+    ])
+    expect(gw.sent('session.transcript').map(p => [p['cursor'], p['limit'], p['order']])).toEqual([
+      [null, 500, 'latest'],
+      ['p2', 500, 'latest'],
+      ['p3', 500, 'latest']
+    ])
+    expect(await allCompactions(gw.client, 's', () => false)).toBeUndefined()
+    expect(await latestCompactions(gw.client, 's')).toEqual([{ at: 300_000, messages: 4, summary: 'c' }])
   })
 })
 
@@ -150,7 +126,7 @@ describe('compaction in the transcript', () => {
     expect(shape(t.entries)).toEqual(['turn(text)'])
   })
 
-  it('puts stored compactions where they happened on resume, keeping what this view saw', () => {
+  it('puts stored compactions where they happened after a resume, keeping what this view saw', () => {
     const at = (s: number) => s
     const messages: TranscriptMessage[] = [
       { role: 'user', text: 'first', timestamp: at(10) },
@@ -167,13 +143,18 @@ describe('compaction in the transcript', () => {
     // This view saw the one at 25 happen.
     t.compactions.compacting({ at: 24_000, before: 90_000 })
     t.compactions.compacted(26_000, { after: 20_000 })
-    t.load(messages, [
+    t.load(messages)
+    // A prompt sent before the compactions were read stays after them.
+    t.push({ at: 50_000, id: t.id('u'), kind: 'user', text: 'third' })
+    const stored = [
       { at: 40_000, summary: 'c' },
       { at: 15_000, summary: 'a' },
       { at: 25_000, messages: 3, summary: 'b' }
-    ])
+    ]
+    t.placeCompactions(stored)
+    t.placeCompactions(stored)
 
-    expect(shape(t.entries)).toEqual(['user', 'turn(text)', 'compaction', 'user', 'turn(tool,compaction,text)', 'compaction'])
+    expect(shape(t.entries)).toEqual(['user', 'turn(text)', 'compaction', 'user', 'turn(tool,compaction,text)', 'compaction', 'user'])
     expect(compactions(t).map(c => c.state.status === 'done' && c.state.summary)).toEqual(['a', 'b', 'c'])
     expect(compactions(t)[1]).toMatchObject({ before: 90_000, state: { after: 20_000, messages: 3 } })
     expect(t.compactions.unsummarized).toBe(false)

@@ -74,7 +74,6 @@ export class Retention {
   #copyHandler: TranscriptContext['copy'] | undefined
   #hour12: boolean | undefined
   #welcomeVersion: string | undefined
-  #welcomeTip: string | undefined
   #welcomeLogo: string | undefined
   #cx: TranscriptContext | undefined
   readonly #live: () => RetentionLive
@@ -365,8 +364,7 @@ export class Retention {
     // Welcome depends on backend session.info.version via FrameCx; copy handlers
     // depend on the function identity. 'now' intentionally fixes ages on first
     // build rather than repainting every old row on every clock tick.
-    const welcomeChanged = this.#welcomeVersion !== cx.welcome.version ||
-      this.#welcomeTip !== cx.welcome.tip || this.#welcomeLogo !== cx.welcome.logo
+    const welcomeChanged = this.#welcomeVersion !== cx.welcome.version || this.#welcomeLogo !== cx.welcome.logo
     const copyHandlerChanged = this.#copyHandler !== cx.copy
     const clockChanged = this.#hour12 !== (cx.hour12 ?? false)
 
@@ -389,7 +387,6 @@ export class Retention {
       }
 
       this.#welcomeVersion = cx.welcome.version
-      this.#welcomeTip = cx.welcome.tip
       this.#welcomeLogo = cx.welcome.logo
       this.#copyHandler = cx.copy
       this.#hour12 = cx.hour12 ?? false

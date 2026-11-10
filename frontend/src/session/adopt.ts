@@ -4,8 +4,7 @@
 // only one), the per-session state, the history, then the stores that follow the session.
 
 import type { SessionResumeResult } from '@hermes/shared/gateway-events'
-
-import type { SessionInfo } from '@tui/types.js'
+import type { SessionInfo } from '@hermes/shared/gateway-types'
 
 import type { BtwThreads } from '../btw.js'
 
@@ -14,9 +13,8 @@ import type { Hud } from '../chrome/hud.js'
 import type { NoticeStrip } from '../chrome/notices.js'
 import type { Sidebar } from '../chrome/sidebar.js'
 import type { ConnectWatcher } from '../connections/watcher.js'
-import { durable, type DurableSessionId, type LiveSessionId, type SessionIds, type SessionRef, type StoredSessionId } from '../core/ids.js'
+import { durable, type DurableSessionId, type LiveSessionId, type SessionIds, type SessionRef } from '../core/ids.js'
 import type { PullRequests } from '../github/store.js'
-import { storedCompactions } from '../hermes/compactions.js'
 import type { MediaDelivery } from '../media-delivery.js'
 import type { Media } from '../media.js'
 import type { OperationalSheets } from '../operations.js'
@@ -41,7 +39,7 @@ import type { SessionTitle } from './title.js'
  */
 export type Snapshot = Pick<AdaptedSnapshot, 'session_id'> &
   Partial<Pick<AdaptedSnapshot, 'messages' | 'subscription_id'>> &
-  Partial<Pick<SessionResumeResult, 'inflight' | 'running' | 'status' | 'stored_session_id' | 'turn_started_at'>> & {
+  Partial<Pick<SessionResumeResult, 'inflight' | 'pending_connection' | 'running' | 'status' | 'stored_session_id' | 'turn_started_at'>> & {
     info?: SessionInfo
   }
 
@@ -65,19 +63,21 @@ export interface AdoptHost {
   readonly activity: Pick<Activity, 'busy' | 'endCompaction' | 'set'>
   readonly agents: Pick<Agents, 'adopt' | 'scan'>
   readonly automation: Pick<Automation, 'adopt'>
-  readonly connect: Pick<ConnectWatcher, 'watch'>
+  readonly connect: Pick<ConnectWatcher, 'restore' | 'watch'>
   readonly media: Pick<Media, 'showAll'>
   readonly mediaDelivery: Pick<MediaDelivery, 'clear'>
   readonly notices: Pick<NoticeStrip, 'reset'>
   readonly processes: Pick<Processes, 'poke'>
   readonly prs: Pick<PullRequests, 'adopt'>
-  readonly queue: Pick<PromptQueue, 'adopt'> & { readonly server: Pick<PromptQueue['server'], 'reset'> }
+  readonly queue: { readonly server: Pick<PromptQueue['server'], 'reset'> }
   readonly sheets: Pick<PromptSheets, 'dropAll'>
   readonly sidebar: Pick<Sidebar, 'adopt'>
   readonly title: Pick<SessionTitle, 'adopt'>
   readonly hud: Pick<Hud, 'adopt'>
   readonly todoHud: Pick<TodoHud, 'adopt'>
   readonly transcript: Pick<Transcript, 'currentTodos' | 'entries' | 'inflight' | 'load' | 'reset'>
+  /** Reads the adopted conversation's compactions in the background and shows them where they happened. */
+  restoreCompactions(): void
   /** Reads the adopted session's busy_input_mode into the state. */
   readBusyMode(): void
   /** Loads shortcuts from the owning gateway after a session is adopted. */
@@ -86,10 +86,8 @@ export interface AdoptHost {
   readVimPreference(): void
   /** Asks the gateway to stream session `sid`'s reasoning. */
   showThoughts(sid: LiveSessionId): void
-  /** Names this pane the viewer of `now` (the plugin's connect results come here), no longer of `before`. */
-  markViewer(now: DurableSessionId, before: StoredSessionId | null): void
-  /** Writes the shown session's id where the plugin's hooks read it. */
-  writeActiveSession(id: DurableSessionId): void
+  /** Tells the plugin this pane shows `now` (its commands get this pane), no longer `before`. */
+  markViewer(now: SessionRef, before: SessionIds): void
   /** Records the shown session as this Tern pane's, which `hermes tern` resumes after the pane's program dies. */
   markPane(id: DurableSessionId): void
   /** Tells Tern the session's folder (OSC 7), when it moved. */
@@ -139,9 +137,8 @@ export function adoptSteps(host: AdoptHost): readonly Adoptable[] {
     { adopt: ({ ref }) => host.showThoughts(ref.live) },
     {
       adopt: ({ previous, ref }) => {
-        // This pane shows the session now: the plugin's Python half sends its connect results here as a card.
-        host.markViewer(durable(ref), previous.stored)
-        host.writeActiveSession(durable(ref))
+        // This pane shows the session now: the plugin's Python half gives its commands this pane.
+        host.markViewer(ref, previous)
         host.markPane(durable(ref))
       }
     },
@@ -168,24 +165,22 @@ export function adoptSteps(host: AdoptHost): readonly Adoptable[] {
     // The last session's children are not this one's: a poll in flight for them drops its answer.
     { adopt: ({ ref }) => host.agents.adopt(ref.live) },
     {
-      adopt: ({ r, ref }) => {
+      adopt: ({ r }) => {
         if (r.messages?.length) {
-          // The history leaves the compactions out; the store says where they were.
-          transcript.load(r.messages, storedCompactions(durable(ref)))
+          transcript.load(r.messages)
           host.agents.scan()
           host.media.showAll(transcript.entries, call => host.imageLanded(call))
+          // The history leaves the compactions out; they fill in once read, after the transcript shows.
+          host.restoreCompactions()
         }
       }
     },
-    // After history, restore this session's newest todo snapshot only if no event snapshot was cached.
+    // History supplies the newest todo snapshot when no event snapshot was cached.
     { adopt: ({ ref }) => {
       const key = durable(ref)
       host.todoHud.adopt(key, transcript.currentTodos())
       host.hud.adopt(key)
     } },
-    // Prompts held for another session go back to the composer, not to this one. After the history:
-    // load() keeps only the welcome, so the notice that says so is written into the loaded transcript.
-    { adopt: ({ ref }) => host.queue.adopt(ref) },
     {
       adopt: ({ ref }) => {
         // The new session's processes, PRs and git state (and none of the last one's), and its open connect cards.
@@ -203,6 +198,9 @@ export function adoptSteps(host: AdoptHost): readonly Adoptable[] {
         }
       }
     },
+    // A connect card the session's tool still waits on comes back on its call (after the turn's
+    // rows: a row the history lacks is added to the running turn).
+    { adopt: ({ r, ref }) => host.connect.restore(r.pending_connection, ref.live) },
     { adopt: () => host.changed() }
   ]
 }

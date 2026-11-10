@@ -1,4 +1,4 @@
-// Uncovered SessionTitle paths: shared-gateway rename, private rename edges and list fallbacks.
+// Uncovered SessionTitle paths: gateway rename receipts and list fallbacks.
 // The gateway and OSC tab are in-process fakes; timers are advanced without wall-clock waits.
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -39,7 +39,7 @@ afterEach(() => {
 
 describe('SessionTitle uncovered rename and read paths', () => {
   it('renameCanonical: resumes and renames with a revision but no generation fence', async () => {
-    const gw = new FakeGateway({ canonical: true })
+    const gw = new FakeGateway()
     gw.handlers.set('session.resume', () => ({ revision: 7, execution_generation: 2 }))
     gw.handlers.set('session.mutate', () => ({ title: 'Named' }))
     const h = host(gw)
@@ -64,7 +64,7 @@ describe('SessionTitle uncovered rename and read paths', () => {
   })
 
   it('renameCanonicalNoRevision: warns and never sends a mutation', async () => {
-    const gw = new FakeGateway({ canonical: true })
+    const gw = new FakeGateway()
     gw.handlers.set('session.resume', () => ({}))
     const h = host(gw)
     const title = new SessionTitle(h)
@@ -82,29 +82,33 @@ describe('SessionTitle uncovered rename and read paths', () => {
     expect(tabs).toEqual([])
   })
 
-  it('renameFallsBackToAsked: uses the requested name when the private reply has no title', async () => {
-    const gw = new FakeGateway({ canonical: false })
-    gw.handlers.set('session.title', () => ({}))
+  it('renameFallsBackToAsked: uses the requested name when the mutation reply has no title', async () => {
+    const gw = new FakeGateway()
+    gw.handlers.set('session.resume', () => ({ revision: 7, execution_generation: 2 }))
+    gw.handlers.set('session.mutate', () => ({}))
     const h = host(gw)
     const title = new SessionTitle(h)
 
     await title.rename(live, 'Asked')
 
-    expect(gw.sent('session.title')).toEqual([{ session_id: 's1', title: 'Asked' }])
+    expect(gw.sent('session.mutate')).toEqual([expect.objectContaining({ session_id: 's1', operation: 'rename', expected_revision: 7, payload: { title: 'Asked' } })])
+    expect(gw.sent('session.title')).toEqual([])
     expect(title.text).toBe('Asked')
     expect(h.changed).toHaveBeenCalledTimes(1)
     expect(tabs).toEqual(['Asked'])
   })
 
-  it('renameOtherSessionIgnored: sends a private rename without changing the current title', async () => {
-    const gw = new FakeGateway({ canonical: false })
-    gw.handlers.set('session.title', () => ({ title: 'Elsewhere' }))
+  it('renameOtherSessionIgnored: renames another session without changing the current title', async () => {
+    const gw = new FakeGateway()
+    gw.handlers.set('session.resume', () => ({ revision: 7, execution_generation: 2 }))
+    gw.handlers.set('session.mutate', () => ({ title: 'Elsewhere' }))
     const h = host(gw)
     const title = new SessionTitle(h)
 
     await title.rename(liveSessionId('s2'), 'X')
 
-    expect(gw.sent('session.title')).toEqual([{ session_id: 's2', title: 'X' }])
+    expect(gw.sent('session.mutate')).toEqual([expect.objectContaining({ session_id: 's2', operation: 'rename', expected_revision: 7, payload: { title: 'X' } })])
+    expect(gw.sent('session.title')).toEqual([])
     expect(title.text).toBe('')
     expect(h.changed).not.toHaveBeenCalled()
     expect(h.notice).not.toHaveBeenCalled()
@@ -112,14 +116,16 @@ describe('SessionTitle uncovered rename and read paths', () => {
   })
 
   it('renameBlankReply: does not replace a blank reply with the requested name', async () => {
-    const gw = new FakeGateway({ canonical: false })
-    gw.handlers.set('session.title', () => ({ title: '   ' }))
+    const gw = new FakeGateway()
+    gw.handlers.set('session.resume', () => ({ revision: 7, execution_generation: 2 }))
+    gw.handlers.set('session.mutate', () => ({ title: '   ' }))
     const h = host(gw)
     const title = new SessionTitle(h)
 
     await title.rename(live, 'Asked')
 
-    expect(gw.sent('session.title')).toEqual([{ session_id: 's1', title: 'Asked' }])
+    expect(gw.sent('session.mutate')).toEqual([expect.objectContaining({ session_id: 's1', operation: 'rename', expected_revision: 7, payload: { title: 'Asked' } })])
+    expect(gw.sent('session.title')).toEqual([])
     expect(title.text).toBe('')
     expect(h.changed).not.toHaveBeenCalled()
     expect(h.notice).not.toHaveBeenCalled()

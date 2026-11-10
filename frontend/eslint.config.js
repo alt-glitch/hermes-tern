@@ -30,10 +30,10 @@ const ZOD = { message: `Import zod/mini, not the zod root. ${see('restricted-imp
 const EFFECT = `This package does not use Effect. ${see('restricted-imports')}`
 
 /**
- * The import rule: zod's root and Effect everywhere, plus App outside entry.ts and the tests, @tui
- * values outside hermes/ and wire/, and view/ outside the modules that draw (VIEWS).
+ * The import rule: zod's root and Effect everywhere, plus App outside entry.ts and the tests, and
+ * view/ outside the modules that draw (VIEWS).
  */
-function imports({ app, tui, view }) {
+function imports({ app, view }) {
   const patterns = [{ group: ['effect/*'], message: EFFECT }]
 
   if (view) {
@@ -47,14 +47,6 @@ function imports({ app, tui, view }) {
     patterns.push({
       message: `Only entry.ts (and the tests) import App, the composition root; a module takes the ports it uses. ${see('restricted-imports')}`,
       regex: '(^|/)app/chat(\\.js)?$|^\\./chat(\\.js)?$'
-    })
-  }
-
-  if (tui) {
-    patterns.push({
-      allowTypeImports: true,
-      group: ['@tui/*'],
-      message: `Value imports from the Hermes sources go through hermes/ or wire/; \`import type\` is fine. ${see('restricted-imports')}`
     })
   }
 
@@ -87,7 +79,7 @@ export const rules = defineConfig([
     rules: {
       '@typescript-eslint/consistent-type-assertions': ['error', { assertionStyle: 'never' }],
       '@typescript-eslint/no-non-null-assertion': 'error',
-      '@typescript-eslint/no-restricted-imports': imports({ app: true, tui: true, view: true }),
+      '@typescript-eslint/no-restricted-imports': imports({ app: true, view: true }),
       '@typescript-eslint/no-unnecessary-type-assertion': 'error',
       '@typescript-eslint/no-unsafe-argument': 'error',
       '@typescript-eslint/no-unsafe-member-access': 'error',
@@ -96,11 +88,11 @@ export const rules = defineConfig([
       'no-restricted-syntax': ['error', JSON_PARSE]
     }
   },
-  { files: VIEWS, rules: { '@typescript-eslint/no-restricted-imports': imports({ app: true, tui: true, view: false }) } },
-  { files: ['src/entry.ts', 'src/__tests__/**'], rules: { '@typescript-eslint/no-restricted-imports': imports({ app: false, tui: true, view: false }) } },
+  { files: VIEWS, rules: { '@typescript-eslint/no-restricted-imports': imports({ app: true, view: false }) } },
+  { files: ['src/entry.ts', 'src/__tests__/**'], rules: { '@typescript-eslint/no-restricted-imports': imports({ app: false, view: false }) } },
   {
     files: ['src/hermes/**', 'src/wire/**'],
-    rules: { '@typescript-eslint/no-restricted-imports': imports({ app: true, tui: false, view: true }) }
+    rules: { '@typescript-eslint/no-restricted-imports': imports({ app: true, view: true }) }
   },
   {
     files: ['src/wire/**', 'src/core/ids.ts', 'src/gateway/dispatch.ts'],

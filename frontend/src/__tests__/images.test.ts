@@ -8,6 +8,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { entryId, liveSessionId, storedSessionId, toolCallId } from '../core/ids.js'
 import { Attachments, type AttachmentsHost, type ClipboardReader, type Image } from '../draft/attachments.js'
 import { extractClipboardImage, type Runner, withClipboardImage } from '../hermes/clipboardImage.js'
+import type { HermesCommand } from '../hermes/connect.js'
 import { imageSize } from '../hermes/images.js'
 import { localSource, Media, shownImage } from '../media.js'
 import type { ToolCall, TurnEntry, UserEntry } from '../model.js'
@@ -109,7 +110,7 @@ describe('splitPrompt: what a stored prompt carried', () => {
 })
 
 describe('a resumed prompt with images', () => {
-  const cx: TranscriptContext = { copy: () => undefined, now: 0, welcome: { tip: '', version: '' } }
+  const cx: TranscriptContext = { copy: () => undefined, now: 0, welcome: { version: '' } }
 
   it('shows its words without the refs, and its images as thumbnails over them', () => {
     const t = new Transcript()
@@ -308,23 +309,27 @@ describe('imageSize', () => {
   })
 })
 
-/** A clipboard read through Hermes' extractor (as off macOS), with `runner` in the extractor's place. */
+/** The Hermes command the launcher hands the pane. */
+const HERMES: HermesCommand = { argv: ['python', '-m', 'hermes_cli.main'], env: {} }
+
+/** A clipboard read as on Linux, with `runner` in `hermes clipboard image`'s place. */
 const clipboardOf = (runner: Runner): ClipboardReader => use =>
-  withClipboardImage(use, { HERMES_PYTHON_SRC_ROOT: dir }, (dest, env) => extractClipboardImage(dest, env, 'linux', runner))
+  withClipboardImage(use, HERMES, (dest, hermes) => extractClipboardImage(dest, hermes, 'linux', runner))
 
-/** An extractor that writes the PNG to its destination, as one finding an image does. */
+/** `hermes clipboard image` finding an image: the PNG written to `--out`. */
 const holding: Runner = async (_file, args) => {
-  writeFileSync(args[1] ?? '', PNG)
+  const out = args[args.indexOf('--out') + 1] ?? ''
+  writeFileSync(out, PNG)
 
-  return 'true'
+  return { code: 0, stderr: '', stdout: JSON.stringify({ bytes: PNG.length, mime: 'image/png', ok: true, path: out }) }
 }
 
-/** An extractor that finds no image. */
-const empty: Runner = async () => 'false'
+/** `hermes clipboard image` finding no image. */
+const empty: Runner = async () => ({ code: 1, stderr: '', stdout: JSON.stringify({ message: 'the clipboard holds no image', ok: false, reason: 'no_image' }) })
 
 /** The attachments on a fake host: the uploads go to a fake gateway, notices and renders are counted. */
-function attachments({ blob, canonical = true, clipboard = clipboardOf(holding), head, sid = 's1', startup }: { blob?: string; canonical?: boolean; clipboard?: ClipboardReader; head?: Image[]; sid?: string | null; startup?: string } = {}) {
-  const gw = new FakeGateway({ canonical })
+function attachments({ blob, clipboard = clipboardOf(holding), head, sid = 's1', startup }: { blob?: string; clipboard?: ClipboardReader; head?: Image[]; sid?: string | null; startup?: string } = {}) {
+  const gw = new FakeGateway()
   let uploads = 0
   gw.handlers.set('image.attach_bytes', () => ({ path: `/uploads/${++uploads}.png` }))
   const notes: { text: string; tone: string | undefined }[] = []
@@ -368,7 +373,7 @@ describe('Attachments: the draft\'s images', () => {
     expect(a.items[0]?.path).toBe('/uploads/attested.png')
   })
 
-  it('preserves original upload when the plugin capability is unavailable or gateway is legacy', async () => {
+  it('preserves original upload when the plugin capability read fails or does not advertise staged bytes', async () => {
     const older = attachments()
     older.gw.handlers.set('gateway.capabilities', () => {
       throw new Error('not implemented')
@@ -377,10 +382,11 @@ describe('Attachments: the draft\'s images', () => {
     expect(older.gw.sent('image.attach_bytes')).toHaveLength(1)
     expect(older.gw.sent('hermes-tern.media.attach_bytes')).toEqual([])
 
-    const legacy = attachments({ canonical: false })
-    await legacy.a.fromPath(shot)
-    expect(legacy.gw.sent('gateway.capabilities')).toEqual([])
-    expect(legacy.gw.sent('image.attach_bytes')).toHaveLength(1)
+    const unadvertised = attachments()
+    await unadvertised.a.fromPath(shot)
+    expect(unadvertised.gw.sent('gateway.capabilities')).toEqual([{ session_id: 's1' }])
+    expect(unadvertised.gw.sent('image.attach_bytes')).toHaveLength(1)
+    expect(unadvertised.gw.sent('hermes-tern.media.attach_bytes')).toEqual([])
   })
 
   it('an empty paste reads the clipboard\'s image and uploads it, with its size and thumbnail', async () => {
@@ -417,7 +423,7 @@ describe('Attachments: the draft\'s images', () => {
   })
 
   it('a clipboard that cannot be read says why', async () => {
-    const { a, notes } = attachments({ clipboard: clipboardOf(() => Promise.reject(new Error('no display'))) })
+    const { a, notes } = attachments({ clipboard: use => withClipboardImage(use, HERMES, () => Promise.reject(new Error('no display'))) })
 
     await a.fromClipboard(false)
 
@@ -523,15 +529,6 @@ describe('Attachments: the launcher\'s startup image', () => {
     await a.attachStartup('s1')
 
     expect(a.items.map(i => i.name)).toEqual(['clip_1.png'])
-  })
-
-  it('a private gateway takes it by path', async () => {
-    const { a, gw } = attachments({ canonical: false, startup: shot })
-
-    await a.attachStartup('s1')
-
-    expect(gw.sent('image.attach')).toEqual([{ path: shot, session_id: 's1' }])
-    expect(gw.sent('image.attach_bytes')).toEqual([])
   })
 
   it('one that cannot be read is a warning, and the queue goes on', async () => {

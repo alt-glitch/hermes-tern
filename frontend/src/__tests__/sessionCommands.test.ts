@@ -1,11 +1,14 @@
 import { describe, expect, it, vi } from 'vitest'
 
+import { sessionHost, type SessionHostCx } from '../commands/host.js'
 import { compressReport, SESSION_COMMANDS, type SessionHost } from '../commands/session.js'
-import { liveSessionId } from '../core/ids.js'
+import { liveSessionId, storedSessionId } from '../core/ids.js'
 import { mutateSession } from '../hermes/mutate.js'
 import { lastTurnRewind, retryText, retryTurnRewind } from '../hermes/rewind.js'
 
-import { must, stub } from './fakes.js'
+import type { Busy } from '../turn/activity.js'
+
+import { FakeGateway, must, stub } from './fakes.js'
 
 const MESSAGES = [
   { content: 'first', role: 'user', row_id: 1 },
@@ -32,7 +35,6 @@ function host(over: Partial<SessionHost> = {}, replies: Record<string, unknown> 
 
   const h = {
     busy: false,
-    canonical: true,
     draft: vi.fn(),
     enqueue: vi.fn(),
     gw: stub<SessionHost['gw']>({ request }),
@@ -123,14 +125,19 @@ describe('session commands', () => {
     expect(h.send).toHaveBeenCalledWith('fix the bug')
   })
 
-  it('leaves rewind, compress and branch to slash.exec on a private gateway', async () => {
-    const { h, request } = host({ canonical: false })
+  it('keeps rewind, compress and branch session-scoped without an active session', async () => {
+    const { h, request } = host({ sid: null })
 
     for (const name of ['undo', 'retry', 'compact', 'branch']) {
-      expect(await run(name, h)).toBe(false)
+      await run(name, h)
     }
 
     expect(request).not.toHaveBeenCalled()
+    expect(h.notice).toHaveBeenCalledWith('Nothing to undo.')
+    expect(h.notice).toHaveBeenCalledWith('Nothing to retry.')
+    expect(h.notice).toHaveBeenCalledWith('No active session.', 'warning')
+    expect(h.open).not.toHaveBeenCalled()
+    expect(h.send).not.toHaveBeenCalled()
   })
 
   it('/compress sends the raw argument as focus, runs the compaction rule, and reloads', async () => {
@@ -235,11 +242,14 @@ describe('session commands', () => {
     expect(h.notice).toHaveBeenCalledWith('Did not connect: linear.', 'warning')
   })
 
-  it('/reload-mcp on a private gateway is left to slash.exec', async () => {
-    const { h, request } = host({ canonical: false })
+  it('/reload-mcp reports an unsupported gateway operation without falling back to slash.exec', async () => {
+    const { h, request } = host({}, { 'reload.mcp': new Error('Method not found: reload.mcp') })
 
-    expect(await run('reload-mcp', h)).toBe(false)
-    expect(request).not.toHaveBeenCalled()
+    await run('reload-mcp', h)
+
+    expect(request).toHaveBeenCalledExactlyOnceWith('reload.mcp', { confirm: true, session_id: 'sid-1' })
+    expect(h.panel).not.toHaveBeenCalled()
+    expect(h.notice).toHaveBeenCalledWith('/reload-mcp failed: Method not found: reload.mcp', 'error')
   })
 
   it('/rollback lists, diffs and restores checkpoints', async () => {
@@ -265,4 +275,63 @@ describe('session commands', () => {
     expect(h.notice).toHaveBeenCalledWith('Rollback restored src/a.ts: restored to abcdef1')
   })
 
+})
+
+describe('sessionHost', () => {
+  it('reads busy and queued live, the sid it was made for, and the session live', async () => {
+    const gw = new FakeGateway()
+    let busy: Busy | null = { label: 'Working…', since: {}, startedAt: 0 }
+    let queued = 2
+    let ref = { live: liveSessionId('s1'), stored: storedSessionId('stored-1') }
+    const resumed: string[] = []
+
+    const cx: SessionHostCx = {
+      activity: {
+        get busy() {
+          return busy
+        }
+      },
+      changed: () => {}, draft: () => {},
+      gw: gw.client,
+      life: {
+        reload: async () => undefined,
+        resume: async id => {
+          resumed.push(id)
+          ref = { live: liveSessionId('s2'), stored: id }
+        }
+      },
+      queue: { count: () => queued },
+      router: { behind: () => {}, send: () => {} },
+      setCompacting: () => {},
+      state: {
+        get ref() {
+          return ref
+        },
+        ticket: () => ({ isCurrent: () => true, signal: new AbortController().signal, sid: ref.live }),
+        usage: null
+      },
+      submit: () => {},
+      transcript: {
+        compactions: { compacted: () => {}, compacting: () => ({ startedAt: 0, state: { status: 'running' } }), uncompact: () => {} },
+        notice: () => {},
+        panel: () => {},
+        steer: () => {}
+      }
+    }
+
+    const host = sessionHost(cx)
+
+    expect(host.busy).toBe(true)
+    expect(host.queued).toBe(2)
+
+    // A command that awaited reads them as they are now.
+    busy = null
+    queued = 0
+    expect(host.busy).toBe(false)
+    expect(host.queued).toBe(0)
+    expect(host.sid).toBe('s1')
+    await expect(host.open(storedSessionId('stored-2'))).resolves.toBe(true)
+    expect(resumed).toEqual(['stored-2'])
+    expect(sessionHost(cx).busy).toBe(false)
+  })
 })

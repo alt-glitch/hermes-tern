@@ -1,12 +1,15 @@
 // The job chart benchmark: real background jobs from Hermes' sessions, replayed through the
 // plugin's own chart registry (processes/widgets/registry.ts) with Hermes' auxiliary model
-// (task `tern_charts`, through `widget_author.py`). Each job's recorded output (and the log file
+// (task `tern_charts`, through the plugin's `charts.author` RPC on the gateway). Each job's recorded output (and the log file
 // its command wrote, when it is still on disk) arrives in 20 steps a second apart, starting at
 // the 15 s mark, so the model is first asked on the early lines, as in a pane, and a decline is
 // asked again once the output has grown. The final view is what the pane would show.
 //
-//   (cd frontend && bunx esbuild ../lab/chartbench.ts --bundle --platform=node --format=esm --outfile=/tmp/chartbench.mjs)
-//   HERMES_PYTHON=… HERMES_PYTHON_SRC_ROOT=… HERMES_TUI_DIR=$PWD/frontend node /tmp/chartbench.mjs JOBS.json OUT_DIR
+//   (cd frontend && bunx esbuild ../lab/chartbench.ts --bundle --platform=node --format=esm --preserve-symlinks --outfile=/tmp/chartbench.mjs)
+//   HERMES_TERN_HERMES='{"argv":["hermes"]}' node /tmp/chartbench.mjs JOBS.json OUT_DIR
+//
+// It attaches to the profile's gateway as a pane does, in a session of its own; the gateway must
+// have the plugin loaded.
 //
 // JOBS.json is a list of {id, command, text, file?: {path, text}}. Jobs and results are the
 // user's sessions: they stay out of this repo.
@@ -15,7 +18,9 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 import type { BackgroundProcess } from '../frontend/src/model.js'
-import { type Author, hermesAuthor } from '../frontend/src/processes/widgets/author.js'
+import { readLaunchEnv } from '../frontend/src/config/env.js'
+import { createGatewayClient } from '../frontend/src/hermes/gatewayClient.js'
+import { type Author, gatewayAuthor, RejectedAnswer } from '../frontend/src/processes/widgets/author.js'
 import { Charts } from '../frontend/src/processes/widgets/registry.js'
 import { specSkip } from '../frontend/src/processes/widgets/spec.js'
 import type { ChartView } from '../frontend/src/processes/widgets/types.js'
@@ -34,11 +39,13 @@ if (!jobsFile || !outDir) {
   throw new Error('usage: chartbench JOBS.json OUT_DIR')
 }
 
-const real = hermesAuthor()
-
-if (!real) {
-  throw new Error('set HERMES_PYTHON, HERMES_PYTHON_SRC_ROOT and HERMES_TUI_DIR')
-}
+const gw = createGatewayClient(readLaunchEnv())
+const ready = new Promise<void>(resolve => gw.on('event', (ev: { type: string }) => ev.type === 'gateway.ready' && resolve()))
+gw.start()
+await ready
+// The session the replies go to.
+const { session_id: sid } = await gw.request<{ session_id: string }>('session.create', {})
+const real = gatewayAuthor(gw, () => sid)
 
 const jobs: Job[] = JSON.parse(readFileSync(jobsFile, 'utf8'))
 mkdirSync(join(outDir, 'logs'), { recursive: true })
@@ -62,9 +69,11 @@ async function bench(job: Job) {
     const p = real(request, signal).then(
       answer => {
         const skip = specSkip(answer)
-        asks.push({ answer: answer === undefined ? 'unavailable' : skip ? `skip: ${skip}` : request.rejected ? 'retry' : 'spec', lines, ms: Date.now() - started })
+        const refused = answer instanceof RejectedAnswer
+        const kind = answer === undefined ? 'unavailable' : refused ? `refused: ${answer.errors.join('; ')}` : skip ? `skip: ${skip}` : request.rejected ? 'retry' : 'spec'
+        asks.push({ answer: kind, lines, ms: Date.now() - started })
 
-        if (answer !== undefined && !skip) {
+        if (answer !== undefined && !skip && !refused) {
           spec = answer
         }
 
@@ -140,3 +149,4 @@ writeFileSync(join(outDir, 'results.json'), JSON.stringify(results, null, 1))
 const live = results.filter(r => r.state === 'live').length
 const reasked = results.filter(r => r.asks.some(a => a.answer.startsWith('skip')) && r.state === 'live').length
 console.log(`\nlive ${live} of ${results.length}; charted after a first decline: ${reasked}; requests: ${results.reduce((n, r) => n + r.asks.length, 0)}`)
+gw.kill('exit')

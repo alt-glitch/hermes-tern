@@ -1,7 +1,7 @@
 // Dictation: dictation.py's lines read once, the record key from config.yaml, the store's capture
 // from the record key to the words at the caret, the helper's process, and the pane end to end.
 // Nothing here opens a microphone: the recorder is a fake, and the helper a stand-in script.
-import { chmodSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -17,7 +17,7 @@ import { type DictationCheck, type DictationEvent, dictationEvent, readDictation
 import { settle, setup } from './appSetup.js'
 import { key, must, topNodes } from './fakes.js'
 
-vi.mock('@tui/lib/history.js', () => ({ append: () => undefined, load: () => [] }))
+vi.mock('@hermes/shared/prompt-history', () => ({ append: () => undefined, load: () => [] }))
 
 /** A capture the test drives: what the store asked of it, and the lines the helper would write. */
 class FakeCapture implements Capture {
@@ -231,8 +231,7 @@ describe('Dictation', () => {
 
 describe('hermesRecorder: dictation.py in its own process', () => {
   const root = mkdtempSync(join(tmpdir(), 'hermes-tern-dictation-'))
-  const ui = join(root, 'frontend')
-  mkdirSync(ui)
+  const interpreter = join(root, 'python')
   // A stand-in for the helper: the same lines and commands, no microphone.
   writeFileSync(
     join(root, 'dictation.py'),
@@ -251,10 +250,32 @@ describe('hermesRecorder: dictation.py in its own process', () => {
     ].join('\n')
   )
   chmodSync(join(root, 'dictation.py'), 0o644)
-  const env = { ...process.env, HERMES_PYTHON: 'python3', HERMES_PYTHON_SRC_ROOT: root, HERMES_TUI_DIR: ui }
+  // Exercise the shipped adapter's command/env while substituting only the interpreter peer.
+  writeFileSync(interpreter, [
+    '#!/usr/bin/env python3',
+    'import os, pathlib, runpy, sys',
+    'assert os.environ.get("DICTATION_FIXTURE") == "isolated"',
+    'script = pathlib.Path(sys.argv[1])',
+    'assert script.is_absolute() and script.name == "dictation.py" and script.is_file()',
+    'fixture = pathlib.Path(os.environ["PYTHONPATH"]) / "dictation.py"',
+    'sys.argv = [str(fixture), *sys.argv[2:]]',
+    'runpy.run_path(str(fixture), run_name="__main__")'
+  ].join('\n'))
+  chmodSync(interpreter, 0o755)
+  const env: NodeJS.ProcessEnv = {
+    PATH: process.env['PATH'],
+    HERMES_TERN_HERMES: JSON.stringify({
+      argv: [interpreter, '-m', 'hermes_cli.main'],
+      env: { PYTHONPATH: root, DICTATION_FIXTURE: 'isolated' }
+    })
+  }
 
   it('is undefined without the interpreter the launcher names', () => {
     expect(hermesRecorder({})).toBeUndefined()
+  })
+
+  it.each(['not JSON', '{"argv":[]}', '{"argv":"python3"}'])('rejects the malformed launcher command %s', command => {
+    expect(hermesRecorder({ HERMES_TERN_HERMES: command })).toBeUndefined()
   })
 
   it('checks, captures, stops and exits', async () => {
@@ -284,8 +305,8 @@ describe('hermesRecorder: dictation.py in its own process', () => {
 
 describe('App: dictation', () => {
   beforeEach(() => {
-    delete process.env['HERMES_TUI_QUERY']
-    delete process.env['HERMES_TUI_IMAGE']
+    delete process.env['HERMES_TERN_QUERY']
+    delete process.env['HERMES_TERN_IMAGE']
   })
 
   afterEach(() => {

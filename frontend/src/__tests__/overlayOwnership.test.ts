@@ -371,12 +371,12 @@ undefined  })
 
   it('cannot activate a model in a same-key successor using an old picker ID or queued SDK callback', async () => {
     await withApp(async h => {
-      h.gw.isCanonical = false
       h.gw.handlers.set('model.options', () => ({
         providers: [{ slug: 'p', name: 'Provider', models: ['one', 'two'], is_current: true }],
         model: 'one', provider: 'p'
       }))
-      h.gw.handlers.set('config.set', () => ({ key: 'model', value: 'two' }))
+      h.gw.handlers.set('session.resume', () => ({ session_id: 's1', revision: 3, execution_generation: 7 }))
+      h.gw.handlers.set('session.mutate', params => params['operation'] === 'model' ? { status: 'applied', model: 'two' } : { status: 'applied' })
       const activate = (id: string) => ({ ev: 'activate', sf: h.surface.id, id, item: 'p\ttwo', raw: {} } as const)
 
       openModelPicker(h.app)
@@ -392,20 +392,38 @@ undefined  })
       expect(nextRoot).not.toBe(oldRoot)
       expect(View.from({ layer: [h.app.overlays.at(-1)?.node(nextRoot)] }).find(nextRoot)).toBeDefined()
       expect(h.surface.dispatch(oldNative)).toBeUndefined()
-      // Session setup can set show_reasoning; only model writes test picker ownership.
-      const beforeStale = h.gw.sent('config.set')
-      expect(beforeStale.filter(params => params['key'] === 'model')).toEqual([])
+      const beforeStale = h.gw.sent('session.mutate')
+      expect(beforeStale).toEqual([])
+      expect(h.gw.sent('session.resume')).toEqual([])
       await oldBound?.()
       await painted()
-      expect(h.gw.sent('config.set')).toEqual(beforeStale)
+      expect(h.gw.sent('session.mutate')).toEqual(beforeStale)
+      expect(h.gw.sent('session.resume')).toEqual([])
 
       const current = h.surface.dispatch(activate(nextRoot))
       expect(current).toBeTypeOf('function')
       await current?.()
       await painted()
-      expect(h.gw.sent('config.set').filter(params => params['key'] === 'model')).toEqual([
-        { confirm_expensive_model: false, key: 'model', session_id: 's1', value: 'two --provider p --session' }
-      ])
+      const expected = [
+        {
+          operation: 'model', session_id: 's1', expected_revision: 3, expected_generation: 7,
+          request_id: expect.any(String), payload: { model: 'two', provider: 'p' }
+        },
+        {
+          operation: 'reasoning', session_id: 's1', expected_revision: 3, expected_generation: 7,
+          request_id: expect.any(String), payload: { effort: 'medium' }
+        }
+      ]
+      expect(h.gw.sent('session.mutate')).toEqual(expected)
+      expect(new Set(h.gw.sent('session.mutate').map(params => params['request_id'])).size).toBe(2)
+      expect(h.gw.sent('session.resume')).toEqual([{ session_id: 's1' }, { session_id: 's1' }])
+      expect(h.surface.dispatch(activate(nextRoot))).toBeUndefined()
+      await current?.()
+      await oldBound?.()
+      await painted()
+      expect(h.gw.sent('session.mutate')).toEqual(expected)
+      expect(h.gw.sent('session.resume')).toEqual([{ session_id: 's1' }, { session_id: 's1' }])
+      expect(h.gw.sent('config.set')).toEqual([{ key: 'show_reasoning', session_id: 's1', value: 'on' }])
       expect(h.gw.methods('prompt.submit')).toHaveLength(0)
     })
   })

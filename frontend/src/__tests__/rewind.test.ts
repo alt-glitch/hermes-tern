@@ -49,7 +49,6 @@ describe('rewind targets', () => {
 function sessionHost(gw: FakeGateway, over: Partial<SessionHost> = {}): SessionHost {
   return {
     busy: false,
-    canonical: true,
     compressing: vi.fn(),
     draft: vi.fn(),
     enqueue: vi.fn(),

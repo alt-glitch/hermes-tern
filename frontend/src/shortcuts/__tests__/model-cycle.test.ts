@@ -20,9 +20,9 @@ function options(models = ['alpha', 'beta', 'gamma']): ModelOptionsResult {
   }
 }
 
-function fixture(models = ['alpha', 'beta', 'gamma'], expensive = false, canonical = false) {
+function fixture(models = ['alpha', 'beta', 'gamma'], expensive = false) {
   let selected = 'alpha'
-  const gw = new FakeGateway({ canonical })
+  const gw = new FakeGateway()
   const state = new SessionState(() => {})
   state.ref = { live: liveSessionId('s1'), stored: null }
   state.info = { model: 'alpha', provider: 'fixture' }
@@ -31,15 +31,6 @@ function fixture(models = ['alpha', 'beta', 'gamma'], expensive = false, canonic
   const overlays: Overlay[] = []
   const changed = vi.fn()
   gw.handlers.set('model.options', () => ({ ...options(models), model: selected }))
-  gw.handlers.set('config.set', p => {
-    if (expensive && p['confirm_expensive_model'] !== true) {
-      return { key: 'model', confirm_required: true, confirm_message: 'Expensive fixture' }
-    }
-
-    selected = String(p['value']).split(' ')[0] ?? ''
-
-    return { key: 'model', value: selected }
-  })
   // Canonical picker authority: read a revision, submit a session.mutate CAS,
   // replay the server's one-time confirmation token on explicit user acceptance.
   gw.handlers.set('session.resume', () => ({ revision: 7, execution_generation: 3 }))
@@ -94,7 +85,12 @@ describe('pinned model inventory and session-owned cycling', () => {
     expect(f.gw.sent('model.options')).toEqual([
       { session_id: 's1' }, { session_id: 's1' }, { session_id: 's1' }
     ])
-    expect(f.gw.sent('config.set').every(p => p['session_id'] === 's1' && String(p['value']).includes('--session'))).toBe(true)
+    expect(f.gw.sent('session.mutate').map(p => [p['session_id'], p['payload']])).toEqual([
+      ['s1', { model: 'beta', provider: 'fixture' }],
+      ['s1', { model: 'gamma', provider: 'fixture' }],
+      ['s1', { model: 'beta', provider: 'fixture' }]
+    ])
+    expect(f.gw.sent('config.set')).toEqual([])
     f.state.ref = { live: liveSessionId('s2'), stored: null }
     expect(modelRecents(f.state).list('s2')).toEqual([])
   })
@@ -104,11 +100,12 @@ describe('pinned model inventory and session-owned cycling', () => {
     // This is the shape pinned _session_info emits when a mid-turn pick is deferred.
     f.state.info = { model: 'beta', provider: 'fixture' }
     await cycleModel(f.host, 1)
-    expect(f.gw.sent('config.set')[0]?.['value']).toBe('gamma --provider fixture --session')
+    expect(f.gw.sent('session.mutate')[0]).toMatchObject({ session_id: 's1', operation: 'model', payload: { model: 'gamma', provider: 'fixture' } })
+    expect(f.gw.sent('config.set')).toEqual([])
     expect(f.state.info?.model).toBe('gamma')
   })
 
-  it('requires explicit confirmation through the noncanonical config.set path', async () => {
+  it('requires explicit keyboard confirmation through the owning gateway', async () => {
     const f = fixture(['alpha', 'beta'], true)
     await cycleModel(f.host, 1)
     expect(f.state.info?.model).toBe('alpha')
@@ -119,15 +116,15 @@ describe('pinned model inventory and session-owned cycling', () => {
 
     confirm.onKey(key('y'))
     await vi.waitFor(() => expect(f.state.info?.model).toBe('beta'))
-    expect(f.gw.sent('config.set')).toEqual([
-      { key: 'model', session_id: 's1', value: 'beta --provider fixture --session', confirm_expensive_model: false },
-      { key: 'model', session_id: 's1', value: 'beta --provider fixture --session', confirm_expensive_model: true }
+    expect(f.gw.sent('session.mutate').map(p => p['payload'])).toEqual([
+      { model: 'beta', provider: 'fixture' },
+      { model: 'beta', provider: 'fixture', confirm: 'once-7' }
     ])
-    expect(f.gw.sent('session.mutate')).toEqual([])
+    expect(f.gw.sent('config.set')).toEqual([])
   })
 
   it('honors canonical CAS authority and replays only its issued confirmation token', async () => {
-    const f = fixture(['alpha', 'beta'], true, true)
+    const f = fixture(['alpha', 'beta'], true)
     await cycleModel(f.host, 1)
     expect(f.state.info?.model).toBe('alpha')
     expect(f.overlays[0]?.key).toBe('confirm:Switch to an expensive model?')
@@ -176,7 +173,9 @@ describe('pinned model inventory and session-owned cycling', () => {
     f.state.ref = { live: liveSessionId('s2'), stored: null }
     confirm.onKey(key('y'))
     await Promise.resolve()
-    expect(f.gw.sent('config.set')).toHaveLength(1)
+    expect(f.gw.sent('session.mutate')).toHaveLength(1)
+    expect(f.gw.sent('session.resume')).toHaveLength(1)
+    expect(f.gw.sent('config.set')).toEqual([])
   })
 
   it('respects authorized recent rows and refuses one-model inventory', () => {

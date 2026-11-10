@@ -1,13 +1,8 @@
-import { mkdtempSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { DatabaseSync } from 'node:sqlite'
-
 import { describe, expect, it, vi } from 'vitest'
 
-import { prKey, storedSessionId, toolCallId } from '../core/ids.js'
+import { liveSessionId, prKey, toolCallId } from '../core/ids.js'
 import { type BranchTarget, parseRemote, parseStacks } from '../github/branch.js'
-import { ancestry, linkedFromResult, storedLinks } from '../github/links.js'
+import { linkedFromResult, linkedPullRequests } from '../github/links.js'
 import {
   ACTIVITY_QUERY,
   batchQuery,
@@ -24,7 +19,7 @@ import { shown } from '../github/remote.js'
 import { PullRequests } from '../github/store.js'
 import type { ToolCall } from '../model.js'
 
-import { must } from './fakes.js'
+import { FakeGateway, must } from './fakes.js'
 
 const ref = (number: number, repository = 'acme/app'): PrRef => ({
   host: 'github.com',
@@ -97,39 +92,6 @@ describe('links', () => {
     expect(linkedFromResult(linkCall([ref(1), ref(2)]))?.map(prKey)).toEqual(['github.com/acme/app#1', 'github.com/acme/app#2'])
     expect(linkedFromResult(linkCall([ref(1)], 'error'))).toBeUndefined()
     expect(linkedFromResult({ ...linkCall([ref(1)]), name: 'terminal' })).toBeUndefined()
-  })
-
-  it('finds a compressed conversation’s links through its ancestors', () => {
-    const file = join(mkdtempSync(join(tmpdir(), 'tern-prs-')), 'pull-requests.json')
-    writeFileSync(file, JSON.stringify({ aliases: { root: 'root', mid: 'root' }, conversations: { root: [ref(7)] }, version: 1 }))
-
-    // `tip` came after the last link (compression), so only its parent is an alias.
-    expect(storedLinks('tip', file, () => ['tip', 'mid', 'root']).map(r => r.number)).toEqual([7])
-    expect(storedLinks('other', file, () => ['other'])).toEqual([])
-    expect(storedLinks('tip', join(file, 'missing'), () => ['tip'])).toEqual([])
-  })
-
-  it('climbs only compression continuations, not a /branch, delegate, reset or tool child', () => {
-    const db = join(mkdtempSync(join(tmpdir(), 'tern-lineage-')), 'state.db')
-    const conn = new DatabaseSync(db)
-    conn.exec('CREATE TABLE sessions (id TEXT PRIMARY KEY, source TEXT, parent_session_id TEXT, model_config TEXT, end_reason TEXT)')
-    const add = conn.prepare('INSERT INTO sessions VALUES (?,?,?,?,?)')
-    add.run('root', 'tui', null, '{}', 'compression')
-    // A continuation copies model_config, so it may carry an older marker that names another row.
-    add.run('mid', 'tui', 'root', '{"_branched_from":"elder"}', 'compression')
-    add.run('tip', 'tui', 'mid', 'not json', null)
-    add.run('branch', 'tui', 'tip', '{"_branched_from":"tip"}', null)
-    add.run('fork', 'tui', 'mid', '{"_branched_from":"mid"}', null)
-    add.run('reset', 'tui', 'mid', '{"_reset_from":"mid"}', null)
-    add.run('agent', 'tui', 'mid', '{"_delegate_from":"mid"}', null)
-    add.run('tool', 'tool', 'mid', '{}', null)
-    add.run('open', 'tui', 'tip', '{}', null)
-    conn.close()
-
-    expect(ancestry('tip', db)).toEqual(['tip', 'mid', 'root'])
-    expect(['branch', 'fork', 'reset', 'agent', 'tool'].map(id => ancestry(id, db))).toEqual([['branch'], ['fork'], ['reset'], ['agent'], ['tool']])
-    // `tip` did not end in compression, so a plain child of it is not its continuation.
-    expect(ancestry('open', db)).toEqual(['open'])
   })
 })
 
@@ -214,7 +176,7 @@ describe('PullRequests', () => {
     const graphql = vi.fn(async () => ({ p0: prJson() }))
     const gh = { graphql, rest: vi.fn() }
     const changed = vi.fn()
-    const store = new PullRequests({ changed, cwd: () => null, sid: () => storedSessionId('s1') }, gh, () => [])
+    const store = new PullRequests({ changed, cwd: () => null, sid: () => liveSessionId('s1'), links: async () => [] }, gh)
 
     store.adopt()
     store.onCall(linkCall([ref(5)]))
@@ -226,29 +188,35 @@ describe('PullRequests', () => {
     store.dispose()
   })
 
-  it("re-reads the stored links for a subagent's link, which this transcript never sees", async () => {
+  it("reads the conversation's links on adopt, and again when told they changed", async () => {
     const gh = { graphql: vi.fn(async () => ({})), rest: vi.fn() }
-    const changed = vi.fn()
     let stored = [ref(1)]
-    const links = vi.fn(() => stored)
-    const store = new PullRequests({ changed, cwd: () => null, sid: () => storedSessionId('s1') }, gh, links)
+    const links = vi.fn(async () => stored)
+    const store = new PullRequests({ changed: vi.fn(), cwd: () => null, links, sid: () => liveSessionId('s1') }, gh)
 
     store.adopt()
-    store.relink()
-    expect(changed).toHaveBeenCalledTimes(1)
+    await vi.waitFor(() => expect(store.entries().map(e => e.ref.number)).toEqual([1]))
 
     stored = [ref(1), ref(2)]
     store.relink()
 
+    await vi.waitFor(() => expect(store.entries().map(e => e.ref.number)).toEqual([1, 2]))
     expect(links).toHaveBeenLastCalledWith('s1')
-    expect(store.entries().map(e => e.ref.number)).toEqual([1, 2])
-    expect(changed).toHaveBeenCalledTimes(2)
     store.dispose()
   })
 
+  it('asks the plugin for the links of the session it names, and reads a malformed answer as none', async () => {
+    const gw = new FakeGateway({ replies: { 'plugin.hermes-tern.pull_requests.linked': () => ({ linked: [ref(3), { host: 'github.com' }] }) } })
+
+    expect((await linkedPullRequests(gw.client, 's1')).map(r => r.number)).toEqual([3])
+    expect(gw.sent('plugin.hermes-tern.pull_requests.linked')).toEqual([{ session_id: 's1' }])
+
+    gw.handlers.set('plugin.hermes-tern.pull_requests.linked', () => ({}))
+    expect(await linkedPullRequests(gw.client, 's1')).toEqual([])
+  })
   it('says once why nothing could be read', async () => {
     const gh = { graphql: vi.fn(async () => Promise.reject(new Error('Not logged in to github.com.'))), rest: vi.fn() }
-    const store = new PullRequests({ changed: vi.fn(), cwd: () => null, sid: () => storedSessionId('s1') }, gh, () => [ref(1), ref(2)])
+    const store = new PullRequests({ changed: vi.fn(), cwd: () => null, sid: () => liveSessionId('s1'), links: async () => [ref(1), ref(2)] }, gh)
 
     store.adopt()
     await vi.waitFor(() => expect(store.error).toBe('Not logged in to github.com.'))
@@ -270,7 +238,7 @@ describe('PullRequests', () => {
       return { repository: { pullRequest: { comments: { nodes: [{ author: { login: 'a' }, body: at.now, createdAt: '2026-01-02T00:00:00Z' }] } } } }
     })
     const rest = vi.fn(async () => [{ filename: `${at.now}.ts`, status: 'modified' }])
-    const store = new PullRequests({ changed: vi.fn(), cwd: () => null, sid: () => storedSessionId('s1') }, { graphql, rest }, () => [ref(5)])
+    const store = new PullRequests({ changed: vi.fn(), cwd: () => null, sid: () => liveSessionId('s1'), links: async () => [ref(5)] }, { graphql, rest })
     const reads = () => graphql.mock.calls.filter(c => c[1] === ACTIVITY_QUERY).length
 
     return { at, reads, rest, store }
@@ -329,7 +297,7 @@ describe('PullRequests', () => {
 
       return { p0: prJson() }
     })
-    const store = new PullRequests({ changed: vi.fn(), cwd: () => null, sid: () => storedSessionId('s1') }, { graphql, rest: vi.fn() }, () => [ref(5)])
+    const store = new PullRequests({ changed: vi.fn(), cwd: () => null, sid: () => liveSessionId('s1'), links: async () => [ref(5)] }, { graphql, rest: vi.fn() })
     const asked = () => graphql.mock.calls.filter(c => c[1].includes('stack { number }')).length
 
     const round = async () => {
@@ -378,7 +346,7 @@ describe('branch and stacks', () => {
     const evil: PrRef = { host: 'github.evil.com', number: 1, repository: 'acme/app', url: 'https://github.evil.com/acme/app/pull/1' }
     const graphql = vi.fn(async (_host: string) => ({ p0: prJson() }))
     const rest = vi.fn(async (_host: string) => [])
-    const store = new PullRequests({ changed: vi.fn(), cwd: () => null, sid: () => storedSessionId('s1') }, { graphql, rest }, () => [evil, ref(5)])
+    const store = new PullRequests({ changed: vi.fn(), cwd: () => null, sid: () => liveSessionId('s1'), links: async () => [evil, ref(5)] }, { graphql, rest })
 
     store.adopt()
     await vi.waitFor(() => expect(store.entries()[1]?.pr?.title).toBe('Fix it'))
@@ -418,9 +386,8 @@ describe('branch and stacks', () => {
     })
     const rest = vi.fn(async () => [{ base: 'main', number: 4, pull_requests: [{ head: { ref: 'x' }, number: 8 }, { head: { ref: 'y' }, number: 9 }] }])
     const store = new PullRequests(
-      { changed: vi.fn(), cwd: () => '/wt', sid: () => storedSessionId('s1') },
+      { changed: vi.fn(), cwd: () => '/wt', links: async () => [ref(5)], sid: () => liveSessionId('s1') },
       { graphql, rest },
-      () => [ref(5)],
       async () => ({ head: 'y', host: 'github.com', repository: 'acme/app' })
     )
 
@@ -447,13 +414,13 @@ describe('branch and stacks', () => {
     })
     const lookups: ((target: BranchTarget) => void)[] = []
     const branchOf = () => new Promise<BranchTarget | undefined>(resolve => lookups.push(resolve))
-    let shown = { cwd: '/a', sid: storedSessionId('s1') }
-    const store = new PullRequests({ changed: vi.fn(), cwd: () => shown.cwd, sid: () => shown.sid }, { graphql, rest: vi.fn() }, () => [], branchOf)
+    let shown = { cwd: '/a', sid: liveSessionId('s1') }
+    const store = new PullRequests({ changed: vi.fn(), cwd: () => shown.cwd, sid: () => shown.sid, links: async () => [] }, { graphql, rest: vi.fn() }, branchOf)
 
     store.adopt()
     await vi.waitFor(() => expect(lookups).toHaveLength(1))
 
-    shown = { cwd: '/b', sid: storedSessionId('s2') }
+    shown = { cwd: '/b', sid: liveSessionId('s2') }
     store.adopt()
     must(lookups[0])({ head: 'old', host: 'github.com', repository: 'acme/app' })
 
@@ -468,13 +435,21 @@ describe('branch and stacks', () => {
 
   it('lists without writing: entries() projects the store, and the stored entries carry no list fields', async () => {
     const graphql = vi.fn(async () => ({ p0: prJson() }))
-    const store = new PullRequests({ changed: vi.fn(), cwd: () => null, sid: () => storedSessionId('s1') }, { graphql, rest: vi.fn() }, () => [ref(5)])
+    // The round waits on the branch lookup until the test lets it go, so the listing is seen before any read.
+    let release: (target: BranchTarget | undefined) => void = () => {}
+    const branchOf = () => new Promise<BranchTarget | undefined>(resolve => (release = resolve))
+    const store = new PullRequests(
+      { changed: vi.fn(), cwd: () => '/repo', links: async () => [ref(5)], sid: () => liveSessionId('s1') },
+      { graphql, rest: vi.fn() },
+      branchOf
+    )
     const key = prKey(ref(5))
 
     store.adopt()
-    expect(store.entries().map(e => `${e.ref.number}:${e.source}`)).toEqual(['5:linked'])
+    await vi.waitFor(() => expect(store.entries().map(e => `${e.ref.number}:${e.source}`)).toEqual(['5:linked']))
     // Listing made no entry (the read does): get() answers a blank, not a stored one.
     expect(store.get(key)).not.toBe(store.get(key))
+    release(undefined)
 
     await vi.waitFor(() => expect(store.entries()[0]?.pr?.title).toBe('Fix it'))
     expect(store.get(key)).toBe(store.get(key))

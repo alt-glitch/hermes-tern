@@ -7,7 +7,7 @@ shared by every profile (``<hermes root>/tern-channels/channels.json``)::
      "channels": {"main": {"dir": "/abs/checkout", "alias": "mytern", "repo": "...", "ref": "main",
                            "sha": "...", "bundle_sha256": "..."}}}
 
-Only ``dir`` is required. ``alias`` names a top-level command (``hermes --tui mytern``). The
+Only ``dir`` is required. ``alias`` names a top-level command (``hermes mytern``). The
 installed plugin's own Python handlers stay loaded in the gateway; a channel changes only the
 frontend, and frontends check the gateway's plugin methods before using them.
 
@@ -62,7 +62,7 @@ def load(path: Optional[Path] = None) -> dict[str, dict[str, Any]]:
 
 
 def frontend_dir(name: str, path: Optional[Path] = None) -> Path:
-    """The channel's ``frontend`` folder (``HERMES_TUI_DIR``); SystemExit naming the problem otherwise."""
+    """The channel's ``frontend`` folder to launch with Node; SystemExit naming the problem otherwise."""
     chans = load(path)
     if name not in chans:
         known = ", ".join(sorted(chans)) or "none"
@@ -83,26 +83,10 @@ def aliases(path: Optional[Path] = None) -> dict[str, str]:
     return out
 
 
-def take_channel(flags: list[str]) -> tuple[list[str], Optional[str]]:
-    """Removes ``--channel NAME`` / ``--channel=NAME`` (``hermes chat`` does not know it)."""
-    out, chan, i = [], None, 0
-    while i < len(flags):
-        f = flags[i]
-        if f == "--channel" and i + 1 < len(flags):
-            chan, i = flags[i + 1], i + 2
-            continue
-        if f.startswith("--channel="):
-            chan = f.split("=", 1)[1]
-        else:
-            out.append(f)
-        i += 1
-    return out, chan
-
-
 def _panes() -> Path:
-    from . import connections
+    from . import plugin_data
 
-    return connections._dir("panes")
+    return plugin_data.folder("panes")
 
 
 def _switch_file(pane: str, folder: Optional[Path] = None) -> Path:
@@ -119,11 +103,15 @@ def _pane_of(pid: int) -> Optional[str]:
 
 def request_switch(name: str, pane: str, folder: Optional[Path] = None, *, kill=os.kill) -> dict[str, Any]:
     """Asks ``pane``'s running ``hermes tern`` to relaunch on channel ``name`` with the same session."""
+    if not pane.isdigit():
+        raise SystemExit("hermes tern: pane must be a numeric Tern pane id")
     frontend_dir(name)  # fail before stopping anything
     folder = folder or _panes()
     try:
         record = json.loads((folder / f"{pane}.json").read_text())
-        pid, sid = int(record["pid"]), str(record["session_id"])
+        pid, sid = record["pid"], record["session_id"]
+        if not isinstance(pid, int) or isinstance(pid, bool) or pid <= 0 or not isinstance(sid, str) or not sid:
+            raise ValueError("invalid pane record")
     except (OSError, ValueError, KeyError, TypeError):
         raise SystemExit(f"hermes tern: pane {pane} shows no hermes tern conversation") from None
     if _pane_of(pid) != pane:
@@ -151,9 +139,12 @@ def pending_switch(env: Optional[Mapping[str, str]] = None, folder: Optional[Pat
         path.unlink(missing_ok=True)
         return None
     path.unlink(missing_ok=True)
-    if not isinstance(request, dict) or time.time() - float(request.get("at") or 0) > SWITCH_TTL_S:
+    if not isinstance(request, dict):
         return None
-    if not request.get("channel") or not request.get("session_id"):
+    at = request.get("at")
+    if not isinstance(at, (int, float)) or not 0 <= time.time() - at <= SWITCH_TTL_S:
+        return None
+    if any(not isinstance(request.get(key), str) or not request[key] for key in ("channel", "session_id")):
         return None
     return request
 

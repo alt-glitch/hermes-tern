@@ -101,7 +101,7 @@ describe('masked terminal success advisory', () => {
   it('preserves retained replay and exposes the warning outside the work fold', () => {
     const pipeline = producer()[0]
     let n = 0
-    const entries = history({ kept: [], compactions: [], id: p => entryId(`${p}${++n}`), messages: [
+    const entries = history({ kept: [], id: p => entryId(`${p}${++n}`), messages: [
       { role: 'user', text: 'run' },
       { role: 'tool', name: 'terminal', tool_call_id: 'term', args: { command: 'npm test | tail' }, content: JSON.stringify(pipeline) },
       { role: 'assistant', text: 'answer' }
@@ -111,7 +111,7 @@ describe('masked terminal success advisory', () => {
     const block = turn.blocks.find(b => b.kind === 'tool')
     if (block?.kind !== 'tool') throw new Error('missing replay tool')
     expect(notice(tree(toolNode(block.call, 0)))).toBe(true)
-    const cx: TranscriptContext = { copy: () => undefined, now: 1000, welcome: { tip: '', version: '' } }
+    const cx: TranscriptContext = { copy: () => undefined, now: 1000, welcome: { version: '' } }
     const full = tree(entryNode(turn, 'main.masked', cx))
     expect(nodes(full).some(n => n.p?.['role'] === 'hermes.turn.fold' && n.p?.['collapsed'] === true)).toBe(false)
     const card = nodes(full).find(n => n.k === 'tool' && n.p?.['name'] === 'bash')

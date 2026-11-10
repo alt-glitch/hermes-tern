@@ -20,11 +20,6 @@ vi.mock('node:child_process', () => ({
   execFile: vi.fn((_file, _args, _options, callback) => callback(null, '', ''))
 }))
 vi.mock('../clipboard.js', () => ({ copyToClipboard: () => undefined }))
-vi.mock('../hermes/sessionIndex.js', async importOriginal => ({
-  ...(await importOriginal<typeof import('../hermes/sessionIndex.js')>()),
-  lastReply: () => '',
-  storedSessions: () => []
-}))
 
 const oldHome = process.env['HERMES_HOME']
 const home = mkdtempSync(join(tmpdir(), 'hermes-tern-postmerge-'))

@@ -10,12 +10,12 @@ import { settle, setup } from './appSetup.js'
 import { approvalCard } from './euiHostFixtures.js'
 import { given, must, ofKind, stubOverlay } from './fakes.js'
 
-vi.mock('@tui/lib/history.js', () => ({ append: () => undefined, load: () => [] }))
+vi.mock('@hermes/shared/prompt-history', () => ({ append: () => undefined, load: () => [] }))
 
 const apps: ReturnType<typeof setup>['app'][] = []
 beforeEach(() => {
-  delete process.env['HERMES_TUI_QUERY']
-  delete process.env['HERMES_TUI_IMAGE']
+  delete process.env['HERMES_TERN_QUERY']
+  delete process.env['HERMES_TERN_IMAGE']
 })
 afterEach(() => {
   for (const app of apps.splice(0)) app.dispose()

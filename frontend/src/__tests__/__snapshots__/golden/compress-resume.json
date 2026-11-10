@@ -4461,6 +4461,10 @@
  ],
  "requests": [
   {
+   "method": "runtime.describe",
+   "params": {}
+  },
+  {
    "method": "setup.status",
    "params": {}
   },
@@ -4491,7 +4495,21 @@
    }
   },
   {
+   "method": "plugin.hermes-tern.viewer.set",
+   "params": {
+    "session_id": "s1",
+    "pid": "<PID>",
+    "tern": {}
+   }
+  },
+  {
    "method": "process.list",
+   "params": {
+    "session_id": "s1"
+   }
+  },
+  {
+   "method": "plugin.hermes-tern.pull_requests.linked",
    "params": {
     "session_id": "s1"
    }
@@ -4530,7 +4548,6 @@
   {
    "method": "session.resume",
    "params": {
-    "cols": 100,
     "session_id": "s1"
    }
   },
@@ -4554,6 +4571,14 @@
     "key": "show_reasoning",
     "session_id": "s1",
     "value": "on"
+   }
+  },
+  {
+   "method": "plugin.hermes-tern.viewer.set",
+   "params": {
+    "session_id": "s1",
+    "pid": "<PID>",
+    "tern": {}
    }
   },
   {
@@ -4587,7 +4612,6 @@
   {
    "method": "session.resume",
    "params": {
-    "cols": 100,
     "session_id": "old"
    }
   },
@@ -4614,7 +4638,37 @@
    }
   },
   {
+   "method": "plugin.hermes-tern.viewer.clear",
+   "params": {
+    "session_id": "s1",
+    "pid": "<PID>"
+   }
+  },
+  {
+   "method": "plugin.hermes-tern.viewer.set",
+   "params": {
+    "session_id": "old",
+    "pid": "<PID>",
+    "tern": {}
+   }
+  },
+  {
+   "method": "session.transcript",
+   "params": {
+    "cursor": null,
+    "limit": 500,
+    "order": "latest",
+    "session_id": "old"
+   }
+  },
+  {
    "method": "process.list",
+   "params": {
+    "session_id": "old"
+   }
+  },
+  {
+   "method": "plugin.hermes-tern.pull_requests.linked",
    "params": {
     "session_id": "old"
    }

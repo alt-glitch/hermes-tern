@@ -51,7 +51,7 @@ describe('fail-closed write refusal', () => {
     let n = 0
     const replayArgs = record(payload['args'])
     if (!replayArgs) throw new Error('missing args')
-    const entries = history({ kept: [], compactions: [], id: p => entryId(`${p}${++n}`), messages: [
+    const entries = history({ kept: [], id: p => entryId(`${p}${++n}`), messages: [
       { role: 'tool', name: 'write_file', tool_call_id: 'replay', args: replayArgs, content: String(payload['result']) }
     ] })
     const turn = entries.find(e => e.kind === 'turn')

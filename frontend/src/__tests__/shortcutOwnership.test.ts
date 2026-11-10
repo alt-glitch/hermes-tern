@@ -6,7 +6,7 @@ import { effectiveShortcuts } from '../shortcuts/actions.js'
 import { busy, settle, setup } from './appSetup.js'
 import { given, key, must, tree } from './fakes.js'
 
-vi.mock('@tui/lib/history.js', () => ({ append: () => undefined, load: () => [] }))
+vi.mock('@hermes/shared/prompt-history', () => ({ append: () => undefined, load: () => [] }))
 
 async function configured(binding = 'ctrl+alt+c', overrides: Record<string, unknown> = {}) {
   const f = setup({

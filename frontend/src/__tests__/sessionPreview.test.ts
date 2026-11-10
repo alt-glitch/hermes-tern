@@ -1,7 +1,7 @@
 import type { NodeJson } from '@stencil-hq/tern'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { StoredSession } from '../hermes/sessionIndex.js'
+import type { ListedSession } from '../hermes/sessionList.js'
 import type { PreviewRow, TranscriptPage, TranscriptReader } from '../hermes/sessionTranscript.js'
 import { MORE, sessionDetail } from '../overlays/sessions/detail.js'
 import { type Preview, PreviewLoader } from '../overlays/sessions/preview.js'
@@ -11,20 +11,16 @@ import { must, spanTexts, tree } from './fakes.js'
 
 const user = (text: string, key = text): PreviewRow => ({ key, kind: 'user', steer: false, text })
 
-/** A reader over `pages` (by cursor), counting its reads; `fail` makes the next read throw. */
-function fakeReader(pages: Record<number, TranscriptPage> = { 0: { next: null, rows: [user('hi')] } }) {
+/** A reader over `pages` (by cursor, `first` for none), counting its reads; `fail` makes the next read throw. */
+function fakeReader(pages: Record<string, TranscriptPage> = { first: { next: null, reset: true, rows: [user('hi')] } }) {
   const reads: string[] = []
   const state = { fail: false }
   const reader: TranscriptReader = {
-    ends: id => {
-      reads.push(`ends ${id}`)
+    page: (id, cursor) => {
+      const at = cursor ?? 'first'
+      reads.push(`page ${id} ${at}`)
 
-      return state.fail ? Promise.reject(new Error('locked')) : Promise.resolve({ firstPrompt: `first of ${id}`, lastReply: `last of ${id}` })
-    },
-    page: (id, after) => {
-      reads.push(`page ${id} ${after}`)
-
-      return Promise.resolve(must(pages[after], `page ${after}`))
+      return state.fail ? Promise.reject(new Error('locked')) : Promise.resolve(must(pages[at], `page ${at}`))
     }
   }
 
@@ -57,8 +53,8 @@ describe('PreviewLoader', () => {
     await vi.advanceTimersByTimeAsync(1)
     await flush()
 
-    expect(reads).toEqual(['ends b', 'page b 0'])
-    expect(loader.get('b')).toMatchObject({ ends: { lastReply: 'last of b' }, next: null, status: 'ready' })
+    expect(reads).toEqual(['page b first'])
+    expect(loader.get('b')).toMatchObject({ next: null, status: 'ready' })
     expect(loader.get('a')).toBeUndefined()
   })
 
@@ -73,7 +69,7 @@ describe('PreviewLoader', () => {
     loader.select('a')
     await vi.advanceTimersByTimeAsync(50)
 
-    expect(reads).toEqual(['ends a', 'page a 0', 'ends b', 'page b 0'])
+    expect(reads).toEqual(['page a first', 'page b first'])
   })
 
   it('shows loading, then the error; selecting the session again retries', async () => {
@@ -93,14 +89,14 @@ describe('PreviewLoader', () => {
     await vi.advanceTimersByTimeAsync(10)
 
     expect(loader.get('a')?.status).toBe('ready')
-    expect(reads.filter(r => r === 'ends a')).toHaveLength(2)
+    expect(reads.filter(r => r === 'page a first')).toHaveLength(2)
   })
 
   it('reads the next page on request, one at a time, without rows it already holds, and stops at the end', async () => {
     const { reader, reads } = fakeReader({
-      0: { next: 4, rows: [user('one'), user('two')] },
-      4: { next: 9, rows: [user('two'), user('three')] },
-      9: { next: null, rows: [user('four')] }
+      first: { next: 'p4', reset: true, rows: [user('one'), user('two')] },
+      p4: { next: 'p9', reset: false, rows: [user('two'), user('three')] },
+      p9: { next: null, reset: false, rows: [user('four')] }
     })
     const loader = new PreviewLoader(reader, () => {}, { delay: 0, pageSize: 4 })
 
@@ -114,7 +110,7 @@ describe('PreviewLoader', () => {
     await flush()
 
     expect(loader.get('a')?.rows.map(r => (r.kind === 'user' ? r.text : ''))).toEqual(['one', 'two', 'three'])
-    expect(reads.filter(r => r.startsWith('page'))).toEqual(['page a 0', 'page a 4'])
+    expect(reads.filter(r => r.startsWith('page'))).toEqual(['page a first', 'page a p4'])
 
     loader.more('a')
     await flush()
@@ -122,14 +118,13 @@ describe('PreviewLoader', () => {
     await flush()
 
     expect(loader.get('a')).toMatchObject({ loadingMore: false, next: null })
-    expect(reads.filter(r => r.startsWith('page'))).toEqual(['page a 0', 'page a 4', 'page a 9'])
+    expect(reads.filter(r => r.startsWith('page'))).toEqual(['page a first', 'page a p4', 'page a p9'])
   })
 
-  it('reads on past a page that adds no line (tool results only)', async () => {
-    const { reader, reads } = fakeReader({
-      0: { next: 3, rows: [user('one')] },
-      3: { next: 6, rows: [] },
-      6: { next: null, rows: [user('two')] }
+  it('drops what it held when the gateway starts the transcript over', async () => {
+    const { reader } = fakeReader({
+      first: { next: 'p2', reset: true, rows: [user('new')] },
+      p2: { next: 'p3', reset: true, rows: [user('newest'), user('new')] }
     })
     const loader = new PreviewLoader(reader, () => {}, { delay: 0 })
 
@@ -138,7 +133,24 @@ describe('PreviewLoader', () => {
     loader.more('a')
     await flush()
 
-    expect(reads.filter(r => r.startsWith('page'))).toEqual(['page a 0', 'page a 3', 'page a 6'])
+    expect(loader.get('a')?.rows.map(r => (r.kind === 'user' ? r.text : ''))).toEqual(['newest', 'new'])
+    expect(loader.get('a')?.next).toBe('p3')
+  })
+
+  it('reads on past a page that adds no line (tool results only)', async () => {
+    const { reader, reads } = fakeReader({
+      first: { next: 'p3', reset: true, rows: [user('one')] },
+      p3: { next: 'p6', reset: false, rows: [] },
+      p6: { next: null, reset: false, rows: [user('two')] }
+    })
+    const loader = new PreviewLoader(reader, () => {}, { delay: 0 })
+
+    loader.select('a')
+    await vi.advanceTimersByTimeAsync(0)
+    loader.more('a')
+    await flush()
+
+    expect(reads.filter(r => r.startsWith('page'))).toEqual(['page a first', 'page a p3', 'page a p6'])
     expect(loader.get('a')?.rows).toHaveLength(2)
   })
 
@@ -175,9 +187,9 @@ describe('list rows', () => {
 
 const ID = 'local-c17b6fd5a5334f0e9d1c2b3a4f5e6d7c8b9a0f1e'
 
-const session: StoredSession = {
-  branch: 'main', cwd: '/w/app', id: ID, lastActive: 1_000, messages: 12, model: 'm', pinned: false,
-  preview: 'the first prompt, cut at 400', repoRoot: '/w/app', source: 'tui', startedAt: 500, title: 'Fix CI'
+const session: ListedSession = {
+  branch: 'main', conversation: ID, cwd: '/w/app', id: ID, lastActive: 1_000, lastReply: 'the last reply', messages: 12, model: 'm',
+  pinned: false, preview: 'the first prompt', running: false, source: 'tui', startedAt: 500, title: 'Fix CI', workspace: '/w/app'
 }
 
 /** Every text a node tree shows: `text` props and span texts. */
@@ -193,13 +205,12 @@ function texts(n: NodeJson): string[] {
 }
 
 function pane(preview: Preview | undefined, focused?: string) {
-  const d = sessionDetail({ copied: false, focus: () => {}, focused, isCurrent: false, more: () => {}, now: 2_000, preview, running: false, session })
+  const d = sessionDetail({ copied: false, focus: () => {}, focused, isCurrent: false, more: () => {}, now: 2_000, preview, session })
 
   return { blocks: d.blocks, json: d.nodes.map(tree), text: d.nodes.map(tree).flatMap(texts).join('\n') }
 }
 
-const ready = (rows: PreviewRow[], next: number | null): Preview => ({
-  ends: { firstPrompt: 'the whole first prompt', lastReply: 'the whole last reply' },
+const ready = (rows: PreviewRow[], next: string | null): Preview => ({
   loadingMore: false,
   next,
   rows,
@@ -215,27 +226,23 @@ describe('the preview pane', () => {
     expect(text).not.toMatch(/local-c17b6fd5a533[^\n]*…/)
   })
 
-  it('shows the first prompt and last reply whole once loaded, the listed prompt before', () => {
-    expect(pane(undefined).text).toContain('the first prompt, cut at 400')
+  it('shows the listed first prompt and last reply before the conversation loads', () => {
+    expect(pane(undefined).text).toContain('the first prompt')
+    expect(pane(undefined).text).toContain('the last reply')
     expect(pane(undefined).text).toContain('Loading the conversation…')
-
-    const loaded = pane(ready([], null)).text
-
-    expect(loaded).toContain('the whole first prompt')
-    expect(loaded).toContain('the whole last reply')
-    expect(loaded).toContain('No messages.')
+    expect(pane(ready([], null)).text).toContain('No messages.')
   })
 
   it('lists the conversation as blocks, a tool call on one line, and a Load more block while pages remain', () => {
     const rows: PreviewRow[] = [user('hi'), { args: { command: 'bun test' }, key: 't', kind: 'tool', name: 'terminal' }, { key: 'r', kind: 'assistant', text: 'All green.' }]
-    const { blocks, text } = pane(ready(rows, 7), 'm1')
+    const { blocks, text } = pane(ready(rows, 'older'), 'm1')
 
     expect(blocks).toEqual(['first', 'last', 'm0', 'm1', 'm2', MORE])
     expect(text).toContain('bun test')
     expect(text).toContain('All green.')
-    expect(text).toContain('Load more')
+    expect(text).toContain('Load older')
     expect(pane(ready(rows, null)).blocks).toEqual(['first', 'last', 'm0', 'm1', 'm2'])
-    expect(pane(ready(rows, null)).text).toContain('End of the conversation.')
+    expect(pane(ready(rows, null)).text).toContain('Start of the conversation.')
   })
 
   it('marks the focused block for Tern', () => {

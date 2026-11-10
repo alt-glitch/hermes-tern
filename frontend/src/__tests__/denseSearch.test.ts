@@ -22,7 +22,7 @@ describe('Hermes dense search cards', () => {
     const generic = 'g'.repeat(4001)
     const denseText = 'dense result' + 'x'.repeat(4001)
     let n = 0
-    const entries = history({ kept: [], compactions: [], id: prefix => entryId(`${prefix}${++n}`), messages: [
+    const entries = history({ kept: [], id: prefix => entryId(`${prefix}${++n}`), messages: [
       { role: 'user', text: 'inspect results' },
       { role: 'tool', name: 'search_files', tool_call_id: 'dense', args: { pattern: 'hit' }, content: JSON.stringify({ matches_text: denseText, total_count: 5, truncated: true, _omitted: 'filtered', error: 'dense failed' }) },
       { role: 'tool', name: 'search_files', tool_call_id: 'structured', args: { pattern: 'hit' }, content: JSON.stringify({ matches: [{ path: 'file.constructor', line: 1, content: 'hit' }], total_count: 2, _omitted: 'filtered', error: 'structured failed' }) },
@@ -89,7 +89,7 @@ describe('Hermes dense search cards', () => {
     expect(live.p?.['meta']).toEqual(['At least 7 matches', 'Search results truncated upstream'])
 
     let n = 0
-    const entries = history({ kept: [], compactions: [], id: prefix => entryId(`${prefix}${++n}`), messages: [
+    const entries = history({ kept: [], id: prefix => entryId(`${prefix}${++n}`), messages: [
       { role: 'user', text: 'find it' },
       { role: 'tool', name: 'search_files', tool_call_id: 'search', args: { pattern: 'hit' }, content: JSON.stringify(payload) }
     ] })

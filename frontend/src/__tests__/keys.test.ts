@@ -3,18 +3,15 @@
 import { type Key, node } from '@stencil-hq/tern'
 import { describe, expect, it } from 'vitest'
 
-import { sessionHost, type SessionHostCx } from '../commands/host.js'
 import { commandEnvelope } from '../commands/slash.js'
-import { liveSessionId, storedSessionId } from '../core/ids.js'
 import { DOUBLE_ESC_MS, EXIT_ARM_MS, EXTERNAL_EDITOR_KEY, KEY_RULES, type KeyCx, KEYS, matches, onKey } from '../draft/keys.js'
 import { HOTKEYS } from '../overlays/help.js'
 import type { Overlay } from '../overlays/overlay.js'
 import { ACTIONS, type ActionCx, onTernEvent } from '../surface/actions.js'
 import { INPUT_ID } from '../surface/host.js'
 import { APP_SHORTCUTS, effectiveShortcuts, shortcutGroups, shortcutMatches } from '../shortcuts/actions.js'
-import type { Busy } from '../turn/activity.js'
 
-import { FakeGateway, key } from './fakes.js'
+import { key } from './fakes.js'
 
 /** The pane as the key rules see it, recording what each rule did. */
 interface Pane {
@@ -457,8 +454,11 @@ describe('the Tern actions', () => {
         ? 'reject ' + image.reason
         : 'attach ' + image.name + ' ' + (image.kind === 'data' ? image.data : image.path)),
       connect: {
+        approve: (ref, name) => void log.push(`approve ${ref} ${name}`),
         continue: ref => void log.push(`continue ${ref}`),
-        open: (ref, name) => void log.push(`open ${ref} ${name}`)
+        open: (ref, name) => void log.push(`open ${ref} ${name}`),
+        retry: (ref, name) => void log.push(`retry ${ref} ${name}`),
+        skip: (ref, name) => void log.push(`skip ${ref} ${name}`)
       },
       focusComposer: () => void log.push('focus'),
       modal: () => modal,
@@ -481,8 +481,31 @@ describe('the Tern actions', () => {
     onTernEvent(action('open-url', 'https://x.test'), cx)
     onTernEvent(action('connect-continue', 'card-1'), cx)
     onTernEvent(action('connect-open', 'call:1:github'), cx)
-    expect(log).toEqual(['agent a1', 'agents', 'process p1', 'url https://x.test', 'continue card-1', 'open call:1 github'])
-    expect(Object.keys(ACTIONS).sort()).toEqual(['connect-continue', 'connect-open', 'open-agent', 'open-agents', 'open-process', 'open-url'])
+    onTernEvent(action('connect-skip', 'op1:figma'), cx)
+    onTernEvent(action('connect-retry', 'op1:figma'), cx)
+    onTernEvent(action('connect-approve', 'op1:linear'), cx)
+    expect(log).toEqual([
+      'agent a1',
+      'agents',
+      'process p1',
+      'url https://x.test',
+      'continue card-1',
+      'open call:1 github',
+      'skip op1 figma',
+      'retry op1 figma',
+      'approve op1 linear'
+    ])
+    expect(Object.keys(ACTIONS).sort()).toEqual([
+      'connect-approve',
+      'connect-continue',
+      'connect-open',
+      'connect-retry',
+      'connect-skip',
+      'open-agent',
+      'open-agents',
+      'open-process',
+      'open-url'
+    ])
   })
   it('do nothing without a value, or for an act with no handler', () => {
     const { cx, log } = actions()
@@ -527,66 +550,6 @@ describe('commandEnvelope', () => {
     expect(commandEnvelope({ output: 3, warning: { text: 'x' } })).toEqual({ dispatch: null, output: undefined, warning: undefined })
   })
 })
-
-describe('sessionHost', () => {
-  it('reads busy and queued live, the sid it was made for, and the session live', async () => {
-    const gw = new FakeGateway()
-    let busy: Busy | null = { label: 'Working…', since: {}, startedAt: 0 }
-    let queued = 2
-    let ref = { live: liveSessionId('s1'), stored: storedSessionId('stored-1') }
-    const resumed: string[] = []
-
-    const cx: SessionHostCx = {
-      activity: {
-        get busy() {
-          return busy
-        }
-      },
-      changed: () => {}, draft: () => {},
-      gw: gw.client,
-      life: {
-        reload: async () => undefined,
-        resume: async id => {
-          resumed.push(id)
-          ref = { live: liveSessionId('s2'), stored: id }
-        }
-      },
-      queue: { count: () => queued },
-      router: { behind: () => {}, send: () => {} },
-      setCompacting: () => {},
-      state: {
-        get ref() {
-          return ref
-        },
-        ticket: () => ({ isCurrent: () => true, signal: new AbortController().signal, sid: ref.live }),
-        usage: null
-      },
-      submit: () => {},
-      transcript: {
-        compactions: { compacted: () => {}, compacting: () => ({ startedAt: 0, state: { status: 'running' } }), uncompact: () => {} },
-        notice: () => {},
-        panel: () => {},
-        steer: () => {}
-      }
-    }
-
-    const host = sessionHost(cx)
-
-    expect(host.busy).toBe(true)
-    expect(host.queued).toBe(2)
-
-    // A command that awaited reads them as they are now.
-    busy = null
-    queued = 0
-    expect(host.busy).toBe(false)
-    expect(host.queued).toBe(0)
-    expect(host.sid).toBe('s1')
-    await expect(host.open(storedSessionId('stored-2'))).resolves.toBe(true)
-    expect(resumed).toEqual(['stored-2'])
-    expect(sessionHost(cx).busy).toBe(false)
-  })
-})
-
 
 describe('artifact copy shortcuts', () => {
   it('Alt+C copies the draft and Alt+Shift+C its current line, without stealing Meta+C', () => {

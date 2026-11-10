@@ -8,7 +8,6 @@ import { hermesTableChartPlanner, readTableChartReply, TABLE_CHART_DEADLINE_MS }
 
 const REPO = fileURLToPath(new URL('../../../', import.meta.url))
 const FIXTURE = join(REPO, 'tests', 'fixtures', 'table_charts')
-const UI = join(REPO, 'frontend')
 const TABLE = '| Category | Revenue |\n| --- | --- |\n| Alpha | 10 |\n| Beta | 25 |'
 const parsed = analyzeTable(TABLE)
 
@@ -17,11 +16,14 @@ function route(scenario: string, expectRedaction = false) {
   // PYTHONPATH resolves fixture providers, not credentials or a live model.
   return hermesTableChartPlanner({
     ...process.env,
-    HERMES_PYTHON: process.env['HERMES_PYTHON'] || 'python3',
-    HERMES_PYTHON_SRC_ROOT: FIXTURE,
-    HERMES_TUI_DIR: UI,
-    TABLE_CHART_FIXTURE_OUTPUT: scenario,
-    TABLE_CHART_FIXTURE_EXPECT_REDACTION: expectRedaction ? '1' : '0'
+    HERMES_TERN_HERMES: JSON.stringify({
+      argv: ['python3', '-m', 'hermes_cli.main'],
+      env: {
+        PYTHONPATH: FIXTURE,
+        TABLE_CHART_FIXTURE_OUTPUT: scenario,
+        TABLE_CHART_FIXTURE_EXPECT_REDACTION: expectRedaction ? '1' : '0'
+      }
+    })
   })
 }
 

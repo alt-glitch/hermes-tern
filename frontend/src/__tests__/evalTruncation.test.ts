@@ -39,7 +39,7 @@ describe('execute_code stdout truncation', () => {
     expect(JSON.stringify(card)).not.toContain('Re-run only with narrower output')
     expect(notices([tree(toolNode(make(short), 0))])).not.toContainEqual(text)
     let n = 0
-    const entries = history({ kept: [], compactions: [], id: p => entryId(`${p}${++n}`), messages: [
+    const entries = history({ kept: [], id: p => entryId(`${p}${++n}`), messages: [
       { role: 'user', text: 'run' }, { role: 'tool', name: 'execute_code', tool_call_id: 'eval', args: { code: 'print(1)' }, content: JSON.stringify(clipped) }
     ] })
     const turn = entries.find(e => e.kind === 'turn')

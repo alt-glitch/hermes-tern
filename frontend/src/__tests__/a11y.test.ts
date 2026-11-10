@@ -220,7 +220,7 @@ describe('every control is a named native button', () => {
     transcript.toolStart({ args: { background: true, command: 'sleep 90' }, name: 'terminal', tool_id: 't1' })
     transcript.toolComplete({ name: 'terminal', result: JSON.stringify({ exit_code: 0, output: 'Background process started', session_id: 'proc_a' }), tool_id: 't1' })
     const connect = must(transcript.call(toolCallId('c1')))
-    connect.connect = { opened: [], targets: [{ name: 'github', state: 'initiated', title: 'GitHub', url: 'https://example.com/auth' }], told: false }
+    connect.connect = { op: { id: 'op-a11y', seq: 2, session: 's1', deadlineAt: 300 }, opened: [], targets: [{ name: 'github', state: 'initiated', title: 'GitHub', url: 'https://example.com/auth' }] }
 
     const card = wire(toolNode(connect, 0))
     const shell = wire(toolNode(must(transcript.call(toolCallId('t1'))), 0))

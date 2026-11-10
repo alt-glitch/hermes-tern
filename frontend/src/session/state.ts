@@ -3,7 +3,7 @@
 // takes a ticket from here and checks it after each await.
 
 import type { Usage } from '@hermes/shared/gateway-events'
-import type { SessionInfo } from '@tui/types.js'
+import type { SessionInfo } from '@hermes/shared/gateway-types'
 
 import type { SessionView } from '../app/ports.js'
 import { Epoch, type Ticket } from '../core/epoch.js'

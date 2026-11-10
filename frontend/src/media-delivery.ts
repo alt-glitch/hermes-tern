@@ -4,7 +4,7 @@ import { constants } from 'node:fs'
 import { open } from 'node:fs/promises'
 
 import type { Session } from '@stencil-hq/tern'
-import type { GatewayClient } from '@tui/gatewayClient.js'
+import type { GatewayClient } from '@hermes/shared/gateway-client'
 
 import { imageFormat } from './hermes/images.js'
 import type { MediaContext } from './read-media.js'
@@ -36,7 +36,7 @@ export type PreviewState =
 
 export interface MediaDeliveryDeps {
   readonly tern: Pick<Session, 'blob' | 'caps'>
-  readonly gw: Pick<GatewayClient, 'attached' | 'request'> & { readonly isCanonical?: boolean }
+  readonly gw: Pick<GatewayClient, 'attached' | 'request'>
   readonly session: () => string | null
   readonly cwd: () => string | undefined
   readonly backend: () => string | null | undefined
@@ -147,13 +147,6 @@ export class MediaDelivery {
     // completed tool card or a mock gateway appears to return valid bytes.
     if (source.host === 'gateway' && source.toolCallId !== undefined) {
       return { label: 'Tool image preview unavailable: no authenticated completed-tool evidence.', status: 'unsupported' }
-    }
-
-    // The legacy WS also reports "attached", but has no public durable-key or
-    // successful canonical media receipt. Never paint Load/Retry for it.
-    if (source.host === 'gateway' && source.scope === 'attachment' &&
-        this.deps.gw.attached && this.deps.gw.isCanonical !== true) {
-      return { label: 'Image preview unsupported for legacy sessions', status: 'unsupported' }
     }
 
     // An owned prompt attachment is gateway-staged, regardless of UNKNOWN
@@ -331,7 +324,7 @@ export class MediaDelivery {
     const { gw, env = process.env } = this.deps
 
     const current = JSON.stringify([
-      this.deps.session(), this.deps.cwd(), this.deps.backend(), gw.attached, gw.isCanonical, ternSharesFrontendHost(env)
+      this.deps.session(), this.deps.cwd(), this.deps.backend(), gw.attached, ternSharesFrontendHost(env)
     ])
 
     // Keying solely by the current values resurrects blobs after A -> B -> A.

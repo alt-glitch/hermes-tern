@@ -289,7 +289,7 @@ describe('delegation ownership (gateway events → Agents → transcript)', () =
     h.agents.apply('subagent.start', { ...payload('root-a', 'group-a'), depth: 0 }, 20)
     attachRow(ownersOf(h.transcript.delegations()), b, 0, {
       delegation_id: 'group-b', depth: 0, goal: 'duplicate identity', subagent_id: 'root-a'
-    }, undefined)
+    })
     const beforeA = JSON.stringify(a.subagents)
     const beforeB = JSON.stringify(b.subagents)
 
@@ -308,7 +308,7 @@ describe('delegation ownership (gateway events → Agents → transcript)', () =
     dispatched(h.transcript, 'call-b', 'group-a', 10)
     attachRow(ownersOf(h.transcript.delegations()), a, 0, {
       delegation_id: 'group-a', depth: 0, goal: 'known root', subagent_id: 'root-a'
-    }, undefined)
+    })
     const revisions = h.transcript.entries.filter(e => e.kind === 'turn').map(t => t.rev)
 
     h.agents.apply('subagent.start', {
@@ -329,7 +329,7 @@ describe('delegation ownership (gateway events → Agents → transcript)', () =
     const call = must(h.transcript.delegations()[0])
     attachRow(ownersOf(h.transcript.delegations()), call, 0, {
       delegation_id: 'resumed-root', depth: 0, goal: 'root task', subagent_id: 'sa-0-resumed'
-    }, undefined)
+    })
 
     h.agents.apply('subagent.start', {
       ...payload('nested-c', 'group-c'), parent_id: 'sa-0-resumed', depth: 1
@@ -348,7 +348,7 @@ describe('delegation ownership (gateway events → Agents → transcript)', () =
     h.agents.apply('subagent.start', { ...payload('root-a', 'group-a'), depth: 0 }, 10)
     attachRow(ownersOf(h.transcript.delegations()), a, 0, {
       delegation_id: 'group-a', depth: 0, goal: 'duplicate root', subagent_id: 'root-a'
-    }, undefined)
+    })
     const before = JSON.stringify(a.subagents)
     const revisions = h.transcript.entries.filter(e => e.kind === 'turn').map(t => t.rev)
 
@@ -509,7 +509,7 @@ describe('delegation ownership (gateway events → Agents → transcript)', () =
     const call = must(h.transcript.delegations()[0])
     const row = attachRow(ownersOf(h.transcript.delegations()), call, 0, {
       delegation_id: 'resumed-group', depth: 0, goal: 'resume goal', subagent_id: 'sa-0-resumed'
-    }, undefined)
+    })
 
     h.agents.apply('subagent.complete', { ...payload('sa-0-resumed', 'resumed-group'), status: 'completed' }, 20)
 

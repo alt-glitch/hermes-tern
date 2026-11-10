@@ -3,7 +3,7 @@
 import type { ServerRequest } from '@hermes/shared/json-rpc-channel'
 
 import { errorText } from '../core/errors.js'
-import { storedCompactions } from '../hermes/compactions.js'
+import { allCompactions, latestCompactions } from '../hermes/compactions.js'
 import { promptOverlay } from '../overlays/prompts.js'
 import { parsePrompt } from '../prompts/parse.js'
 import { interruptTurn } from '../turn/control.js'
@@ -20,7 +20,6 @@ export function gates(cx: ActionsCx): GateState {
   return {
     awaitingStartup: cx.attachments.awaitingStartup,
     busy: activity.busy !== null,
-    canonical: cx.gw.isCanonical,
     compacting: activity.compacting !== undefined,
     sid: cx.state.ref.live,
     switching: cx.life.switching
@@ -76,21 +75,46 @@ export function setCompacting(cx: ActionsCx, on: boolean, { manual = false }: { 
 }
 
 export function summarize(cx: ActionsCx, delay = 0) {
-  const { state, transcript } = cx
+  const { gw, state, transcript } = cx
   const ticket = state.ticket()
 
-  if (!transcript.compactions.unsummarized) {
+  if (!transcript.compactions.unsummarized || !ticket.sid) {
     return
   }
 
-  cx.timers.timeout(() => {
-    const stored = state.info?.stored_session_id || state.ref.stored
+  const sid = ticket.sid
+  const read = async () => {
+    if (!ticket.isCurrent() || !transcript.compactions.unsummarized) {
+      return
+    }
 
-    if (ticket.isCurrent() && stored && transcript.compactions.unsummarized) {
-      transcript.compactions.summarize(storedCompactions(stored))
+    // A failed read leaves the summary to the next turn's end.
+    const stored = await latestCompactions(gw, sid).catch(() => [])
+
+    if (ticket.isCurrent()) {
+      transcript.compactions.summarize(stored)
       cx.changed()
     }
-  }, delay)
+  }
+
+  cx.timers.timeout(() => void read(), delay)
+}
+
+export async function restoreCompactions(cx: ActionsCx) {
+  const { gw, state, transcript } = cx
+  const ticket = state.ticket()
+
+  if (!ticket.sid) {
+    return
+  }
+
+  // A failed read leaves the transcript without its markers, as a gateway without them would.
+  const stored = await allCompactions(gw, ticket.sid, () => ticket.isCurrent()).catch(() => undefined)
+
+  if (stored?.length && ticket.isCurrent()) {
+    transcript.placeCompactions(stored)
+    cx.changed()
+  }
 }
 
 export async function readBusyMode(cx: ActionsCx) {

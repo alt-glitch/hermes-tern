@@ -5,7 +5,7 @@
 // skipped, a missing list reads as none.
 
 import type { SessionLiveInfo } from '@hermes/shared/gateway-events'
-import type { SessionInfo } from '@tui/types.js'
+import type { SessionInfo } from '@hermes/shared/gateway-types'
 import * as z from 'zod/mini'
 
 import { oneOf } from '../core/assert.js'

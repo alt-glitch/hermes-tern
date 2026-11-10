@@ -22,7 +22,7 @@ export async function steerTurn(gw: Requester, sid: string, text: string): Promi
     const execution_generation = await currentGeneration(gw, sid)
     const r = await rpc(gw, 'session.steer', { session_id: sid, execution_generation, text })
 
-    return r?.status === 'queued' ? { ok: true } : { ok: false }
+    return r && 'status' in r && r.status === 'queued' ? { ok: true } : { ok: false }
   } catch (e) {
     // A stale generation means the turn ended first; anything else is a real failure.
     return errorText(e).includes('stale_generation') ? { ok: false } : { error: errorText(e), ok: false }
@@ -39,7 +39,7 @@ export async function redirectTurn(gw: Requester, sid: string, text: string): Pr
     const execution_generation = await currentGeneration(gw, sid)
     const r = await rpc(gw, 'session.redirect', { session_id: sid, execution_generation, text })
 
-    return r?.status === 'redirected' || r?.status === 'queued' ? { ok: true } : { ok: false }
+    return r && 'status' in r && (r.status === 'redirected' || r.status === 'queued') ? { ok: true } : { ok: false }
   } catch (e) {
     return errorText(e).includes('stale_generation') ? { ok: false } : { error: errorText(e), ok: false }
   }

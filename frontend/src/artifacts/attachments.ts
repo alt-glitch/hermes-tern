@@ -4,7 +4,7 @@
 import { isAbsolute } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import type { GatewayClient } from '@tui/gatewayClient.js'
+import type { GatewayClient } from '@hermes/shared/gateway-client'
 
 import { ternSharesFrontendHost } from './links.js'
 

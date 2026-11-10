@@ -16,7 +16,9 @@ the user's prompt, so one home covers every flow:
     "slow"      -> one 8-second command, long enough to queue or steer a message
     "solo…"     -> (at the start) one delegated agent with a long brief (context)
     "delegate…" -> (at the start) a delegate_task batch of three subagents, each running two slow
-                   terminal calls before a slowly streamed answer
+                   terminal calls before a slowly streamed answer; "delegate slow…": two 12 s calls
+                   each, long enough to open the hub, the pane beside the chat, or quit and resume
+    "nested…"   -> (at the start) one orchestrator subagent that delegates one slow worker of its own
     "delegate tiles…" -> six subagents with progress notes and two 45 s terminal steps, for tile/overflow capture
     "background…" -> (at the start) a 90 s ticking background process that notifies on exit
     "watch…"    -> (at the start) a 2 min ticking background process watching for "tick 10"
@@ -27,12 +29,19 @@ the user's prompt, so one home covers every flow:
     "errands…"  -> (at the start) a four-item todo list worked through over slow steps
     "todos…"    -> (at the start) a long todo list (16 items: long ones that wrap, done, cancelled,
                    subtasks under parents), then a long answer for the open panel to sit over
+    "connect APP…" -> (at the start) a manage_connections connect for the apps named (the
+                   gateway's connection card; it mints real links under a guest identity)
+    "install APP…" -> (at the start) a manage_connections install of those local MCP servers (the
+                   card shows what Connect runs; approving it installs the server into the lab home)
     "connector…" -> (at the start) a tool search, a two-app connector batch and one connector call
     "replay ID" -> runs recorded job ID from $FAKE_MODEL_REPLAY/commands.json in the background,
                    and answers its chart request with $FAKE_MODEL_REPLAY/ID.spec.json (the rules
                    the auxiliary model wrote for it in lab/chartbench.ts): real charts in the lab
     "ternenv"   -> (at the start) prints the TERN_* variables from a command, a background command and a Python cell's command
     "pr [URL…]" -> (at the start) links the PR URLs given, else a real public PR (link_pull_request)
+    "sublink [URL]" -> (at the start) one subagent that links the PR URL given, else a real public PR:
+                   the parent's transcript gets no link result, so its pane learns of the link
+                   from the plugin's event alone
     "cron…"     -> (at the start) two cron jobs: a 30 min digest and a 15 min page monitor
     anything else -> a streamed markdown reply
 """
@@ -141,6 +150,17 @@ TILE_STEPS = [
      "printf 'Checking the second progress sample\\n'; sleep 45; printf 'Second sample collected\\n'"),
 ]
 
+# "delegate slow…": the goals say so, and a child whose goal does takes these steps instead.
+SLOW = " (slowly)"
+SLOW_SUBAGENT_STEPS = [
+    "sleep 12 && ls | head -5",
+    "sleep 12 && date && find . -maxdepth 2 -name '*.md' | wc -l",
+]
+
+# "nested…": an orchestrator child whose goal says so delegates one slow worker of its own.
+ORCHESTRATE_GOAL = "Orchestrate: hand the clock reading to a worker of your own"
+WORKER_GOAL = "Read the clock twice, a few seconds apart" + SLOW
+
 SOLO_GOAL = "Read-only on the repo (only write the one output file). Verify which cleanup candidates in the audit are still dead code."
 SOLO_CONTEXT = """Repo checkout (read-only) at origin/main. Do not fetch; work on this snapshot and note the commit.
 
@@ -197,12 +217,28 @@ ERRANDS = [
 ]
 
 
+PR_URL = r"https://[^\s/]+/[^\s/]+/[^\s/]+/pull/\d+"
+DEFAULT_PR = "https://github.com/alt-glitch/hermes-tern/pull/22"
+# The goal the "sublink" prompt gives its subagent; the subagent's first move reads the URL from it.
+SUBLINK_GOAL = "Link the pull request "
+
+
 def _subagent_calls(messages: list[dict]) -> list[dict] | None:
-    """A subagent's next move: one slow terminal step per earlier tool result, then the answer."""
+    """A subagent's next move: one slow terminal step per earlier tool result, then the answer.
+    An orchestrator (its goal says so) first delegates one worker and waits for it. The "sublink"
+    subagent links its pull request first."""
+    goal = next((str(m.get("content")) for m in messages if m.get("role") == "user"), "")
     done = sum(1 for m in messages if m.get("role") == "tool")
-    if done >= len(SUBAGENT_STEPS):
+    if ORCHESTRATE_GOAL in goal:
+        return None if done else [_call("delegate_task", {"goal": WORKER_GOAL}, "call-worker")]
+    if SUBLINK_GOAL.lower() in goal.lower():
+        url = re.search(PR_URL, goal)
+        link = _call("tool_call", {"calls": [{"name": "link_pull_request", "arguments": {"url": url.group(0) if url else DEFAULT_PR}}]}, "call-sublink")
+        return None if done else [link]
+    steps = SLOW_SUBAGENT_STEPS if SLOW in goal else SUBAGENT_STEPS
+    if done >= len(steps):
         return None
-    return [_call("terminal", {"command": SUBAGENT_STEPS[done]}, f"call-step{done}")]
+    return [_call("terminal", {"command": steps[done]}, f"call-step{done}")]
 
 
 def _calls(prompt: str, target: Path) -> list[dict] | None:
@@ -215,7 +251,10 @@ def _calls(prompt: str, target: Path) -> list[dict] | None:
             for g in TILE_GOALS
         ]})]
     if words.lstrip().startswith("delegate"):
-        return [_call("delegate_task", {"tasks": [{"goal": g} for g in SUBAGENT_GOALS]})]
+        slow = SLOW if words.split()[1:2] == ["slow"] else ""
+        return [_call("delegate_task", {"tasks": [{"goal": g + slow} for g in SUBAGENT_GOALS]})]
+    if words.lstrip().startswith("nested"):
+        return [_call("delegate_task", {"goal": ORCHESTRATE_GOAL, "role": "orchestrator"})]
     if words.lstrip().startswith("solo"):
         # One delegated agent with a long brief, as a real audit hand-off reads.
         return [_call("delegate_task", {"goal": SOLO_GOAL, "context": SOLO_CONTEXT})]
@@ -232,6 +271,16 @@ def _calls(prompt: str, target: Path) -> list[dict] | None:
     if words.lstrip().startswith("watch"):
         # `notify` is the advertised flag (tools/terminal_tool.py): a list watches for those lines.
         return [_call("terminal", {"command": TICKS.format(n=120), "background": True, "notify": ["tick 10"]})]
+    if words.lstrip().startswith("connect "):
+        # A manage_connections connect for the apps named: the gateway's connection card. A real
+        # connect, so the scratch home gets a guest identity and real links (nothing is authorized).
+        apps = re.findall(r"[a-z][a-z0-9_-]*", words.split(None, 1)[1]) or ["figma"]
+        return [_call("manage_connections", {"action": "connect", "connectors": apps}, "call-connect")]
+    if words.lstrip().startswith("install "):
+        # A manage_connections install of the catalog's local MCP servers named: the card shows what
+        # Connect would run. Approving it really installs the server into the lab's home.
+        apps = re.findall(r"[a-z][a-z0-9_-]*", words.split(None, 1)[1]) or ["figma"]
+        return [_call("manage_connections", {"action": "install", "connectors": [{"name": a, "mcp": True} for a in apps]}, "call-install")]
     if words.lstrip().startswith("connector"):
         # Connectors come through the tool_call bridge as a batch; the lab has none connected,
         # so each entry fails, which is what the batch view must show too.
@@ -243,11 +292,14 @@ def _calls(prompt: str, target: Path) -> list[dict] | None:
             ]}, "call-batch"),
             _call("tool_call", {"name": "connectors__linear__LINEAR_LIST_ISSUES", "arguments": {"limit": 3}}, "call-one"),
         ]
+    if words.lstrip().startswith("sublink"):
+        url = re.search(PR_URL, prompt)
+        return [_call("delegate_task", {"goal": SUBLINK_GOAL + (url.group(0) if url else DEFAULT_PR)})]
     if words.lstrip().startswith("pr"):
         # A real public PR, linked the way an agent links one it opened (through the tool_call bridge
         # in case Tool Search defers the plugin's tools).
         # Any host: the tool, not the model, decides which hosts a link may name.
-        urls = re.findall(r"https://[^\s/]+/[^\s/]+/[^\s/]+/pull/\d+", words) or ["https://github.com/alt-glitch/hermes-tern/pull/22"]
+        urls = re.findall(PR_URL, words) or [DEFAULT_PR]
         return [_call("tool_call", {"calls": [{"name": "link_pull_request", "arguments": {"url": u}} for u in urls]}, "call-link")]
     if words.lstrip().startswith("cron"):
         # cronjob_manage is a deferred tool: the model reaches it through the tool_call bridge.
@@ -512,6 +564,8 @@ def write_home(home: Path, base_url: str) -> Path:
         "telemetry": {"shared_metrics": {"enabled": False, "send": False, "offer_version": 2}},
         # A short tail, so /compress has something to summarize after a few turns.
         "compression": {"protect_last_n": 2, "protect_first_n": 0},
+        # Room for "nested…": an orchestrator child may spawn one level of workers.
+        "delegation": {"max_spawn_depth": 2},
     }, indent=2))
     (home / ".env").write_text("OPENAI_API_KEY=loopback-only\n")
     target = home / "approve-target"

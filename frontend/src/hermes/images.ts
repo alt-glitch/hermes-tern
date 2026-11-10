@@ -5,7 +5,7 @@ import { readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { extname, resolve } from 'node:path'
 
-import type { GatewayClient } from '@tui/gatewayClient.js'
+import type { GatewayClient } from '@hermes/shared/gateway-client'
 
 import { rpc } from '../wire/rpc.js'
 
@@ -94,7 +94,7 @@ export function imageSize(bytes: Buffer): { w: number; h: number } | undefined {
  * back too: the composer's thumbnail shows them (a clipboard image's file is gone right after).
  */
 export async function uploadImage(
-  gw: Pick<GatewayClient, 'request'> & { readonly isCanonical?: boolean },
+  gw: Pick<GatewayClient, 'request'>,
   sid: string,
   raw: string,
   cwd: string
@@ -127,24 +127,22 @@ export async function uploadImage(
   return { bytes, mime: format.mime, path: r.path }
 }
 
-/** Keep optional canonical plugin staging shared by every byte upload path. */
-export async function stageImageBytes(gw: Pick<GatewayClient, 'request'> & { readonly isCanonical?: boolean }, params: { session_id: string; filename: string; content_base64: string }) {
+/** Share optional plugin staging across every byte upload path on the gateway. */
+export async function stageImageBytes(gw: Pick<GatewayClient, 'request'>, params: { session_id: string; filename: string; content_base64: string }) {
   const sid = params.session_id
-  // Canonical plugin staging keeps an original caller-bound lease. If the
+  // Plugin staging keeps an original caller-bound lease. If the
   // optional method is absent, preserve core image.attach_bytes byte-for-byte.
   let namespaced = false
 
-  if (gw.isCanonical === true) {
-    try {
-      const caps = await gw.request<{ plugin_methods?: unknown }>('gateway.capabilities', {
-        session_id: sid
-      })
+  try {
+    const caps = await gw.request<{ plugin_methods?: unknown }>('gateway.capabilities', {
+      session_id: sid
+    })
 
-      namespaced = Array.isArray(caps?.plugin_methods) &&
-        caps.plugin_methods.includes('hermes-tern.media.attach_bytes')
-    } catch {
-      // An older gateway may not implement capabilities. Original staging still works.
-    }
+    namespaced = Array.isArray(caps?.plugin_methods) &&
+      caps.plugin_methods.includes('hermes-tern.media.attach_bytes')
+  } catch {
+    // An older gateway may not implement capabilities. Original staging still works.
   }
 
   const r = namespaced

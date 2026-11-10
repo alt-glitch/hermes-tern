@@ -4519,6 +4519,10 @@
  ],
  "requests": [
   {
+   "method": "runtime.describe",
+   "params": {}
+  },
+  {
    "method": "setup.status",
    "params": {}
   },
@@ -4549,7 +4553,21 @@
    }
   },
   {
+   "method": "plugin.hermes-tern.viewer.set",
+   "params": {
+    "session_id": "s1",
+    "pid": "<PID>",
+    "tern": {}
+   }
+  },
+  {
    "method": "process.list",
+   "params": {
+    "session_id": "s1"
+   }
+  },
+  {
+   "method": "plugin.hermes-tern.pull_requests.linked",
    "params": {
     "session_id": "s1"
    }
@@ -4574,6 +4592,21 @@
     "session_id": "s1",
     "submission_id": "00000000-0000-4000-8000-000000000001",
     "text": "delegate one audit"
+   }
+  },
+  {
+   "method": "subagent.list",
+   "params": {
+    "session_id": "s1"
+   }
+  },
+  {
+   "method": "session.transcript",
+   "params": {
+    "limit": 200,
+    "order": "oldest",
+    "session_id": "s1",
+    "subagent_id": "solo-agent"
    }
   }
  ]

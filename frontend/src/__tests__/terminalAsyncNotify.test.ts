@@ -19,11 +19,12 @@ const nodes = (node: NodeJson): NodeJson[] => [node, ...(node.c ?? []).flatMap(n
 const notice = (node: NodeJson) => nodes(node).some(n => n.p?.['role'] === 'omp.tool.notice' && JSON.stringify(n.p).includes(message))
 const make = (result: unknown, more: Partial<ToolCall> = {}) => call('terminal', { command: 'make test', background: true, notify_on_complete: true }, { result, ...more })
 
+const producerOutput = execFileSync('python3', [resolve('src/__tests__/fixtures/terminal-async-notify-core.py')], {
+  cwd: resolve('.hermes-src'), encoding: 'utf8', env: { ...process.env, PYTHONPATH: resolve('.hermes-src') }
+})
+
 function producer(): { args: Record<string, unknown>; result: Record<string, unknown>; event: Record<string, unknown> }[] {
-  const raw = execFileSync('python3', [resolve('src/__tests__/fixtures/terminal-async-notify-core.py')], {
-    cwd: resolve('.hermes-src'), encoding: 'utf8', env: { ...process.env, PYTHONPATH: resolve('.hermes-src') }
-  })
-  const events = parseJson(raw)
+  const events = parseJson(producerOutput)
   if (!Array.isArray(events)) throw new Error('expected envelopes')
   return events.map(value => {
     const event = record(value)
@@ -59,14 +60,14 @@ describe('unavailable terminal async notifications', () => {
     expect(notice(tree(toolNode(block.call, 5000)))).toBe(true)
 
     let n = 0
-    const entries = history({ kept: [], compactions: [], id: p => entryId(`${p}${++n}`), messages: [
+    const entries = history({ kept: [], id: p => entryId(`${p}${++n}`), messages: [
       { role: 'user', text: 'run' },
       { role: 'tool', name: 'terminal', tool_call_id: 'term', args: row.args, content: JSON.stringify(row.result) },
       { role: 'assistant', text: 'answer' }
     ] })
     const replay = entries.find(e => e.kind === 'turn')
     if (!replay) throw new Error('missing replay turn')
-    const cx: TranscriptContext = { copy: () => undefined, now: 1000, welcome: { tip: '', version: '' } }
+    const cx: TranscriptContext = { copy: () => undefined, now: 1000, welcome: { version: '' } }
     const full = tree(entryNode(replay, 'main.notify', cx))
     const card = nodes(full).find(n => n.k === 'tool' && n.p?.['name'] === 'bash')
     if (!card) throw new Error('missing terminal card')

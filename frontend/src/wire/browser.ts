@@ -2,7 +2,7 @@
 // profile on plugin methods; the caller binds its *server-provided* profile
 // identity and original SessionRef locally, then sends only session_id on wire.
 // Older gateways must advertise the actual namespaced registration or refuse.
-import type { GatewayClient } from '@tui/gatewayClient.js'
+import type { GatewayClient } from '@hermes/shared/gateway-client'
 
 import type { SessionView } from '../app/ports.js'
 import { record } from './json.js'

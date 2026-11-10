@@ -89,7 +89,7 @@ describe('cross-host previews', () => {
       }
       const prompt = tree(entryNode(entry, 'main.unknown', {
         copy: () => undefined, media: delivery, mediaRev: delivery.token(),
-        now: 0, welcome: { tip: '', version: '' }
+        now: 0, welcome: { version: '' }
       }))
       expect(nodes(prompt).some(n => n.k === 'image' && n.p?.['path'])).toBe(false)
       if (attached) {
@@ -216,7 +216,7 @@ describe('cross-host previews', () => {
     }
     const view = (): TranscriptContext => ({
       copy: () => undefined,
-      media: delivery, mediaRev: delivery.token(), now: 0, welcome: { tip: '', version: '' }
+      media: delivery, mediaRev: delivery.token(), now: 0, welcome: { version: '' }
     })
 
     expect(JSON.stringify(tree(entryNode(entry, 'main.u1', view())))).toContain('Load image preview')

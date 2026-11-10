@@ -1,6 +1,6 @@
 // Namespaced plugin RPC capability handshake. An old/core-only Hermes must never
 // impersonate a revision-bound plan authority just because it supports /plan.
-import type { GatewayClient } from '@tui/gatewayClient.js'
+import type { GatewayClient } from '@hermes/shared/gateway-client'
 
 export const PLAN_METHODS = {
   status: 'hermes-tern.plan.status',

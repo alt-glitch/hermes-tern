@@ -6,6 +6,7 @@
 import type { JSX } from '@stencil-hq/tern'
 
 import { displayMarkdown, type FileContext } from '../artifacts/links.js'
+import { liveOpen } from '../connections/live.js'
 import { optional } from '../core/assert.js'
 import type { MediaDelivery } from '../media-delivery.js'
 import type { SessionIds } from '../core/ids.js'
@@ -216,7 +217,10 @@ function turnNode(turn: TurnEntry, id: string, cx: TranscriptContext): JSX.Eleme
   // A running compaction is its own live line.
   const compacting = last?.kind === 'block' && last.block.kind === 'compaction' && last.block.compaction.state.status === 'running'
 
-  if (live && !compacting && (!last || (last.kind === 'block' && last.block.kind !== 'text') || (last.kind === 'work' && latestFailed(last.items)))) {
+  // A connect card the tool waits on is waiting on the user, not on the model.
+  const asking = last?.kind === 'block' && last.block.kind === 'tool' && liveOpen(last.block.call.connect)
+
+  if (live && !compacting && !asking && (!last || (last.kind === 'block' && last.block.kind !== 'text') || (last.kind === 'work' && latestFailed(last.items)))) {
     children.push(thinkingRow())
   }
 

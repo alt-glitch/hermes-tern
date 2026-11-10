@@ -47,12 +47,12 @@ describe('/skin', () => {
   })
 })
 
-describe('the model picker on the shared gateway', () => {
+describe('the model picker', () => {
   it('sends a session switch the model mutation takes', () => {
-    expect(modelPayload(pickerValue('hermes-4', 'nous', false))).toEqual({ model: 'hermes-4', provider: 'nous' })
+    expect(modelPayload(pickerValue('hermes-4', 'nous'))).toEqual({ model: 'hermes-4', provider: 'nous' })
   })
 
   it('refuses --global before any call, and says why', () => {
-    expect(() => modelPayload(pickerValue('hermes-4', 'nous', true))).toThrow(/this session only/)
+    expect(() => modelPayload('hermes-4 --provider nous --global')).toThrow(/this session only/)
   })
 })

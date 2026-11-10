@@ -1,7 +1,7 @@
 import { node, Surface, View } from '@stencil-hq/tern'
 import { describe, expect, it, vi } from 'vitest'
 
-import type { SessionInfo } from '@tui/types.js'
+import type { SessionInfo } from '@hermes/shared/gateway-types'
 import { liveSessionId } from '../core/ids.js'
 import { openSettings } from '../overlays/settings.js'
 import type { Overlay } from '../overlays/overlay.js'
@@ -9,7 +9,7 @@ import { PROFILE_PREFERENCES } from '../preferences/contracts.js'
 import { settle, setup } from './appSetup.js'
 import { key, must, stub, tree } from './fakes.js'
 
-vi.mock('@tui/lib/history.js', () => ({ append: () => undefined, load: () => [] }))
+vi.mock('@hermes/shared/prompt-history', () => ({ append: () => undefined, load: () => [] }))
 
 function fixture(options: { preflight?: Promise<{ value: string }>; wrongReadback?: boolean; rejectWrite?: boolean } = {}) {
   const values = new Map(PROFILE_PREFERENCES.map(f => [f.key, f.options?.[0] ?? 'default']))

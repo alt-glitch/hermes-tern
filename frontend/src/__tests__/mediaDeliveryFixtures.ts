@@ -10,15 +10,14 @@ export const response = () => ({ content_base64: png.toString('base64'), bytes: 
 interface Setup {
   readonly blobs?: boolean
   readonly attached?: boolean
-  readonly canonical?: boolean
   readonly backend?: string | null | undefined
   readonly env?: NodeJS.ProcessEnv
   readonly native?: boolean
 }
 
 export function setup(options: Setup = {}) {
-  const { blobs = true, attached = true, canonical = true, env = {}, native = false } = options
-  const gw = new FakeGateway({ canonical, replies: {
+  const { blobs = true, attached = true, env = {}, native = false } = options
+  const gw = new FakeGateway({ replies: {
     'gateway.capabilities': () => ({ plugin_methods: ['hermes-tern.media.image'] }),
     'hermes-tern.media.image': response
   } })

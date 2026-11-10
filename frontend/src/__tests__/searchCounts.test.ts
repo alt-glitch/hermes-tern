@@ -38,7 +38,7 @@ describe('Hermes per-file search counts', () => {
       [{ s: 'muted', t: 'Hermes total count: at least 8' }], [{ s: 'muted', t: 'Search results truncated upstream' }]
     ])
     let n = 0
-    const entries = history({ kept: [], compactions: [], id: p => entryId(`${p}${++n}`), messages: [
+    const entries = history({ kept: [], id: p => entryId(`${p}${++n}`), messages: [
       { role: 'user', text: 'count' },
       { role: 'tool', name: 'search_files', tool_call_id: 'search', args, content: JSON.stringify(result) }
     ] })

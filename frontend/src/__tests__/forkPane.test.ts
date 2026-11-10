@@ -10,7 +10,7 @@ import { isUnsupportedFork } from '../wire/fork.js'
 
 import { key, must, stub, stubOverlay } from './fakes.js'
 
-function fixture(options: { fallback?: boolean; canonical?: boolean; profile?: string } = {}) {
+function fixture(options: { fallback?: boolean; profile?: string } = {}) {
   const requests: { method: string; params: Record<string, unknown> }[] = []
   const request = vi.fn(async (method: string, params: Record<string, unknown> = {}): Promise<unknown> => {
     requests.push({ method, params })
@@ -37,7 +37,6 @@ function fixture(options: { fallback?: boolean; canonical?: boolean; profile?: s
   const gw = stub<SessionHost['gw']>({ request })
   const control = stub<SessionHost>({
     busy: false,
-    canonical: options.canonical ?? true,
     gw,
     sid: liveSessionId('runtime-parent'),
     stale: () => current !== 'runtime-parent'
@@ -115,15 +114,46 @@ describe('fork session in a sibling pane', () => {
     expect(f.notices[0]?.text).toContain('Method not found')
   })
 
-  it('fails clearly on a private gateway or during an active turn', async () => {
-    const local = fixture({ canonical: false })
-    await fork(local)
+  it('fails clearly without a session or during an active turn', async () => {
+    const local = fixture()
+    const sessionless = stub<ForkHost>({ ...local.host, control: () => ({ ...local.control, sid: null }) })
+    await forkSession(sessionless, '', local.open)
     expect(local.requests).toEqual([])
+    expect(local.open).not.toHaveBeenCalled()
+    expect(local.notices[0]?.text).toBe('Start a session before forking.')
     const running = fixture()
     const busy = stub<ForkHost>({ ...running.host, busy: { label: 'Working' } })
     await forkSession(busy, '', running.open)
     expect(running.requests).toEqual([])
     expect(running.notices[0]?.text).toContain('Wait for the current turn')
+  })
+
+  it.each(['session_owner_mismatch', 'permission_denied'])('a gateway %s refusal cannot fall back or launch a fork', async reason => {
+    const f = fixture()
+    f.request.mockRejectedValueOnce(new Error(reason))
+
+    await fork(f)
+
+    expect(f.request).toHaveBeenCalledExactlyOnceWith('session.fork', { session_id: 'runtime-parent' })
+    expect(f.open).not.toHaveBeenCalled()
+    expect(f.notices).toEqual([{ text: 'Could not fork session: ' + reason, tone: 'error' }])
+    expect(f.control.sid).toBe('runtime-parent')
+  })
+
+  it('an unavailable compatibility mutation cannot claim a saved child or open a pane', async () => {
+    const f = fixture({ fallback: true })
+    f.request.mockImplementation(async method => {
+      if (method === 'session.fork') throw new Error('Method not found: session.fork')
+      if (method === 'session.resume') return { revision: 12, execution_generation: 7 }
+      throw new Error('Method not found: session.mutate')
+    })
+
+    await fork(f)
+
+    expect(f.request.mock.calls.map(([method]) => method)).toEqual(['session.fork', 'session.resume', 'session.mutate'])
+    expect(f.open).not.toHaveBeenCalled()
+    expect(f.notices).toEqual([{ text: 'Could not fork session: Method not found: session.mutate', tone: 'error' }])
+    expect(f.control.sid).toBe('runtime-parent')
   })
 
   it('repeats cannot create two children while the first request remains pending', async () => {
@@ -218,7 +248,11 @@ describe('the fork shortcut', () => {
 })
 
 describe('the actual plugin pane launcher', () => {
-  const env = { HERMES_HOME: '/home', HERMES_PYTHON: '/venv/python', HERMES_PYTHON_SRC_ROOT: '/src', TERN_PANE: 'b3' }
+  const env = {
+    HERMES_HOME: '/home',
+    HERMES_TERN_HERMES: JSON.stringify({ argv: ['/venv/python', '-m', 'hermes_cli.main'], env: { PYTHONPATH: '/src' } }),
+    TERN_PANE: 'b3'
+  }
 
   it('uses fixed Tern argv, the plugin CLI and the active cwd without a shell', async () => {
     const execute = vi.fn(async (_file: string, _args: string[], _options: { shell: false }) => undefined)
@@ -230,10 +264,13 @@ describe('the actual plugin pane launcher', () => {
     ], { shell: false })
   })
 
-  it('without the original interpreter or pane never runs a process', async () => {
+  it('without the launcher command or pane never runs a process', async () => {
     const execute = vi.fn(async (_file: string, _args: string[], _options: { shell: false }) => undefined)
     expect(await launchPane(['tern', '--resume', 'child'], '/repo', { ...env, TERN_PANE: undefined }, execute)).toBe(false)
-    expect(await launchPane(['tern', '--resume', 'child'], '/repo', { ...env, HERMES_PYTHON: undefined }, execute)).toBe(false)
+    expect(await launchPane(['tern', '--resume', 'child'], '/repo', { ...env, HERMES_TERN_HERMES: undefined }, execute)).toBe(false)
+    for (const command of ['', 'not-json', '{}', JSON.stringify({ argv: [], env: { PYTHONPATH: '/src' } })]) {
+      expect(await launchPane(['tern', '--resume', 'child'], '/repo', { ...env, HERMES_TERN_HERMES: command }, execute)).toBe(false)
+    }
     expect(execute).not.toHaveBeenCalled()
   })
 })

@@ -17,7 +17,7 @@ const notice = 'Hermes reported this memory change was staged for approval; appl
 const tool = (id: string, c: ToolCall): Extract<Block, { kind: 'tool' }> => ({ kind: 'tool', id: entryId(id), call: c })
 const text = (id: string): Block => ({ kind: 'text', id: entryId(id), text: id })
 const turn = (blocks: Block[]): TurnEntry => ({ kind: 'turn', id: entryId('turn'), rev: 0, startedAt: 0, end: { status: 'done', endedAt: 1000 }, blocks })
-const cx: TranscriptContext = { copy: () => undefined, now: 1000, welcome: { tip: '', version: '' } }
+const cx: TranscriptContext = { copy: () => undefined, now: 1000, welcome: { version: '' } }
 const nodes = (root: NodeJson): NodeJson[] => [root, ...(root.c ?? []).flatMap(nodes)]
 const staged = { success: true, staged: true, pending_id: '1a2b3c4d', message: 'Pending approval' }
 const make = (result: unknown, more: Partial<ToolCall> = {}) => call('memory', { action: 'add' }, { result, ...more })
@@ -95,7 +95,7 @@ describe('historical memory staging attention', () => {
     if (!payload) throw new Error('missing payload')
     const args = record(payload['args'])
     if (!args) throw new Error('missing args')
-    const replay = (content?: string) => history({ kept: [], compactions: [], id: entryId, messages: [
+    const replay = (content?: string) => history({ kept: [], id: entryId, messages: [
       { role: 'tool', name: 'memory', tool_call_id: 'memory', args, ...(content ? { content } : {}) },
       { role: 'assistant', text: 'answer' }
     ] }).find(e => e.kind === 'turn')

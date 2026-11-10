@@ -5,7 +5,7 @@
 // sheet serves both wires. Its `respond` returns the RPC: the sheet closes once the answer lands
 // and stays open to retry when the gateway refuses it.
 import type { ServerRequest } from '@hermes/shared/json-rpc-channel'
-import type { AnyGatewayEvent, CanonicalClarifyPrompt } from '@tui/gatewayTypes.js'
+import type { AnyGatewayEvent, CanonicalClarifyPrompt } from '@hermes/shared/gateway-types'
 
 import { type Requester, type ResultOf, rpc } from '../wire/rpc.js'
 

@@ -49,7 +49,7 @@ describe('terminal environment recreation', () => {
     expect(JSON.stringify(card)).not.toContain('Persistent files were restored')
     expect(notices([tree(toolNode(make(clean), 0))])).not.toContainEqual(expected)
     let n = 0
-    const entries = history({ kept: [], compactions: [], id: p => entryId(`${p}${++n}`), messages: [
+    const entries = history({ kept: [], id: p => entryId(`${p}${++n}`), messages: [
       { role: 'user', text: 'run' }, { role: 'tool', name: 'terminal', tool_call_id: 'term', args: { command: 'true' }, content: JSON.stringify(flagged) }
     ] })
     const turn = entries.find(e => e.kind === 'turn')

@@ -9,7 +9,7 @@ import type { BtwThread } from '../wire/side.js'
 import { nativeBrowserSurface } from './browserSdk.js'
 import { FakeGateway, fakeTern, given, must, settle, stubOverlay, topNodes } from './fakes.js'
 
-vi.mock('@tui/lib/history.js', () => ({ append: () => undefined, load: () => [] }))
+vi.mock('@hermes/shared/prompt-history', () => ({ append: () => undefined, load: () => [] }))
 
 function thread(id: string, state: BtwThread['turns'][number]['state'] = 'answered', revision = 1): BtwThread {
   return {

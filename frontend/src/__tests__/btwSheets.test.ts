@@ -13,7 +13,7 @@ import { FakeGateway, fakeTern, given, key, must, stubOverlay, tree } from './fa
 import { sideSetup } from './sideSetup.js'
 
 vi.mock('../clipboard.js', () => ({ copyToClipboard: vi.fn() }))
-vi.mock('@tui/lib/history.js', () => ({ append: vi.fn(), load: () => [] }))
+vi.mock('@hermes/shared/prompt-history', () => ({ append: vi.fn(), load: () => [] }))
 
 function thread(id: string, state: BtwThread['turns'][number]['state'] = 'answered', revision = 1): BtwThread {
   return {

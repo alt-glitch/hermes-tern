@@ -183,7 +183,7 @@ describe('dockModel: removing an attached image', () => {
 
   /** Two landed images and one still uploading, with the upload's release. */
   async function draft() {
-    const gw = new FakeGateway({ canonical: true })
+    const gw = new FakeGateway()
     let uploads = 0
     let land: (v: unknown) => void = () => undefined
     gw.handlers.set('image.attach_bytes', () => (++uploads < 3 ? { path: `/uploads/${uploads}.png` } : new Promise(resolve => (land = resolve))))
@@ -199,7 +199,7 @@ describe('dockModel: removing an attached image', () => {
       launchCwd: dir,
       note: () => undefined,
       owner: () => owner
-    })
+    }, { clipboard: async () => undefined })
     await a.fromPath(shot)
     await a.fromPath(shot)
     const uploading = a.fromPath(shot)
@@ -274,7 +274,7 @@ function frame(over: Partial<FrameCx> = {}) {
     sidebar: { node: () => null },
     surface: { closed: false, follow: id => void log.push(`follow ${id}`), render: () => void log.push('render') },
     transcript: { changedEntries: new Set(), currentTodos: () => undefined, entries: [] },
-    welcome: { tip: '', version: '' },
+    welcome: { version: '' },
     ...over,
     stack: over.stack ?? stack
   }

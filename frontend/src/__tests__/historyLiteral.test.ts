@@ -12,7 +12,7 @@ import { FakeGateway, fakeTern, given, key, settle, stub, topNodes } from './fak
 import { Peer } from './surfacePeer.js'
 
 const history = vi.hoisted((): string[] => [])
-vi.mock('@tui/lib/history.js', () => ({
+vi.mock('@hermes/shared/prompt-history', () => ({
   append: (text: string) => void history.push(text),
   load: () => history
 }))

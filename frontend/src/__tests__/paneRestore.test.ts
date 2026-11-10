@@ -16,7 +16,7 @@ process.env['HERMES_HOME'] = mkdtempSync(join(tmpdir(), 'hermes-tern-pane-'))
 vi.mock('../surface/osc.js', () => ({ reportCwd: () => undefined, setTabTitle: () => undefined }))
 
 const { App } = await import('../app/chat.js')
-const { dataDir } = await import('../connections/cards.js')
+const { dataDir } = await import('../config/dataDir.js')
 
 const flush = () => new Promise(resolve => setTimeout(resolve, 0))
 const read = (pane: string, dir = dataDir()) => record(parseJson(readFileSync(paneFile(pane, dir), 'utf8'))) ?? {}
@@ -84,7 +84,7 @@ describe('the pane file', () => {
 
 describe('a pane restarted after its program died', () => {
   it('resumes the launcher’s session and says so', async () => {
-    const { app } = await started({ HERMES_TERN_RESTORED: 'root', HERMES_TUI_RESUME: 'tip' })
+    const { app } = await started({ HERMES_TERN_RESTORED: 'root', HERMES_TERN_RESUME: 'tip' })
 
     expect(gw.methods('session.create')).toHaveLength(0)
     expect(app.session.ref.stored).toBe('tip')
@@ -95,14 +95,44 @@ describe('a pane restarted after its program died', () => {
     gw.handlers.set('session.resume', () => {
       throw new Error('session not found')
     })
-    const { app } = await started({ HERMES_TERN_RESTORED: 'root', HERMES_TUI_RESUME: 'tip' })
+    const { app } = await started({ HERMES_TERN_RESTORED: 'root', HERMES_TERN_RESUME: 'tip' })
 
     expect(app.session.ref.live).toBe('new')
     expect(notices(app)).toEqual(["Could not resume this pane's last session (session not found); started a new one."])
   })
 
+  it('starts a new session when another live pane shows that one (the plugin says so)', async () => {
+    gw.handlers.set('plugin.hermes-tern.viewer.shown', p => ({ shown: JSON.stringify(p['ids']) === '["tip"]' }))
+    const { app } = await started({ HERMES_TERN_RESTORED: 'root', HERMES_TERN_RESUME: 'tip' })
+
+    expect(gw.methods('session.resume')).toHaveLength(0)
+    expect(app.session.ref.live).toBe('new')
+    expect(notices(app)).toEqual(["Another pane shows this pane's last session; started a new one."])
+  })
+
+  it('starts that new session where the pane launched, not in the other conversation\'s folder', async () => {
+    gw.handlers.set('plugin.hermes-tern.viewer.shown', () => ({ shown: true }))
+    await started({ HERMES_TERN_RESTORED: 'root', HERMES_TERN_RESUME: 'tip', HERMES_TERN_SESSION_CWD: '/elsewhere/repo' })
+
+    expect(gw.methods('session.create').map(c => c.params['cwd'])).toEqual(['/work'])
+  })
+
+  it('leaves a switch the user made while the plugin was answering alone', async () => {
+    let answer: (shown: { shown: boolean }) => void = () => undefined
+    gw.handlers.set('plugin.hermes-tern.viewer.shown', () => new Promise(resolve => (answer = resolve)))
+    const { app } = await started({ HERMES_TERN_RESTORED: 'root', HERMES_TERN_RESUME: 'tip' })
+
+    await app.stores.life.newSession()
+    answer({ shown: true })
+    await flush()
+
+    expect(gw.methods('session.create')).toHaveLength(1)
+    expect(gw.methods('session.resume')).toHaveLength(0)
+    expect(notices(app)).toEqual([])
+  })
+
   it('says nothing for a plain --resume', async () => {
-    const { app } = await started({ HERMES_TUI_RESUME: 'tip' })
+    const { app } = await started({ HERMES_TERN_RESUME: 'tip' })
 
     expect(app.session.ref.stored).toBe('tip')
     expect(notices(app)).toEqual([])

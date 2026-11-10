@@ -3,7 +3,7 @@
 // from here: filled whenever a picker loads the options, and once lazily by the effort picker.
 
 import type { ModelCapabilities, ModelOptionProvider } from '@hermes/shared/gateway-events'
-import type { GatewayClient } from '@tui/gatewayClient.js'
+import type { GatewayClient } from '@hermes/shared/gateway-client'
 
 import { rpc } from './wire/rpc.js'
 

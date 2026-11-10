@@ -113,7 +113,7 @@ export function cycleModel(host: ModelsHost, direction: -1 | 1): Promise<void> {
         return
       }
 
-      const value = pickerValue(next.model, next.provider, false)
+      const value = pickerValue(next.model, next.provider)
       const result = await switchModel(host, value)
 
       if (!current()) {

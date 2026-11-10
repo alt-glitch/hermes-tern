@@ -1,7 +1,7 @@
 // The agents hub's state: the tab, the picked agent, whether one agent's timeline is open, and
 // what the search line or the confirm bar is doing over it. A key (hubKey) and a click
 // (HUB_CLICKS) become the same HubAction, and reduceHub gives the next state and the one effect
-// the sheet runs for it (close, open beside, steer, stop, pause, read a log). The reducer is pure:
+// the sheet runs for it (close, open beside, steer, stop, pause). The reducer is pure:
 // it reads the agents from the list the sheet passes in.
 
 import type { Key } from '@stencil-hq/tern'
@@ -11,6 +11,7 @@ import type { Subagent } from '../model.js'
 import { editQuery, moveSelection } from '../overlays/search.js'
 
 import { isRunning } from './rows.js'
+import { agentSteps } from './transcript.js'
 
 export type HubTab = 'all' | 'running'
 
@@ -56,8 +57,6 @@ export type HubAction =
 export type HubEffect =
   | { kind: 'close' }
   | { kind: 'beside'; id: string }
-  /** Reads the agent's live log again, for its timeline. */
-  | { kind: 'refresh'; agent: Subagent }
   | { kind: 'steer'; agent: Subagent; text: string }
   | { kind: 'stop'; agent: Subagent }
   | { kind: 'pause' }
@@ -95,7 +94,7 @@ export function shownAgents(state: HubState, agents: readonly Subagent[]): Subag
 
 /** The ids of `a`'s timeline steps, oldest first. */
 export function stepIds(a: Subagent): string[] {
-  return (a.log?.entries ?? []).map((_, i) => `e${i}`)
+  return agentSteps(a).map((_, i) => `e${i}`)
 }
 
 const running = (a: Subagent | undefined): a is Subagent => Boolean(a && isRunning(a))
@@ -135,9 +134,7 @@ export function reduceHub(state: HubState, action: HubAction, agents: readonly S
     case 'watch': {
       const picked = agents.find(x => x.id === state.selected)
 
-      return picked
-        ? { effect: { agent: picked, kind: 'refresh' }, state: { ...state, view: { agent: picked.id, kind: 'timeline', step: undefined } } }
-        : { state }
+      return picked ? { state: { ...state, view: { agent: picked.id, kind: 'timeline', step: undefined } } } : { state }
     }
 
     case 'beside': {

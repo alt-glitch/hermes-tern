@@ -51,7 +51,7 @@ describe('read marker-pair disclosure', () => {
     const reverse = record(payloads[1])
     if (!reverse) throw new Error('missing reverse envelope')
     let n = 0
-    const entries = history({ kept: [], compactions: [], id: p => entryId(`${p}${++n}`), messages: [
+    const entries = history({ kept: [], id: p => entryId(`${p}${++n}`), messages: [
       { role: 'tool', name: 'read_file', tool_call_id: 'reverse', args: { path: 'example.py' }, content: String(reverse['result']) }
     ] })
     const turn = entries.find(e => e.kind === 'turn')

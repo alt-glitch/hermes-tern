@@ -52,7 +52,7 @@ describe('unchanged skill view', () => {
   it('renders retained history and keeps the actual grouped work as a fold', () => {
     const [result] = producer()
     let i = 0
-    const entries = history({ kept: [], compactions: [], id: p => entryId(`${p}${++i}`), messages: [
+    const entries = history({ kept: [], id: p => entryId(`${p}${++i}`), messages: [
       { role: 'user', text: 'read' },
       { role: 'tool', name: 'skill_view', tool_call_id: 's', args: { name: 'example' }, content: JSON.stringify(result) },
       { role: 'assistant', text: 'answer' }
@@ -61,7 +61,7 @@ describe('unchanged skill view', () => {
     const block = t?.blocks.find(b => b.kind === 'tool')
     if (!t || block?.kind !== 'tool') throw new Error('missing replay')
     expect(texts([tree(toolNode(block.call, 0))])).toContain(NOTICE)
-    const cx: TranscriptContext = { copy: () => undefined, now: 1000, welcome: { tip: '', version: '' } }
+    const cx: TranscriptContext = { copy: () => undefined, now: 1000, welcome: { version: '' } }
     const all = tree(entryNode(t, 'main.skill', cx))
     expect(JSON.stringify(all)).toContain('hermes.turn.fold')
     expect(texts([all])).toContain(NOTICE)
@@ -82,7 +82,7 @@ describe('unchanged skill view', () => {
     ]
     const t: TurnEntry = { kind: 'turn', id: entryId('turn'), rev: 0, startedAt: 0,
       end: { status: 'done', endedAt: 1000 }, blocks }
-    const cx: TranscriptContext = { copy: () => undefined, now: 1000, welcome: { tip: '', version: '' } }
+    const cx: TranscriptContext = { copy: () => undefined, now: 1000, welcome: { version: '' } }
     const root = tree(entryNode(t, 'main.combined', cx))
     const checklist = nodes(root).find(node => node.k === 'checklist')
     const dock = dockNodes(dockContext({ pills: { todos: { list: todos, open: true } } }), dockActions())

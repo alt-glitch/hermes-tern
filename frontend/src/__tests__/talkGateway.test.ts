@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events'
-import type { GatewayClient } from '@tui/gatewayClient.js'
+import type { GatewayClient } from '@hermes/shared/gateway-client'
 import { describe, expect, it, vi } from 'vitest'
 import { TalkGateway } from '../voice/talk-gateway.js'
 import { isTalkToggleKey } from '../voice/hold.js'

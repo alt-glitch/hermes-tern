@@ -5,7 +5,7 @@
 
 import type { CompleteSlashResult, CompletionItem } from '@hermes/shared/gateway-events'
 import type { JSX, Key } from '@stencil-hq/tern'
-import type { GatewayClient } from '@tui/gatewayClient.js'
+import type { GatewayClient } from '@hermes/shared/gateway-client'
 
 import { HIDDEN_COMMANDS, localCommands } from '../commands/local.js'
 import { optional } from '../core/assert.js'

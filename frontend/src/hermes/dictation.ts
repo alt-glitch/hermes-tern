@@ -3,12 +3,15 @@
 // names (`voice.record_key`).
 
 import { spawn } from 'node:child_process'
-import { join } from 'node:path'
+import { existsSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 
 import { type KeyMatch, KEYS } from '../draft/keys.js'
 import { type DictationCheck, type DictationEvent, dictationEvent, readDictationCheck } from '../wire/files.js'
 import { record } from '../wire/json.js'
 import { type Requester, rpc } from '../wire/rpc.js'
+
+import { readHermesCommand } from './connect.js'
 
 /** How long `--check` may take: its first run imports Hermes' audio and STT modules. */
 const CHECK_TIMEOUT_MS = 60_000
@@ -33,18 +36,18 @@ export interface Recorder {
   start(on: (event: DictationEvent) => void): Capture
 }
 
-/** The helper in Hermes' interpreter; undefined when the launcher named no interpreter or checkout to run it with. */
+/** The bundled helper in Hermes' interpreter; undefined when the launcher command is missing or invalid. */
 export function hermesRecorder(env: NodeJS.ProcessEnv = process.env): Recorder | undefined {
-  const python = env['HERMES_PYTHON']?.trim()
-  const root = env['HERMES_PYTHON_SRC_ROOT']
-  const ui = env['HERMES_TUI_DIR']
+  const hermes = readHermesCommand(env['HERMES_TERN_HERMES'])
 
-  if (!python || !root || !ui) {
+  if (!hermes) {
     return undefined
   }
 
-  const script = join(ui, '..', 'dictation.py')
-  const run = (args: string[]) => spawn(python, [script, ...args], { cwd: root, env: { ...env, PYTHONPATH: root }, stdio: ['pipe', 'pipe', 'ignore'] })
+  const [python] = hermes.argv
+  const bundled = new URL('../../dictation.py', import.meta.url)
+  const script = fileURLToPath(existsSync(bundled) ? bundled : new URL('../../../dictation.py', import.meta.url))
+  const run = (args: string[]) => spawn(python, [script, ...args], { env: { ...env, ...hermes.env }, stdio: ['pipe', 'pipe', 'ignore'] })
 
   return {
     check: () =>

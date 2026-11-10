@@ -5,12 +5,12 @@ import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { type Key, Node, plain } from '@stencil-hq/tern'
+import { type Key, plain } from '@stencil-hq/tern'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { FakeGateway, fakeTern, given, key, must, type Reply } from './fakes.js'
 
-vi.mock('@tui/lib/history.js', () => ({ append: () => undefined, load: () => [] }))
+vi.mock('@hermes/shared/prompt-history', () => ({ append: () => undefined, load: () => [] }))
 
 process.env['HERMES_HOME'] = mkdtempSync(join(tmpdir(), 'hermes-tern-status-'))
 
@@ -23,8 +23,8 @@ const { openModelPicker } = await import('../overlays/models.js')
 
 const settle = () => new Promise(resolve => setTimeout(resolve, 5))
 
-function setup(replies: Record<string, Reply> = {}, canonical = true) {
-  const gw = new FakeGateway({ canonical, replies })
+function setup(replies: Record<string, Reply> = {}) {
+  const gw = new FakeGateway({ replies })
   const tern = fakeTern({ cols: 100, draws: true })
   /** The last frame's dock. */
   const shown = () => tern.region('dock') ?? []
@@ -55,7 +55,7 @@ function setup(replies: Record<string, Reply> = {}, canonical = true) {
     return JSON.stringify(shown())
   }
 
-  return { app, dock, emit, press, raw, sent }
+  return { app, dispatch: tern.dispatch, dock, emit, press, raw, sent }
 }
 
 const goal = { contract: {}, gates: [], max_turns: 10, status: 'active', subgoals: [], title: 'Fix the flaky test', turns_used: 4 }
@@ -212,32 +212,65 @@ describe('App: fast mode', () => {
   })
 
   it.each(['keyboard', 'native'] as const)('keeps an expensive model pending on modified keys, then confirms via %s', async mode => {
-    const { app, press, sent } = setup({
+    const { app, dispatch, press, sent } = setup({
       'model.options': () => ({ model: 'a', provider: 'p', providers: [{ is_current: true, models: ['a', 'b'], name: 'P', slug: 'p' }] }),
-      'config.set': params => params['confirm_expensive_model'] === true
-        ? { key: 'model', value: 'b' }
-        : { key: 'model', confirm_required: true, confirm_message: 'Expensive' }
-    }, false)
+      'session.resume': () => ({ revision: 7, execution_generation: 3 }),
+      'session.mutate': params => {
+        if (params['operation'] === 'reasoning') return { status: 'applied' }
+        const payload = params['payload']
+        return payload && typeof payload === 'object' && 'confirm' in payload && payload.confirm === 'expensive-model-token'
+          ? { status: 'applied', model: 'b' }
+          : { status: 'confirmation_required', confirm: 'expensive-model-token', confirm_message: 'Expensive' }
+      }
+    })
     given.info(app, { model: 'a', provider: 'p' })
     openModelPicker(app)
     await settle()
     await press(key('down'))
     await press(key('enter'))
-    await vi.waitFor(() => expect(sent('config.set').filter(p => p['key'] === 'model')).toHaveLength(1))
+    const requested = {
+      operation: 'model', session_id: 's1', expected_revision: 7, expected_generation: 3,
+      request_id: expect.any(String), payload: { model: 'b', provider: 'p' }
+    }
+    await vi.waitFor(() => expect(sent('session.mutate')).toEqual([requested]))
+    expect(sent('session.resume')).toEqual([{ session_id: 's1' }])
     const overlay = must(app.overlays.find(item => item.key === 'models'))
     for (const name of ['y', 'enter', 'n', 'escape']) {
       await press(key(name, { ctrl: true, alt: true }))
     }
-    expect(sent('config.set').filter(p => p['key'] === 'model')).toHaveLength(1)
+    expect(sent('session.mutate')).toEqual([requested])
+    expect(sent('session.resume')).toEqual([{ session_id: 's1' }])
+    const event = { act: 'confirm', ev: 'action', id: app.stores.stack.rootOf(overlay), raw: {}, sf: 'hermes' } as const
+    const confirm = must(dispatch(event))
+    expect(confirm).toBeTypeOf('function')
     if (mode === 'keyboard') {
       await press(key('y'))
     } else {
-      const picker = overlay.node('layer.overlay-1')
-      if (!(picker instanceof Node)) { throw new Error('missing picker') }
-      must(picker.handlers?.onAction?.['confirm'])({ act: 'confirm', ev: 'action', id: 'layer.overlay-1', raw: {}, sf: 'hermes' })
+      await confirm()
     }
-    await vi.waitFor(() => expect(sent('config.set').filter(p => p['key'] === 'model')).toHaveLength(2))
-    expect(sent('config.set').filter(p => p['key'] === 'model')[1]).toMatchObject({ confirm_expensive_model: true })
+    const expected = [
+      requested,
+      {
+        operation: 'model', session_id: 's1', expected_revision: 7, expected_generation: 3,
+        request_id: expect.any(String), payload: { model: 'b', provider: 'p', confirm: 'expensive-model-token' }
+      },
+      {
+        operation: 'reasoning', session_id: 's1', expected_revision: 7, expected_generation: 3,
+        request_id: expect.any(String), payload: { effort: 'medium' }
+      }
+    ]
+    await vi.waitFor(() => expect(sent('session.mutate')).toEqual(expected))
+    expect(new Set(sent('session.mutate').map(params => params['request_id'])).size).toBe(3)
+    const resumes = [{ session_id: 's1' }, { session_id: 's1' }, { session_id: 's1' }]
+    expect(sent('session.resume')).toEqual(resumes)
+    expect(app.overlays).not.toContain(overlay)
+    await settle()
+    expect(dispatch(event)).toBeUndefined()
+    await confirm()
+    await settle()
+    expect(sent('session.mutate')).toEqual(expected)
+    expect(sent('session.resume')).toEqual(resumes)
+    expect(sent('config.set')).toEqual([])
   })
 })
 
@@ -300,15 +333,11 @@ describe('App: setting the effort', () => {
     expect(app.session.info?.reasoning_effort).toBe('high')
   })
 
-  it('keeps config.set scope=global for Save as default, and config.set on a private gateway', async () => {
-    const shared = setup(mutation())
-    await shared.app.setEffort('max', 'global')
-    expect(shared.sent('config.set')).toEqual([{ key: 'reasoning', scope: 'global', session_id: 's1', value: 'max' }])
-    expect(shared.sent('session.mutate')).toEqual([])
-
-    const own = setup({}, false)
-    await own.app.setEffort('low', 'session')
-    expect(own.sent('config.set')).toEqual([{ key: 'reasoning', scope: 'session', session_id: 's1', value: 'low' }])
+  it('keeps config.set scope=global for Save as default', async () => {
+    const { app, sent } = setup(mutation())
+    await app.setEffort('max', 'global')
+    expect(sent('config.set')).toEqual([{ key: 'reasoning', scope: 'global', session_id: 's1', value: 'max' }])
+    expect(sent('session.mutate')).toEqual([])
   })
 
   it('rolls the chip back when the change is refused', async () => {

@@ -4,7 +4,7 @@
 // /prs, /sidebar, …) are candidates too: the gateway's canon never lists them.
 
 import type { CommandsCatalogResult } from '@hermes/shared/gateway-events'
-import type { GatewayClient } from '@tui/gatewayClient.js'
+import type { GatewayClient } from '@hermes/shared/gateway-client'
 
 import { scoreSlashMenuItem } from '../hermes/completion.js'
 import { rpc } from '../wire/rpc.js'

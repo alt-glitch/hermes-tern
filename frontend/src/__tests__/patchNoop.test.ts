@@ -40,7 +40,7 @@ describe('already-applied patch projection', () => {
     expect(notice(toolDetail(c, 0).map(tree))).toContainEqual([{ s: 'muted', t: label }])
     expect(nodes(root).some(n => n.k === 'diff')).toBe(false)
     let n = 0
-    const entries = history({ kept: [], compactions: [], id: p => entryId(`${p}${++n}`), messages: [
+    const entries = history({ kept: [], id: p => entryId(`${p}${++n}`), messages: [
       { role: 'user', text: 'patch' }, { role: 'tool', name: 'patch', tool_call_id: 'p', args: { path: 'file.py' }, content: raw }
     ] })
     const turn = entries.find(e => e.kind === 'turn')
@@ -69,7 +69,7 @@ describe('already-applied patch projection', () => {
       { kind: 'text', id: entryId('answer'), text: 'answer' }
     ]
     const turn: TurnEntry = { kind: 'turn', id: entryId('turn'), rev: 0, startedAt: 0, end: { status: 'done', endedAt: 1000 }, blocks }
-    const cx: TranscriptContext = { copy: () => undefined, now: 1000, welcome: { tip: '', version: '' } }
+    const cx: TranscriptContext = { copy: () => undefined, now: 1000, welcome: { version: '' } }
     const root = tree(entryNode(turn, 'main.patch', cx))
     const data = JSON.stringify(root)
     expect(data).toContain('hermes.turn.fold')
@@ -92,7 +92,7 @@ describe('already-applied patch projection', () => {
     const turn: TurnEntry = { kind: 'turn', id: entryId('turn'), rev: 0, startedAt: 0, end: { status: 'done', endedAt: 1000 }, blocks }
     expect(foldOf(turn)?.hidden.has(entryId('web'))).toBe(false)
     expect(parts(turn).map(p => `${p.kind}:${p.blocks.map(b => b.id).join(',')}`)).toEqual(['fold:no-op', 'shown:web', 'fold:real', 'shown:answer'])
-    const cx: TranscriptContext = { copy: () => undefined, now: 1000, welcome: { tip: '', version: '' } }
+    const cx: TranscriptContext = { copy: () => undefined, now: 1000, welcome: { version: '' } }
     const root = tree(entryNode(turn, 'main.combined', cx))
     const fetch = nodes(root).filter(n => n.k === 'tool' && n.p?.['name'] === 'fetch')
     expect(fetch).toHaveLength(1)

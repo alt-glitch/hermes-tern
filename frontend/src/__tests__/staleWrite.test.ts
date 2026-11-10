@@ -19,7 +19,7 @@ import { call } from './toolFixtures.js'
 const args = { path: 'x.py', content: 'proposed content' }
 const make = (result: unknown, more: Partial<ToolCall> = {}) => call('write_file', args, { result, outcome: { kind: 'error', duration: 1 }, ...more })
 const nodes = (root: NodeJson): NodeJson[] => [root, ...(root.c ?? []).flatMap(nodes)]
-const cx: TranscriptContext = { copy: () => undefined, now: 1000, welcome: { tip: '', version: '' } }
+const cx: TranscriptContext = { copy: () => undefined, now: 1000, welcome: { version: '' } }
 const block = (id: string, c: ToolCall): Extract<Block, { kind: 'tool' }> => ({ kind: 'tool', id: entryId(id), call: c })
 function fixture(): Record<string, unknown> {
   const raw = execFileSync('python3', [resolve('src/__tests__/fixtures/stale-write-core.py')], {
@@ -69,7 +69,7 @@ describe('stale overwrite refusal', () => {
   it('retains the disclosure in history when the producer result survives', () => {
     const payload = fixture()
     let n = 0
-    const entries = history({ kept: [], compactions: [], id: p => entryId(`${p}${++n}`), messages: [
+    const entries = history({ kept: [], id: p => entryId(`${p}${++n}`), messages: [
       { role: 'tool', name: 'write_file', tool_call_id: 'stale', args, content: String(payload['result']) },
       { role: 'assistant', text: 'answer' }
     ] })

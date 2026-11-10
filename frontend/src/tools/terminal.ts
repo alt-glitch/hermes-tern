@@ -1,5 +1,4 @@
-// The terminal tool's detail: the command, how it ran, and what it printed; and a command without
-// the plugin's Tern pane prefix, as every view and store shows it.
+// The terminal tool's detail: the unchanged command, how it ran, and what it printed.
 
 import type { ToolCall } from '../model.js'
 
@@ -49,10 +48,15 @@ const ASYNC_UNSUPPORTED = 'notify_on_complete / watch_patterns are not available
   'an async completion after the turn ends (a one-shot runner such as `hermes -z`, a cron ' +
   'job, a Kanban worker, or a stateless HTTP endpoint). The process is running in the ' +
   "background; retrieve its result with process(action='poll') or process(action='wait')."
+const ASYNC_UNSUPPORTED_CURRENT = 'notify_on_complete / watch_patterns are not available in this session — it cannot receive ' +
+  'an async completion after the turn ends (a one-shot runner such as `hermes -z`, a /bg ' +
+  'background task, a cron job, a Kanban worker, or a stateless HTTP endpoint). The process is running in the ' +
+  "background; retrieve its result with process(action='poll') or process(action='wait')."
 
 function asyncNotifyUnavailable(result: Raw['result']): boolean {
   try {
-    if (!result || !Object.hasOwn(result, 'notify_unsupported') || result['notify_unsupported'] !== ASYNC_UNSUPPORTED) return false
+    if (!result || !Object.hasOwn(result, 'notify_unsupported') ||
+      (result['notify_unsupported'] !== ASYNC_UNSUPPORTED && result['notify_unsupported'] !== ASYNC_UNSUPPORTED_CURRENT)) return false
     if (!Object.hasOwn(result, 'notify_on_complete') || result['notify_on_complete'] !== false) return false
     if (!Object.hasOwn(result, 'session_id') || typeof result['session_id'] !== 'string' || !result['session_id']) return false
     if (!Object.hasOwn(result, 'output') || result['output'] !== 'Background process started') return false
@@ -109,18 +113,4 @@ export function terminalRecreationNeedsAttention(call: ToolCall, detail: Termina
 /** A retained successful foreground advisory warns about another command's unknown outcome. */
 export function terminalMaskedNeedsAttention(call: ToolCall, detail: TerminalDetail): boolean {
   return call.outcome.kind === 'done' && !detail.background && detail.maskedSuccess
-}
-
-/**
- * The prefix the plugin's `tool_request` middleware puts before a command so it runs with the chat's
- * Tern pane (`tern_env.py`): `export TERN_PANE=… …;` and/or `unset TERN_…;`. It is not what the agent
- * wrote, so the views and the stores leave it out.
- */
-const TERN_ENV = /^\s*(?:export (?:TERN_[A-Z_]+=(?:'[^']*'|"[^"]*"|[^\s;]+) ?)+; ?)?(?:unset (?:TERN_[A-Z_]+ ?)+; ?)?/
-
-/** `command` without the plugin's Tern pane prefix. */
-export function withoutTernEnv(command: string): string {
-  const m = TERN_ENV.exec(command)
-
-  return m?.[0] ? command.slice(m[0].length) : command
 }

@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { FakeGateway, given } from './fakes.js'
 import { App } from './appSetup.js'
 
-vi.mock('@tui/lib/history.js', () => ({ append: () => undefined, load: () => [] }))
+vi.mock('@hermes/shared/prompt-history', () => ({ append: () => undefined, load: () => [] }))
 vi.mock('../../assets/logo.png', async () => {
   const { readFile } = await import('node:fs/promises')
   return { default: await readFile(new URL('../../assets/logo.png', import.meta.url)) }
@@ -13,15 +13,15 @@ vi.mock('../../assets/logo.png', async () => {
 describe('Ctrl+L through a connected native SDK session', () => {
   it('decodes the real chord, paints a listening orb, and hangs up with another chord', async () => {
     delete process.env['HERMES_TUI_SPLASH']
-    delete process.env['HERMES_TUI_QUERY']
-    delete process.env['HERMES_TUI_IMAGE']
+    delete process.env['HERMES_TERN_QUERY']
+    delete process.env['HERMES_TERN_IMAGE']
     const input = new EventEmitter()
     const tern = new Session(input, { write() {} }, { exitHooks: false, record: '' })
     const connecting = tern.handshake()
     input.emit('data', `\x1b_tsp;r;${JSON.stringify({ ...tern.caps, r: 'hello', v: 1, term: 'fixture', ver: '0', features: ['blobs'], credits: 64, apc: 1048576 })}\x1b\\`)
     expect(await connecting).toBe(true)
     let active = false
-    const gateway = new FakeGateway({ canonical: true, replies: { 'command.dispatch': p => {
+    const gateway = new FakeGateway({ replies: { 'command.dispatch': p => {
       const [action, id] = String(p['arg']).split(' ')
       if (action === 'start') active = true
       if (action === 'stop') active = false

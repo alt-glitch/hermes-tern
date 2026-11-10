@@ -4,8 +4,8 @@
 // lost session held, once per outage.
 
 import type { ServerRequest } from '@hermes/shared/json-rpc-channel'
-import type { GatewayClient } from '@tui/gatewayClient.js'
-import type { AnyGatewayEvent } from '@tui/gatewayTypes.js'
+import type { GatewayClient } from '@hermes/shared/gateway-client'
+import type { AnyGatewayEvent } from '@hermes/shared/gateway-types'
 
 import type { BtwThreads } from '../btw.js'
 import type { Reconnect } from '../chrome/reconnect.js'

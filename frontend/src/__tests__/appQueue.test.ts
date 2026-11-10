@@ -4,11 +4,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { type App, busy, settle, setup } from './appSetup.js'
 import { given, key, must, type Reply } from './fakes.js'
 
-vi.mock('@tui/lib/history.js', () => ({ append: () => undefined, load: () => [] }))
+vi.mock('@hermes/shared/prompt-history', () => ({ append: () => undefined, load: () => [] }))
 
 beforeEach(() => {
-  delete process.env['HERMES_TUI_QUERY']
-  delete process.env['HERMES_TUI_IMAGE']
+  delete process.env['HERMES_TERN_QUERY']
+  delete process.env['HERMES_TERN_IMAGE']
 })
 
 afterEach(() => {
@@ -37,19 +37,6 @@ describe('App: compaction', () => {
     expect(users(app)).toEqual([])
     expect(queuedRows()).toEqual([{ actions: ['edit'], text: 'after it' }])
     expect(JSON.stringify(app.transcript.entries)).toContain('"status":"running"')
-  })
-
-  it('on a private gateway the held prompt goes when the compaction ends', async () => {
-    const { app, emit, press, sent, type } = setup({}, { canonical: false })
-    emit('event', status('compressing', 'compressing'))
-    await type('after it')
-    await press(key('enter'))
-    expect(sent('prompt.submit')).toEqual([])
-    expect(app.stores.queue.held).toMatchObject([{ text: 'after it' }])
-
-    emit('event', status('ready'))
-    await settle()
-    expect(sent('prompt.submit')).toMatchObject([{ text: 'after it' }])
   })
 
   it('a compaction inside a turn still offers Steer on a queued prompt (Hermes holds it until the compaction ends)', async () => {

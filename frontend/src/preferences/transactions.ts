@@ -1,7 +1,7 @@
 // Serialize our own profile reads/writes and confirm every accepted setter by
 // its owner's normalized config.get. This is optimistic detection, NOT an atomic
 // cross-client CAS: the pinned Hermes config API exposes no expected_revision.
-import type { GatewayClient } from '@tui/gatewayClient.js'
+import type { GatewayClient } from '@hermes/shared/gateway-client'
 
 import { rpc } from '../wire/rpc.js'
 

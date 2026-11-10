@@ -34,7 +34,7 @@ describe('partial search failures', () => {
 
   it('replays a retained structured failure without losing rows or duplicating the reason', () => {
     let n = 0
-    const entries = history({ kept: [], compactions: [], id: p => entryId(`${p}${++n}`), messages: [
+    const entries = history({ kept: [], id: p => entryId(`${p}${++n}`), messages: [
       { role: 'user', text: 'search' },
       { role: 'tool', name: 'search_files', tool_call_id: 's', args: {}, content: JSON.stringify(scenarios[0]?.result) }
     ] })
