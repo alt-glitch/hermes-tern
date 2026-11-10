@@ -7,6 +7,7 @@ import type { GatewayClient } from '@tui/gatewayClient.js'
 
 import type { SessionView } from '../app/ports.js'
 import type { Transcript } from '../transcript/store.js'
+import { commandReply } from '../wire/json.js'
 
 export interface GlideHost {
   readonly gw: Pick<GatewayClient, 'request'>
@@ -55,9 +56,7 @@ export async function glideCommand(host: GlideHost, arg: string): Promise<void> 
     const { output } = await host.gw.request<{ output: string }>('command.dispatch', {
       name: 'glide', arg: `json ${verb} ${JSON.stringify(params)}`, session_id: sid
     })
-    const result = JSON.parse(output) as T & { error?: string }
-    if (result.error) throw new Error(result.error)
-    return result
+    return commandReply<T>(output)
   }
   const fail = (error: unknown) => {
     host.transcript.notice(`/glide: ${error instanceof Error ? error.message : String(error)}`, 'error')
