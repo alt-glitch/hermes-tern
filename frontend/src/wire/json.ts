@@ -31,6 +31,6 @@ export function decodeJson(text: string): unknown {
 export function commandReply<T>(output: string): T {
   const reply = record(output)
   if (!reply) throw new Error('the command did not answer with JSON')
-  if (typeof reply.error === 'string') throw new Error(reply.error)
+  if (typeof reply['error'] === 'string') throw new Error(reply['error'])
   return reply as T
 }

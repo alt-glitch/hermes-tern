@@ -91,7 +91,7 @@ describe('/glide', () => {
     })
     const request = vi.fn(async (method: string, params: Record<string, unknown>) => {
       if (method !== 'command.dispatch') throw new Error(`unknown method: ${method}`)
-      dispatched.push(String(params.arg))
+      dispatched.push(String(params['arg']))
       expect(params).toMatchObject({ name: 'glide', session_id: 'glide-session' })
       return { type: 'plugin', output: JSON.stringify(detected) }
     })
