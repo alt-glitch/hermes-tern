@@ -7,7 +7,7 @@
 
 <p align="center">
   <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-blue"></a>
-  <img alt="Hermes Agent 0.23.1 or later" src="https://img.shields.io/badge/hermes--agent-%E2%89%A50.23.1-6f42c1">
+  <img alt="Hermes Agent newer than 0.23.0" src="https://img.shields.io/badge/hermes--agent-%3E0.23.0-6f42c1">
   <img alt="Tern 0.9.5" src="https://img.shields.io/badge/tern-0.9.5-2b7a78">
 </p>
 
@@ -35,7 +35,7 @@ hermes plugins install hermes-tern            # from the plugin catalog, once li
 hermes plugins install alt-glitch/hermes-tern # or from GitHub
 ```
 
-You need Hermes Agent 0.23.1 or later and [Tern](https://stencil.so/tern). The plugin is built and tested on Tern 0.9.5.
+You need a Hermes Agent newer than the 0.23.0 release (run `hermes update`) and [Tern](https://stencil.so/tern). The plugin is built and tested on Tern 0.9.5.
 
 Then, in a Tern pane:
 
