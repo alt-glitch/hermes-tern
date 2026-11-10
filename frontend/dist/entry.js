@@ -52000,6 +52000,25 @@ function createParams({
   return canonical ? { ...create5, ...cwd ? { cwd } : {} } : { cols, ...cwd ? { cwd } : {} };
 }
 
+// src/hermes/requirements.ts
+var REQUIRED_CAPABILITIES = [
+  "plugin-rpc-v1",
+  // the plugin's own methods and events (viewers.py, charts.py)
+  "session-client-v1",
+  // `client` on session.create
+  "session-list-picker-v1",
+  // session.list's picker fields
+  "session-transcript-v1"
+  // session.transcript
+];
+async function missingCapabilities(gw2) {
+  const { capabilities } = await rpc(gw2, "runtime.describe", {});
+  return REQUIRED_CAPABILITIES.filter((name) => !capabilities.includes(name));
+}
+function tooOldNotice(missing) {
+  return `This Hermes is older than hermes tern needs (it lacks ${missing.join(", ")}). Run \`hermes update\`, then start \`hermes tern\` again.`;
+}
+
 // src/session/views.ts
 var SessionViews = class {
   #gw;
@@ -52127,10 +52146,29 @@ var SessionLifecycle = class {
   follow(deliver) {
     this.#deliver = deliver;
   }
-  /** gateway.ready: a reconnect's reattaches the shown session; only a sessionless app bootstraps. */
+  /**
+   * gateway.ready: a reconnect's reattaches the shown session; only a sessionless app bootstraps.
+   * Neither happens on a gateway that lacks what this frontend needs: the pane says so instead.
+   */
   ready() {
-    const { stored } = this.#host.state.ref;
-    void (stored ? this.reattach(stored) : this.#bootstrap());
+    void this.#ready();
+  }
+  async #ready() {
+    const host = this.#host;
+    try {
+      const missing = await missingCapabilities(host.gw);
+      if (missing.length > 0) {
+        host.transcript.notice(tooOldNotice(missing), "error");
+        host.changed();
+        return;
+      }
+    } catch (error) {
+      host.transcript.notice(`Could not read what the agent backend supports: ${errorText(error)}`, "error");
+      host.changed();
+      return;
+    }
+    const { stored } = host.state.ref;
+    await (stored ? this.reattach(stored) : this.#bootstrap());
   }
   /** The gateway went away: the runtime session died with it, and nothing can answer the held requests. */
   lost() {
@@ -54081,7 +54119,12 @@ var gatewayTextEn = {
   canonical: {
     launch: {
       noTuiPolicy: "gateway does not support tui session policy; update/restart the gateway",
-      unsupportedOptions: (options) => `gateway does not support TUI launch options: ${options}`
+      unsupportedOptions: (options) => `gateway does not support TUI launch options: ${options}`,
+      // The same refusals for a client that launches with another source or names itself.
+      /** {0} = session source */
+      noSourcePolicy: (source2) => `gateway does not support ${source2} session policy; update/restart the gateway`,
+      /** {0} = comma-separated option names */
+      unsupportedSessionOptions: (options) => `gateway does not support these session options: ${options}`
     }
   },
   libText: {
@@ -54109,22 +54152,53 @@ var gatewayText = (key2, ...args) => {
   return typeof leaf === "function" ? leaf(...args) : String(leaf);
 };
 
+// node_modules/@hermes/shared/src/session-http-mutations.ts
+function randomUuid() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  const bytes = new Uint8Array(16);
+  if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
+    crypto.getRandomValues(bytes);
+  } else {
+    for (let index2 = 0; index2 < bytes.length; index2 += 1) {
+      bytes[index2] = Math.floor(Math.random() * 256);
+    }
+  }
+  bytes[6] = bytes[6] & 15 | 64;
+  bytes[8] = bytes[8] & 63 | 128;
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
 // node_modules/@hermes/shared/src/gateway-canonical.ts
-function canonicalRequest(method, original, contract, text16 = gatewayText) {
+function canonicalRequest(method, original, contract, text16 = gatewayText, identity = {}) {
   const params = { ...original };
   if (method === "session.create") {
+    const source2 = identity.source ?? "tui";
+    const neutral = source2 !== "tui" || identity.client !== void 0;
     delete params.cols;
-    params.source = "tui";
-    params.request_id ??= crypto.randomUUID();
-    if (!contract?.sources.includes("tui")) {
-      throw new Error(text16("canonical.launch.noTuiPolicy"));
+    params.source = source2;
+    params.request_id ??= randomUuid();
+    if (!contract?.sources.includes(source2)) {
+      throw new Error(neutral ? text16("canonical.launch.noSourcePolicy", source2) : text16("canonical.launch.noTuiPolicy"));
     }
     if (!contract.parameters.includes("client_env")) {
       delete params.client_env;
     }
+    if (identity.client) {
+      if (contract.parameters.includes("client")) {
+        params.client = { ...identity.client };
+      } else {
+        delete params.client;
+      }
+    }
     const unsupported = Object.keys(params).filter((key2) => !contract.parameters.includes(key2));
     if (unsupported.length) {
-      throw new Error(text16("canonical.launch.unsupportedOptions", unsupported.join(", ")));
+      throw new Error(text16(
+        neutral ? "canonical.launch.unsupportedSessionOptions" : "canonical.launch.unsupportedOptions",
+        unsupported.join(", ")
+      ));
     }
   }
   if (["prompt.submit", "session.steer", "session.redirect"].includes(method) && params.submission_id) {
@@ -54251,6 +54325,7 @@ var JsonRpcRequestChannel = class {
       onEvent: options.onEvent,
       onHeartbeatFailure: options.onHeartbeatFailure,
       onRequestHandlerError: options.onRequestHandlerError,
+      onUncorrelatedError: options.onUncorrelatedError,
       onUnhandledRequest: options.onUnhandledRequest,
       requestIdPrefix: options.requestIdPrefix ?? "r",
       requestTimeoutMs: options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS,
@@ -54423,10 +54498,30 @@ var JsonRpcRequestChannel = class {
       }
     }
   }
+  /** Settle the ping or pending call this response answers; an unknown id is ignored. */
+  settleResponse(id, frame) {
+    if (typeof id === "string" && this.outstandingPings.delete(id)) {
+      this.lastLivenessAt = Date.now();
+      return;
+    }
+    const call = this.pending.get(id);
+    if (!call) {
+      return;
+    }
+    this.lastLivenessAt = Date.now();
+    this.clearPending(id);
+    if (frame.error) {
+      call.reject(jsonRpcErrorFromFrame(frame.error));
+      return;
+    }
+    this.deliverOpenRequests(frame.result);
+    call.resolve(frame.result);
+  }
   /**
-   * Route one inbound frame: a response settles its pending call, an
-   * `event` notification reaches `onEvent`, a server→client request reaches
-   * the `onRequest` handlers. Returns the decoded frame so the owner can act
+   * Route one inbound frame: a response settles its pending call, an error
+   * frame with no request id reaches `onUncorrelatedError`, an `event`
+   * notification reaches `onEvent`, a server→client request reaches the
+   * `onRequest` handlers. Returns the decoded frame so the owner can act
    * on it too (mirror it, record seq, …) or `null` when the text was not
    * JSON or not a JSON object (`null`, a scalar).
    */
@@ -54449,21 +54544,11 @@ var JsonRpcRequestChannel = class {
       return frame;
     }
     if (frame.id !== void 0 && frame.id !== null) {
-      if (typeof frame.id === "string" && this.outstandingPings.delete(frame.id)) {
-        this.lastLivenessAt = Date.now();
-        return frame;
-      }
-      const call = this.pending.get(frame.id);
-      if (call) {
-        this.lastLivenessAt = Date.now();
-        this.clearPending(frame.id);
-        if (frame.error) {
-          call.reject(jsonRpcErrorFromFrame(frame.error));
-        } else {
-          this.deliverOpenRequests(frame.result);
-          call.resolve(frame.result);
-        }
-      }
+      this.settleResponse(frame.id, frame);
+      return frame;
+    }
+    if (frame.error) {
+      this.options.onUncorrelatedError?.(jsonRpcErrorFromFrame(frame.error));
       return frame;
     }
     if (frame.method === "event" && frame.params && typeof frame.params.type === "string") {
@@ -54669,6 +54754,7 @@ var GatewayClient = class extends EventEmitter {
       onEvent: (ev) => this.publishWire(ev),
       onHeartbeatFailure: () => this.onHeartbeatFailure(),
       onRequestHandlerError: (error, req) => this.pushLog(`[protocol] server request handler crashed: ${req.method} (${error.message})`),
+      onUncorrelatedError: (error) => this.pushLog(`[protocol] error frame with no request id: ${error.code ?? "none"} ${error.message}`),
       onUnhandledRequest: (req) => this.pushLog(`[protocol] unhandled server request: ${req.method}`),
       requestTimeoutMs: options.requestTimeoutMs ?? 12e4,
       unrefTimers: true
@@ -55233,7 +55319,13 @@ var GatewayClient = class extends EventEmitter {
       if (method === "session.create" && !this.creationContract) {
         await this.describeRuntime();
       }
-      const request = canonicalRequest(method, params, this.creationContract, this.text);
+      const request = canonicalRequest(
+        method,
+        params,
+        this.creationContract,
+        this.text,
+        { client: this.options.client, source: this.options.source }
+      );
       if (request.method === "session.create") {
         return this.createCanonical(request.params, timeoutMs);
       }
@@ -55282,10 +55374,62 @@ var GatewayClient = class extends EventEmitter {
   }
 };
 
+// package.json
+var package_default = {
+  name: "hermes-tern-frontend",
+  version: "0.1.0",
+  private: true,
+  description: "Hermes for Tern: the chat UI described over the Tern Surface Protocol instead of painted cells",
+  type: "module",
+  scripts: {
+    setup: "node scripts/hermes-src.mjs && bun install",
+    bundle: "node scripts/hermes-src.mjs && node scripts/build.mjs",
+    "bundle:report": "node scripts/bundle-report.mjs",
+    typecheck: "node scripts/typecheck.mjs",
+    test: "vitest run",
+    "check:size": "node scripts/check-size.mjs",
+    "check:strict": "node scripts/check-strict.mjs",
+    "check:suppressions": "node scripts/check-suppressions.mjs",
+    lint: "node scripts/lint.mjs",
+    check: "node scripts/check-hermes-src.mjs && bun run typecheck && bun run test && bun run lint && bun run check:size && bun run check:strict && bun run check:suppressions"
+  },
+  dependencies: {
+    "@hermes/shared": "file:.hermes-src/apps/shared",
+    "@stencil-hq/tern": "0.1.0",
+    "hast-util-to-mdast": "10.1.2",
+    "hast-util-to-text": "4.0.2",
+    "mdast-util-find-and-replace": "3.0.3",
+    "mdast-util-gfm": "3.1.0",
+    "mdast-util-to-markdown": "2.2.0",
+    "rehype-raw": "7.0.0",
+    "rehype-sanitize": "6.0.0",
+    "remark-gfm": "4.0.1",
+    "remark-parse": "11.0.0",
+    "remark-rehype": "11.1.2",
+    unified: "11.0.5",
+    "unist-util-visit": "5.1.0",
+    zod: "4.4.3"
+  },
+  devDependencies: {
+    "@types/node": "22.20.1",
+    esbuild: "0.28.1",
+    eslint: "10.13.0",
+    typescript: "6.0.3",
+    "typescript-eslint": "8.72.0",
+    vitest: "4.1.10"
+  }
+};
+
 // src/hermes/gatewayClient.ts
+var CLIENT = { name: "hermes-tern", version: package_default.version };
 function createGatewayClient(launch3) {
   const connect2 = launch3.hermes ? attachGateway(launch3.hermes) : () => Promise.reject(new AttachError("gateway unavailable: start the chat with `hermes tern`", true));
-  return new GatewayClient({ connect: connect2, terminalConnectFailure: terminalAttachFailure, toolProgress: () => launch3.toolProgress || void 0 });
+  return new GatewayClient({
+    client: CLIENT,
+    connect: connect2,
+    terminalConnectFailure: terminalAttachFailure,
+    toolProgress: () => launch3.toolProgress || void 0
+  });
 }
 
 // src/watch/watchApp.ts
