@@ -19,11 +19,12 @@ const nodes = (node: NodeJson): NodeJson[] => [node, ...(node.c ?? []).flatMap(n
 const notice = (node: NodeJson) => nodes(node).some(n => n.p?.['role'] === 'omp.tool.notice' && JSON.stringify(n.p).includes(message))
 const make = (result: unknown, more: Partial<ToolCall> = {}) => call('terminal', { command: 'make test', background: true, notify_on_complete: true }, { result, ...more })
 
+const producerOutput = execFileSync('python3', [resolve('src/__tests__/fixtures/terminal-async-notify-core.py')], {
+  cwd: resolve('.hermes-src'), encoding: 'utf8', env: { ...process.env, PYTHONPATH: resolve('.hermes-src') }
+})
+
 function producer(): { args: Record<string, unknown>; result: Record<string, unknown>; event: Record<string, unknown> }[] {
-  const raw = execFileSync('python3', [resolve('src/__tests__/fixtures/terminal-async-notify-core.py')], {
-    cwd: resolve('.hermes-src'), encoding: 'utf8', env: { ...process.env, PYTHONPATH: resolve('.hermes-src') }
-  })
-  const events = parseJson(raw)
+  const events = parseJson(producerOutput)
   if (!Array.isArray(events)) throw new Error('expected envelopes')
   return events.map(value => {
     const event = record(value)
