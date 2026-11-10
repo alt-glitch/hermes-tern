@@ -3960,6 +3960,15 @@
    }
   },
   {
+   "method": "session.transcript",
+   "params": {
+    "cursor": null,
+    "limit": 500,
+    "order": "latest",
+    "session_id": "old"
+   }
+  },
+  {
    "method": "process.list",
    "params": {
     "session_id": "old"

@@ -24,7 +24,7 @@ import type { PrKey } from '../core/ids.js'
 import type { Attachments } from '../draft/attachments.js'
 import type { Composer } from '../draft/composer.js'
 import type { KeyCx, Presses } from '../draft/keys.js'
-import { storedCompactions } from '../hermes/compactions.js'
+import { allCompactions, latestCompactions } from '../hermes/compactions.js'
 import { shellError, shellExec, shellLines } from '../hermes/shell.js'
 import type { Media } from '../media.js'
 import type { ToolCall } from '../model.js'
@@ -365,23 +365,49 @@ export class AppActions {
     }
   }
 
-  /** Gives the compactions seen here their summaries from the store, `delay` ms from now. */
+  /** Gives the compactions seen here their summaries from the transcript's newest page, `delay` ms from now. */
   summarize(delay = 0) {
-    const { state, transcript } = this.#cx
+    const { gw, state, transcript } = this.#cx
     const ticket = state.ticket()
 
-    if (!transcript.compactions.unsummarized) {
+    if (!transcript.compactions.unsummarized || !ticket.sid) {
       return
     }
 
-    this.#cx.timers.timeout(() => {
-      const stored = state.info?.stored_session_id || state.ref.stored
+    const sid = ticket.sid
+    const read = async () => {
+      if (!ticket.isCurrent() || !transcript.compactions.unsummarized) {
+        return
+      }
 
-      if (ticket.isCurrent() && stored && transcript.compactions.unsummarized) {
-        transcript.compactions.summarize(storedCompactions(stored))
+      // A failed read leaves the summary to the next turn's end.
+      const stored = await latestCompactions(gw, sid).catch(() => [])
+
+      if (ticket.isCurrent()) {
+        transcript.compactions.summarize(stored)
         this.#cx.changed()
       }
-    }, delay)
+    }
+
+    this.#cx.timers.timeout(() => void read(), delay)
+  }
+
+  /** Reads every compaction of the shown conversation and shows each where it happened; the transcript is up before. */
+  async restoreCompactions() {
+    const { gw, state, transcript } = this.#cx
+    const ticket = state.ticket()
+
+    if (!ticket.sid) {
+      return
+    }
+
+    // A failed read leaves the transcript without its markers, as a gateway without them would.
+    const stored = await allCompactions(gw, ticket.sid, () => ticket.isCurrent()).catch(() => undefined)
+
+    if (stored?.length && ticket.isCurrent()) {
+      transcript.placeCompactions(stored)
+      this.#cx.changed()
+    }
   }
 
   /** Reads the shown session's busy_input_mode; an older gateway without it leaves Enter queueing (the TUI default). */

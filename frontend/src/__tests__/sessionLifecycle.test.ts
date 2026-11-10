@@ -163,6 +163,7 @@ function recordingHost() {
     prs: { adopt: rec('prs.adopt') },
     queue: { adopt: ref => void log.push(`queue.adopt ${ref.live}`), server: { reset: rec('queue.reset') } },
     readBusyMode: rec('readBusyMode'),
+    restoreCompactions: rec('restoreCompactions'),
     reportCwd: rec('reportCwd'),
     sheets: { dropAll: rec('sheets.dropAll') },
     sidebar: { adopt: sid => void log.push(`sidebar.adopt ${sid}`) },
@@ -222,6 +223,7 @@ describe('adoptSteps', () => {
       'transcript.load',
       'agents.scan',
       'media.showAll',
+      'restoreCompactions',
       // Held prompts for another session go back after the history, so their notice stays.
       'queue.adopt b',
       'processes.poke',

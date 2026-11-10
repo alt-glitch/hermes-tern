@@ -12,7 +12,6 @@ import type { Sidebar } from '../chrome/sidebar.js'
 import type { ConnectWatcher } from '../connections/watcher.js'
 import { durable, type DurableSessionId, type LiveSessionId, type SessionIds, type SessionRef } from '../core/ids.js'
 import type { PullRequests } from '../github/store.js'
-import { storedCompactions } from '../hermes/compactions.js'
 import type { Media } from '../media.js'
 import type { ToolCall } from '../model.js'
 import type { Processes } from '../processes/store.js'
@@ -66,6 +65,8 @@ export interface AdoptHost {
   readonly sidebar: Pick<Sidebar, 'adopt'>
   readonly title: Pick<SessionTitle, 'adopt'>
   readonly transcript: Pick<Transcript, 'entries' | 'inflight' | 'load' | 'reset'>
+  /** Reads the adopted conversation's compactions in the background and shows them where they happened. */
+  restoreCompactions(): void
   /** Reads the adopted session's busy_input_mode into the state. */
   readBusyMode(): void
   /** Asks the gateway to stream session `sid`'s reasoning. */
@@ -144,12 +145,13 @@ export function adoptSteps(host: AdoptHost): readonly Adoptable[] {
     // The last session's children are not this one's: a poll in flight for them drops its answer.
     { adopt: ({ ref }) => host.agents.adopt(ref.live) },
     {
-      adopt: ({ r, ref }) => {
+      adopt: ({ r }) => {
         if (r.messages?.length) {
-          // The history leaves the compactions out; the store says where they were.
-          transcript.load(r.messages, storedCompactions(durable(ref)))
+          transcript.load(r.messages)
           host.agents.scan()
           host.media.showAll(transcript.entries, call => host.imageLanded(call))
+          // The history leaves the compactions out; they fill in once read, after the transcript shows.
+          host.restoreCompactions()
         }
       }
     },

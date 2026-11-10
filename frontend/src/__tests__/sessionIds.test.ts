@@ -15,14 +15,9 @@ import { FakeGateway, fakeTern, settle } from './fakes.js'
 process.env['HERMES_HOME'] = mkdtempSync(join(tmpdir(), 'hermes-tern-ids-'))
 
 const spy = vi.hoisted(() => ({
-  compactions: vi.fn((_sid: string) => []),
   links: vi.fn((_sid: string) => [])
 }))
 
-vi.mock('../hermes/compactions.js', async importOriginal => ({
-  ...(await importOriginal<typeof import('../hermes/compactions.js')>()),
-  storedCompactions: spy.compactions
-}))
 vi.mock('../github/links.js', async importOriginal => ({
   ...(await importOriginal<typeof import('../github/links.js')>()),
   storedLinks: spy.links
@@ -78,7 +73,7 @@ describe('a session with a stored id', () => {
     expect(spy.links.mock.calls).toEqual([['stored-1']])
   })
 
-  it('files a resumed session and its stored compactions under the stored id', async () => {
+  it('files a resumed session under the stored id, and reads its compactions under the runtime id', async () => {
     const gw = gateway()
     const { app } = await started(gw)
     gw.handlers.set('session.resume', p => ({
@@ -94,7 +89,7 @@ describe('a session with a stored id', () => {
     expect(app.session.ref.live).toBe('live-2')
     expect(gw.sent('plugin.hermes-tern.viewer.set').at(-1)).toMatchObject({ session_id: 'live-2', stored: 'stored-2' })
     expect(gw.sent('plugin.hermes-tern.viewer.clear')).toEqual([{ pid: process.pid, session_id: 'live-1', stored: 'stored-1' }])
-    expect(spy.compactions.mock.calls).toEqual([['stored-2']])
+    expect(gw.sent('session.transcript').map(p => p['session_id'])).toEqual(['live-2'])
     expect(spy.links.mock.calls.at(-1)).toEqual(['stored-2'])
   })
 
@@ -135,7 +130,7 @@ describe('a session with a stored id', () => {
     expect(resumed(gw)).toEqual(['stored-1'])
   })
 
-  it('reads the summaries of its compactions under the stored id', async () => {
+  it('reads the summaries of its compactions under the runtime id', async () => {
     const gw = gateway()
     await started(gw)
 
@@ -143,9 +138,9 @@ describe('a session with a stored id', () => {
     gw.event({ payload: { kind: 'compacting', text: 'Compacting context' }, session_id: 'live-1', type: 'status.update' })
     gw.event({ payload: { kind: 'compacted', text: 'Compacted ~182,000 → ~31,000 tokens' }, session_id: 'live-1', type: 'status.update' })
     gw.event({ payload: { text: 'Done.' }, session_id: 'live-1', type: 'message.complete' })
-    await vi.waitFor(() => expect(spy.compactions).toHaveBeenCalled())
+    await vi.waitFor(() => expect(gw.sent('session.transcript')).toHaveLength(1))
 
-    expect(spy.compactions.mock.calls[0]).toEqual(['stored-1'])
+    expect(gw.sent('session.transcript')[0]).toMatchObject({ order: 'latest', session_id: 'live-1' })
   })
 
   it('opens a branch when the session it resumed is the one it asked for', async () => {
@@ -202,7 +197,7 @@ describe('a session with no stored id', () => {
     expect(app.session.ref.live).toBe('live-2')
   })
 
-  it('reads no stored compactions: their summaries need a stored id', async () => {
+  it('reads the summaries of its compactions under its runtime id too', async () => {
     const gw = gateway({ stored: false })
     await started(gw)
 
@@ -210,10 +205,9 @@ describe('a session with no stored id', () => {
     gw.event({ payload: { kind: 'compacting', text: 'Compacting context' }, session_id: 'live-1', type: 'status.update' })
     gw.event({ payload: { kind: 'compacted', text: 'Compacted ~182,000 → ~31,000 tokens' }, session_id: 'live-1', type: 'status.update' })
     gw.event({ payload: { text: 'Done.' }, session_id: 'live-1', type: 'message.complete' })
-    await settle(gw)
-    await new Promise(resolve => setTimeout(resolve, 5))
+    await vi.waitFor(() => expect(gw.sent('session.transcript')).toHaveLength(1))
 
-    expect(spy.compactions).not.toHaveBeenCalled()
+    expect(gw.sent('session.transcript')[0]).toMatchObject({ session_id: 'live-1' })
   })
 })
 

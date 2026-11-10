@@ -237,6 +237,7 @@ export function chatStores(chat: ChatPorts, { act, gw, launch, settings, surface
       markViewer: (now, before) => viewer.show(now, before),
       readBusyMode: () => void act().readBusyMode(),
       reportCwd: () => act().reportCwd(),
+      restoreCompactions: () => void act().restoreCompactions(),
       showThoughts: sid => showThoughts({ gw, notice: (text, tone) => chat.notice(text, tone), settings }, sid)
     })
   )
