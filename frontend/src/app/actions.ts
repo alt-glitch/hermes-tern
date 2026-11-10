@@ -579,7 +579,7 @@ export class AppActions {
 
     const cwd = state.info?.cwd || this.#cx.launch.home || '/'
 
-    if (!(await openSidebar(specOf(a, agentName(a), sid, state.ref.stored), cwd))) {
+    if (!(await openSidebar(specOf(a, agentName(a), sid), cwd))) {
       openAgents(chat, { id, watch: true })
     }
   }

@@ -16,7 +16,9 @@ the user's prompt, so one home covers every flow:
     "slow"      -> one 8-second command, long enough to queue or steer a message
     "solo…"     -> (at the start) one delegated agent with a long brief (context)
     "delegate…" -> (at the start) a delegate_task batch of three subagents, each running two slow
-                   terminal calls before a slowly streamed answer
+                   terminal calls before a slowly streamed answer; "delegate slow…": two 12 s calls
+                   each, long enough to open the hub, the pane beside the chat, or quit and resume
+    "nested…"   -> (at the start) one orchestrator subagent that delegates one slow worker of its own
     "background…" -> (at the start) a 90 s ticking background process that notifies on exit
     "watch…"    -> (at the start) a 2 min ticking background process watching for "tick 10"
     "jobchart…" -> (at the start) a 2 min background benchmark printing tok/s and loss against a
@@ -131,6 +133,17 @@ SUBAGENT_STEPS = [
     "sleep 4 && date && find . -maxdepth 2 -name '*.md' | wc -l",
 ]
 
+# "delegate slow…": the goals say so, and a child whose goal does takes these steps instead.
+SLOW = " (slowly)"
+SLOW_SUBAGENT_STEPS = [
+    "sleep 12 && ls | head -5",
+    "sleep 12 && date && find . -maxdepth 2 -name '*.md' | wc -l",
+]
+
+# "nested…": an orchestrator child whose goal says so delegates one slow worker of its own.
+ORCHESTRATE_GOAL = "Orchestrate: hand the clock reading to a worker of your own"
+WORKER_GOAL = "Read the clock twice, a few seconds apart" + SLOW
+
 SOLO_GOAL = "Read-only on the repo (only write the one output file). Verify which cleanup candidates in the audit are still dead code."
 SOLO_CONTEXT = """Repo checkout (read-only) at origin/main. Do not fetch; work on this snapshot and note the commit.
 
@@ -193,17 +206,22 @@ DEFAULT_PR = "https://github.com/alt-glitch/hermes-tern/pull/22"
 SUBLINK_GOAL = "Link the pull request "
 
 
-def _subagent_calls(messages: list[dict], goal: str) -> list[dict] | None:
-    """A subagent's next move: one slow terminal step per earlier tool result, then the answer. The
-    "sublink" subagent links its pull request first."""
+def _subagent_calls(messages: list[dict]) -> list[dict] | None:
+    """A subagent's next move: one slow terminal step per earlier tool result, then the answer.
+    An orchestrator (its goal says so) first delegates one worker and waits for it. The "sublink"
+    subagent links its pull request first."""
+    goal = next((str(m.get("content")) for m in messages if m.get("role") == "user"), "")
     done = sum(1 for m in messages if m.get("role") == "tool")
+    if ORCHESTRATE_GOAL in goal:
+        return None if done else [_call("delegate_task", {"goal": WORKER_GOAL}, "call-worker")]
     if SUBLINK_GOAL.lower() in goal.lower():
         url = re.search(PR_URL, goal)
         link = _call("tool_call", {"calls": [{"name": "link_pull_request", "arguments": {"url": url.group(0) if url else DEFAULT_PR}}]}, "call-sublink")
         return None if done else [link]
-    if done >= len(SUBAGENT_STEPS):
+    steps = SLOW_SUBAGENT_STEPS if SLOW in goal else SUBAGENT_STEPS
+    if done >= len(steps):
         return None
-    return [_call("terminal", {"command": SUBAGENT_STEPS[done]}, f"call-step{done}")]
+    return [_call("terminal", {"command": steps[done]}, f"call-step{done}")]
 
 
 def _calls(prompt: str, target: Path) -> list[dict] | None:
@@ -211,7 +229,10 @@ def _calls(prompt: str, target: Path) -> list[dict] | None:
     # Only a prompt that starts with it: the parent's completion notice quotes the delegation and
     # would otherwise dispatch again, forever.
     if words.lstrip().startswith("delegate"):
-        return [_call("delegate_task", {"tasks": [{"goal": g} for g in SUBAGENT_GOALS]})]
+        slow = SLOW if words.split()[1:2] == ["slow"] else ""
+        return [_call("delegate_task", {"tasks": [{"goal": g + slow} for g in SUBAGENT_GOALS]})]
+    if words.lstrip().startswith("nested"):
+        return [_call("delegate_task", {"goal": ORCHESTRATE_GOAL, "role": "orchestrator"})]
     if words.lstrip().startswith("solo"):
         # One delegated agent with a long brief, as a real audit hand-off reads.
         return [_call("delegate_task", {"goal": SOLO_GOAL, "context": SOLO_CONTEXT})]
@@ -395,7 +416,7 @@ class Model(BaseHTTPRequestHandler):
             content, delay = COMPACTION_SUMMARY, 2.5
             calls = None
         elif isinstance(system, str) and SUBAGENT_MARKER in system:
-            calls = _subagent_calls(messages, str(prompt))
+            calls = _subagent_calls(messages)
             content = None if calls else SUBAGENT_REPLY
             delay = 0.15
         elif prompt.lower().lstrip().startswith("work"):
@@ -515,6 +536,8 @@ def write_home(home: Path, base_url: str) -> Path:
         "telemetry": {"shared_metrics": {"enabled": False, "send": False, "offer_version": 2}},
         # A short tail, so /compress has something to summarize after a few turns.
         "compression": {"protect_last_n": 2, "protect_first_n": 0},
+        # Room for "nested…": an orchestrator child may spawn one level of workers.
+        "delegation": {"max_spawn_depth": 2},
     }, indent=2))
     (home / ".env").write_text("OPENAI_API_KEY=loopback-only\n")
     target = home / "approve-target"

@@ -1,4 +1,4 @@
-// The file, row and reply readers of wire/files.ts and wire/sqlite.ts: each reads a valid file,
+// The file and reply readers of wire/files.ts: each reads a valid file,
 // falls back where the reader before the schema fell back, and still reads what the Python half
 // writes. What the new code writes stays readable by the reader before it (an old pane runs the old
 // bundle after a `git pull`): the `before*` functions below are those readers, kept as they were.
@@ -6,19 +6,17 @@
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { DatabaseSync } from 'node:sqlite'
 
 import { describe, expect, it } from 'vitest'
 import * as z from 'zod/mini'
 
-import { liveSessionId, storedSessionId } from '../core/ids.js'
+import { liveSessionId } from '../core/ids.js'
 import { parseStacks } from '../github/branch.js'
 import { chartMemory } from '../processes/widgets/memory.js'
 import { loadSettings, saveSettings } from '../settings.js'
 import { readWatchSpec, WATCH_ENV, type WatchSpec } from '../watch/spec.js'
 import { readJsonFile } from '../wire/files.js'
 import { decodeJson } from '../wire/json.js'
-import { first, rows, storedCalls, text } from '../wire/sqlite.js'
 
 const scratch = () => mkdtempSync(join(tmpdir(), 'files-'))
 
@@ -80,11 +78,9 @@ describe('the watch spec', () => {
   const spec: WatchSpec = {
     goal: 'Survey the repo',
     index: 2,
-    log: '/tmp/a.log',
     name: 'scout',
     sid: liveSessionId('live-1'),
     startedAt: 1_700_000_000_000,
-    stored: storedSessionId('stored-1'),
     subagent: 'sa-1'
   }
 
@@ -135,41 +131,5 @@ describe('chart memory', () => {
     expect(chartMemory(dir).load('none')).toBeUndefined()
     expect(chartMemory(dir).load('bad')).toBeUndefined()
     expect(chartMemory(dir).load('rules')).toBeUndefined()
-  })
-})
-
-describe('SQLite rows', () => {
-  const db = () => {
-    const conn = new DatabaseSync(':memory:')
-    conn.exec("CREATE TABLE t (id TEXT, n REAL); INSERT INTO t VALUES ('a', 1), (NULL, 2), ('c', NULL)")
-
-    return conn
-  }
-
-  it('reads each row through its schema and skips a row it cannot read', () => {
-    const row = z.object({ id: z.string(), n: z.nullable(z.number()) })
-
-    expect(rows(db().prepare('SELECT id, n FROM t ORDER BY rowid'), row)).toEqual([
-      { id: 'a', n: 1 },
-      { id: 'c', n: null }
-    ])
-  })
-
-  it('reads the first row, or none', () => {
-    const row = z.object({ id: text })
-
-    expect(first(db().prepare('SELECT id FROM t WHERE n = ?'), row, 2)).toEqual({ id: null })
-    expect(first(db().prepare('SELECT id FROM t WHERE n = ?'), row, 9)).toBeUndefined()
-  })
-
-  it("reads a row's tool calls; none for NULL or text that is not a list, and a null call throws as before", () => {
-    expect(storedCalls('[{"id":"c1","function":{"name":"terminal","arguments":"{}"}},5]')).toEqual([
-      { function: { arguments: '{}', name: 'terminal' }, id: 'c1' },
-      {}
-    ])
-    expect(storedCalls(null)).toEqual([])
-    expect(storedCalls('{"id":"c1"}')).toEqual([])
-    expect(storedCalls('[{')).toEqual([])
-    expect(() => storedCalls('[null]')).toThrow(TypeError)
   })
 })

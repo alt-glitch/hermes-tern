@@ -4,7 +4,7 @@
 
 import type { SubagentEventPayload, Usage } from '@hermes/shared/gateway-events'
 
-import type { LiveLog } from './agents/liveLog.js'
+import type { AgentStep } from './agents/transcript.js'
 import type { ConnectCard } from './connections/cards.js'
 import type { NonEmpty } from './core/assert.js'
 import type { BlockKey, EntryId, SubagentKey, ToolCallId } from './core/ids.js'
@@ -48,13 +48,11 @@ export interface Subagent {
   depth?: number
   /** The subagent that spawned this one (nested delegation). */
   parentId?: string
-  /** The live transcript log on this machine (`live_transcripts` of the dispatch result). */
-  logPath?: string | undefined
-  /** That log, parsed: the agent's timeline. */
-  log?: LiveLog
+  /** Its stored transcript as timeline steps, once the hub read it (agents/transcript.ts). */
+  steps?: AgentStep[] | undefined
   /** The owner takes steering text for it now (`accepting_steer`). */
   steerable?: boolean | undefined
-  /** Why it ended, when the log says (max_iterations, …) or its error. */
+  /** Why it ended, when its end was not a plain completion (timeout, an error, …). */
   exitReason?: string | undefined
 }
 
