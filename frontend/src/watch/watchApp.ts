@@ -6,8 +6,8 @@
 import { readFile } from 'node:fs/promises'
 
 import type { Key, Session, TspEvent } from '@stencil-hq/tern'
-import type { GatewayClient } from '@tui/gatewayClient.js'
-import type { AnyGatewayEvent } from '@tui/gatewayTypes.js'
+import type { GatewayClient } from '@hermes/shared/gateway-client'
+import type { AnyGatewayEvent } from '@hermes/shared/gateway-types'
 
 import { agentNode } from '../agents/agentRow.js'
 import { parseLiveLog } from '../agents/liveLog.js'
@@ -368,7 +368,7 @@ export class WatchApp {
     const now = Date.now()
     const a = this.#agent
     const running = isRunning(a)
-    const cx = { copy: () => undefined, now, welcome: { tip: '', version: '' } }
+    const cx = { copy: () => undefined, now, welcome: { version: '' } }
 
     this.#surface.render({
       dock: dockNodes(

@@ -6,7 +6,7 @@
 
 import type { ServerRequest } from '@hermes/shared/json-rpc-channel'
 import type { Key, Session } from '@stencil-hq/tern'
-import type { GatewayClient } from '@tui/gatewayClient.js'
+import type { GatewayClient } from '@hermes/shared/gateway-client'
 
 import { agentName } from '../agents/rows.js'
 import type { Hud, SheetPill } from '../chrome/hud.js'

@@ -2,7 +2,7 @@ import { chmod, mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import type { GatewayClient } from '@tui/gatewayClient.js'
+import type { GatewayClient } from '@hermes/shared/gateway-client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { parseLiveLog } from '../agents/liveLog.js'

@@ -5,7 +5,7 @@ import { mkdtempSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import type { AnyGatewayEvent } from '@tui/gatewayTypes.js'
+import type { AnyGatewayEvent } from '@hermes/shared/gateway-types'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { toolCallId } from '../core/ids.js'
@@ -44,7 +44,7 @@ vi.mock('../gateway/dispatch.js', async importOriginal => {
     }
   }
 })
-vi.mock('@tui/lib/history.js', () => ({ append: () => undefined, load: () => [] }))
+vi.mock('@hermes/shared/prompt-history', () => ({ append: () => undefined, load: () => [] }))
 vi.mock('../hermes/sessionIndex.js', async importOriginal => ({
   ...(await importOriginal<typeof import('../hermes/sessionIndex.js')>()),
   lastReply: () => '',

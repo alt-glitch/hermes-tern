@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // The Tern frontend's esbuild recipe: one self-contained ESM file for node.
-// `@tui/*` reaches the renderer-free modules of ui-tui (gateway transport, skin
-// palette) in the Hermes checkout `.hermes-src` points at (scripts/hermes-src.mjs).
+// `@hermes/shared` (the gateway client, its types, skins) comes from apps/shared in
+// the Hermes checkout `.hermes-src` points at (scripts/hermes-src.mjs).
 // Output: `dist/entry.js` (or `$TSP_OUT`).
 import { build } from 'esbuild'
 import { dirname, resolve } from 'node:path'
@@ -22,10 +22,9 @@ export async function bundle({ outfile, logLevel = 'warning', metafile = false }
     jsx: 'automatic',
     jsxImportSource: '@stencil-hq/tern',
     loader: { '.png': 'binary' },
-    alias: { '@tui': resolve(root, '.hermes-src/ui-tui/src') },
-    // Hermes sources resolve their npm imports (undici, nanostores) from this package.
+    // `@hermes/shared` is a link into the Hermes checkout: keep its files under this package.
     preserveSymlinks: true,
-    // CommonJS dependencies (undici) still call require().
+    // A CommonJS dependency may still call require().
     banner: {
       js: "import { createRequire as __createRequire } from 'node:module'; const require = __createRequire(import.meta.url);"
     },

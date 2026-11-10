@@ -6,7 +6,7 @@
 import { existsSync } from 'node:fs'
 import { basename } from 'node:path'
 
-import type { GatewayClient } from '@tui/gatewayClient.js'
+import type { GatewayClient } from '@hermes/shared/gateway-client'
 
 import { errorText } from '../core/errors.js'
 import { imagePathOf, withClipboardImage } from '../hermes/clipboardImage.js'

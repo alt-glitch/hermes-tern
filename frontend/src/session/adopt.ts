@@ -4,7 +4,7 @@
 // only one), the per-session state, the history, then the stores that follow the session.
 
 import type { SessionResumeResult } from '@hermes/shared/gateway-events'
-import type { SessionInfo } from '@tui/types.js'
+import type { SessionInfo } from '@hermes/shared/gateway-types'
 
 import type { Agents } from '../agents/store.js'
 import type { NoticeStrip } from '../chrome/notices.js'
@@ -72,8 +72,6 @@ export interface AdoptHost {
   showThoughts(sid: LiveSessionId): void
   /** Names this pane the viewer of `now` (the plugin's connect results come here), no longer of `before`. */
   markViewer(now: DurableSessionId, before: StoredSessionId | null): void
-  /** Writes the shown session's id where the plugin's hooks read it. */
-  writeActiveSession(id: DurableSessionId): void
   /** Records the shown session as this Tern pane's, which `hermes tern` resumes after the pane's program dies. */
   markPane(id: DurableSessionId): void
   /** Tells Tern the session's folder (OSC 7), when it moved. */
@@ -120,7 +118,6 @@ export function adoptSteps(host: AdoptHost): readonly Adoptable[] {
       adopt: ({ previous, ref }) => {
         // This pane shows the session now: the plugin's Python half sends its connect results here as a card.
         host.markViewer(durable(ref), previous.stored)
-        host.writeActiveSession(durable(ref))
         host.markPane(durable(ref))
       }
     },

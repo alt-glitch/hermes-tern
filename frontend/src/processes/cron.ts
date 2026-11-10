@@ -4,7 +4,7 @@
 // pause, resume and remove go through the same method.
 
 import type { CronJobRow } from '@hermes/shared/gateway-events'
-import type { GatewayClient } from '@tui/gatewayClient.js'
+import type { GatewayClient } from '@hermes/shared/gateway-client'
 
 import { errorText } from '../core/errors.js'
 import { Poller } from '../core/poller.js'

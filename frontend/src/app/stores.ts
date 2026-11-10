@@ -4,7 +4,7 @@
 // calls back; each closure here reads what it calls when it runs, never while the stores are made.
 
 import type { Session } from '@stencil-hq/tern'
-import type { GatewayClient } from '@tui/gatewayClient.js'
+import type { GatewayClient } from '@hermes/shared/gateway-client'
 
 import { Agents } from '../agents/store.js'
 import { Hud } from '../chrome/hud.js'
@@ -23,7 +23,6 @@ import { Composer } from '../draft/composer.js'
 import type { Presses } from '../draft/keys.js'
 import type { Warned } from '../gateway/handlers/chrome.js'
 import { PullRequests } from '../github/store.js'
-import { writeActiveSessionFile } from '../hermes/activeSessionFile.js'
 import { Media } from '../media.js'
 import { Completion } from '../overlays/completion.js'
 import { OverlayStack } from '../overlays/overlay.js'
@@ -47,7 +46,7 @@ import { Transcript } from '../transcript/store.js'
 import { Activity } from '../turn/activity.js'
 import { PromptQueue } from '../turn/queue.js'
 import { canDrain, canSwitch, PromptRouter } from '../turn/router.js'
-import { randomTip, type WelcomeContext } from '../view/welcome.js'
+import type { WelcomeContext } from '../view/welcome.js'
 
 import type { AppActions } from './actions.js'
 import type { ChatPorts } from './ports.js'
@@ -238,14 +237,13 @@ export function chatStores(chat: ChatPorts, { act, gw, launch, settings, surface
       markViewer,
       readBusyMode: () => void act().readBusyMode(),
       reportCwd: () => act().reportCwd(),
-      showThoughts: sid => showThoughts({ gw, notice: (text, tone) => chat.notice(text, tone), settings }, sid),
-      writeActiveSession: writeActiveSessionFile
+      showThoughts: sid => showThoughts({ gw, notice: (text, tone) => chat.notice(text, tone), settings }, sid)
     })
   )
   /** Whose colors the surface wears, and the gateway's skin. */
   const theme = new Theme({ palette: palette => surface().palette(palette), settings }, saved.theme ?? 'tern')
   const completion = new Completion(chat, gw, () => session.ref.live)
-  const welcome: WelcomeContext = { tip: randomTip(launch.pythonSrcRoot), version: version && version !== 'unknown' ? `v${version}` : '' }
+  const welcome: WelcomeContext = { version: version && version !== 'unknown' ? `v${version}` : '' }
 
   return { ...shared, attachments, completion, cron, life, router, stack, theme, warned, welcome }
 }

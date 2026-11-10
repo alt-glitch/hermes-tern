@@ -5,7 +5,7 @@
 // contract does not declare (a newer gateway's) is told once and dropped. coverage.ts checks that
 // every declared type is handled or named as ignored.
 
-import type { AnyGatewayEvent, AnyGatewayEventName } from '@tui/gatewayTypes.js'
+import type { AnyGatewayEvent, AnyGatewayEventName } from '@hermes/shared/gateway-types'
 
 import { IGNORED } from './coverage.js'
 import { agentHandlers, type AgentsCx } from './handlers/agents.js'

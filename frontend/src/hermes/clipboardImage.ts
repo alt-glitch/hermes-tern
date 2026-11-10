@@ -1,12 +1,11 @@
 // Images from the clipboard and from dropped or pasted file paths, as Hermes' Ink TUI takes them
 // (ui-tui/src/app/useComposerState.ts). A terminal pastes an image as no text at all, so an empty
 // paste, Ctrl+V and `/paste` read the clipboard's image into a file: on macOS straight from the
-// pasteboard, elsewhere with Hermes' own extractor (ui-tui/scripts/clipboard_image.py, which
-// handles Wayland, X11 and WSL). A paste that is one image path (what a file dropped on the pane
-// types) attaches that file.
+// pasteboard, on Linux with `wl-paste` (Wayland) or `xclip` (X11). A paste that is one image path
+// (what a file dropped on the pane types) attaches that file.
 
 import { execFile } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { existsSync, statSync } from 'node:fs'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -50,10 +49,15 @@ function run(argv) {
   return d && !d.isNil() && d.writeToFileAtomically(argv[0], true) ? 'true' : 'false';
 }`
 
+/** Linux: the clipboard's PNG written to "$1", by the tool of the session's display server. */
+const LINUX_READERS: { when: (env: NodeJS.ProcessEnv) => boolean; script: string }[] = [
+  { script: 'wl-paste --no-newline --type image/png > "$1"', when: env => Boolean(env['WAYLAND_DISPLAY']) },
+  { script: 'xclip -selection clipboard -t image/png -o > "$1"', when: env => Boolean(env['DISPLAY']) }
+]
+
 /**
  * The clipboard's image as a file: `dest`, written, or (macOS) the image file Finder copied;
- * undefined when the clipboard holds none. On macOS Hermes' extractor runs only when osascript
- * itself fails, not when it finds no image.
+ * undefined when the clipboard holds none or nothing here can read it.
  */
 export async function extractClipboardImage(
   dest: string,
@@ -62,40 +66,39 @@ export async function extractClipboardImage(
   run: Runner = runFile
 ): Promise<string | undefined> {
   if (platform === 'darwin') {
-    let answer: string | undefined
+    let answer: string
 
     try {
       answer = (await run('osascript', ['-l', 'JavaScript', '-e', MAC_SCRIPT, dest], { timeout: 5_000 })).trim()
     } catch {
-      // No answer at all (no osascript, a sandbox): Hermes' extractor may still read it.
+      // No osascript (a sandbox): no image.
+      return undefined
     }
 
-    if (answer?.startsWith('file:')) {
+    if (answer.startsWith('file:')) {
       // A copied file that is no image is no clipboard image, nor is the icon beside it.
       const file = answer.slice('file:'.length)
 
       return IMAGE.test(file) && existsSync(file) ? file : undefined
     }
 
-    if (answer !== undefined) {
-      return answer === 'true' && existsSync(dest) ? dest : undefined
+    return answer === 'true' && existsSync(dest) ? dest : undefined
+  }
+
+  for (const reader of platform === 'linux' ? LINUX_READERS.filter(r => r.when(env)) : []) {
+    try {
+      await run('sh', ['-c', reader.script, 'sh', dest], { env, timeout: 5_000 })
+    } catch {
+      // No such tool, or no image on the clipboard: try the next.
+      continue
+    }
+
+    if (existsSync(dest) && statSync(dest).size > 0) {
+      return dest
     }
   }
 
-  const root = env['HERMES_PYTHON_SRC_ROOT']
-  const python = env['HERMES_PYTHON']?.trim() || 'python3'
-
-  if (!root) {
-    return undefined
-  }
-
-  const stdout = await run(python, [join(root, 'ui-tui/scripts/clipboard_image.py'), dest], {
-    cwd: root,
-    env: { ...env, PYTHONPATH: root },
-    timeout: 15_000
-  })
-
-  return stdout.trim() === 'true' && existsSync(dest) ? dest : undefined
+  return undefined
 }
 
 /**

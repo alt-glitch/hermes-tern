@@ -2,7 +2,7 @@
 // to a viewer that asks (a session flag, not a settings write); the work log shows it as thought
 // rows. settings.json's `thoughts: false` keeps them off.
 
-import type { GatewayClient } from '@tui/gatewayClient.js'
+import type { GatewayClient } from '@hermes/shared/gateway-client'
 
 import type { ChatPorts } from '../app/ports.js'
 import type { LiveSessionId } from '../core/ids.js'

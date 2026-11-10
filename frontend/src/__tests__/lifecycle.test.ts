@@ -78,7 +78,7 @@ describe('session lifecycle', () => {
     const dir = mkdtempSync(join(tmpdir(), 'hermes-tern-startup-'))
     writeFileSync(join(dir, 'shot.png'), Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 0]))
     gw.handlers.set('image.attach_bytes', () => ({ path: '/uploads/1.png' }))
-    const app = new App(fakeTern().session, gw.client, '', { launch: readLaunchEnv({ HERMES_TUI_IMAGE: 'shot.png' }, dir) })
+    const app = new App(fakeTern().session, gw.client, '', { launch: readLaunchEnv({ HERMES_TERN_IMAGE: 'shot.png' }, dir) })
     void app.run()
     expect(app.stores.queue.held).toEqual([{ images: [], kind: 'app', text: 'What do you see in this image?' }])
 

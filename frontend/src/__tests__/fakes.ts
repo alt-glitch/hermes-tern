@@ -5,8 +5,8 @@
 import { EventEmitter } from 'node:events'
 
 import { type JSX, type Key, node, Node, type NodeJson, type Region, type RegionName, type Renderable, type Session, Span, type ViewInput } from '@stencil-hq/tern'
-import type { GatewayClient } from '@tui/gatewayClient.js'
-import type { SessionInfo } from '@tui/types.js'
+import type { GatewayClient } from '@hermes/shared/gateway-client'
+import type { SessionInfo } from '@hermes/shared/gateway-types'
 
 import type { SessionView } from '../app/ports.js'
 import { liveSessionId } from '../core/ids.js'

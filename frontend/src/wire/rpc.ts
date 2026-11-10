@@ -10,8 +10,8 @@ import type {
   RpcMethods,
   TranscriptMessage
 } from '@hermes/shared/gateway-events'
-import type { GatewayClient } from '@tui/gatewayClient.js'
-import type { SessionInfo } from '@tui/types.js'
+import type { GatewayClient } from '@hermes/shared/gateway-client'
+import type { SessionInfo } from '@hermes/shared/gateway-types'
 import type { ZodMiniType } from 'zod/mini'
 
 import {
@@ -121,5 +121,5 @@ export function snapshotIds(r: SnapshotIdFields): SnapshotIds {
 
 /** The admission a prompt.submit receipt names; only the shared gateway admits into a queue. */
 export function admissionOf(r: ResultOf<'prompt.submit'> | null | undefined): AdmissionId | undefined {
-  return r && 'admission_id' in r ? admissionId(r.admission_id) : undefined
+  return r && 'admission_id' in r && r.admission_id ? admissionId(r.admission_id) : undefined
 }

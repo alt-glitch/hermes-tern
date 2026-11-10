@@ -11,7 +11,7 @@
 import type { HermesSkin } from '@hermes/shared/skin'
 import type { Palette } from '@stencil-hq/tern'
 
-import { fromSkin, type ThemeColors } from '../hermes/theme.js'
+import { skinColors, type SkinSemantics } from '../hermes/theme.js'
 import type { ThemeMode } from '../settings.js'
 
 type Tokens = Record<string, string>
@@ -56,32 +56,12 @@ export function paletteFor(mode: ThemeMode, skin: HermesSkin | undefined): Palet
   return { dark: {}, light: {}, name: { dark: 'tern', light: 'tern' } }
 }
 
-/**
- * The skin's colors for one polarity. `fromSkin` decides polarity from the
- * environment (`HERMES_TUI_LIGHT`), so pin it for the call; the overlay a
- * skin authors for that polarity wins over its base colors.
- *
- * Boundary: this writes the environment for a Hermes call that reads it. It
- * is not a launch setting, so it stays out of LaunchEnv (config/env.ts).
- */
-function resolve(skin: HermesSkin, polarity: 'dark' | 'light'): ThemeColors {
-  const light = polarity === 'light'
-  const colors = { ...skin.colors, ...(light ? skin.light_colors : skin.dark_colors) }
-  const saved = process.env['HERMES_TUI_LIGHT']
-  process.env['HERMES_TUI_LIGHT'] = light ? '1' : '0'
-
-  try {
-    return fromSkin(colors, skin.branding ?? {}).color
-  } finally {
-    if (saved === undefined) {
-      delete process.env['HERMES_TUI_LIGHT']
-    } else {
-      process.env['HERMES_TUI_LIGHT'] = saved
-    }
-  }
+/** The skin's colors for one polarity: the overlay a skin authors for that polarity wins over its base colors. */
+function resolve(skin: HermesSkin, polarity: 'dark' | 'light'): SkinSemantics {
+  return skinColors({ ...skin.colors, ...(polarity === 'light' ? skin.light_colors : skin.dark_colors) }, polarity)
 }
 
-function semantic(c: ThemeColors): Tokens {
+function semantic(c: SkinSemantics): Tokens {
   const out: Tokens = {
     accent: c.accent,
     borderAccent: c.accent,
