@@ -288,35 +288,93 @@ export const STYLES = css`
     max-width: 360px;
   }
 
-  /* The connect card's buttons: Authorize per app, Continue at the foot. */
-  [data-role='hermes.connect.open'],
-  [data-role='hermes.connect.continue'] {
+  /* The connect card (Hermes Desktop's): one row per app in the UI face, each verb the same small
+     ringed button in a fixed lane at the row's end, Not now a quiet word beside it, Continue a
+     ringed button at the foot. An answer in flight is the same box, dimmed and inert. */
+  [data-role='hermes.connect.row'],
+  [data-role='hermes.connect.foot'],
+  [data-role='hermes.connect.note'] {
+    font: 400 13px/22px var(--sans) !important;
+  }
+
+  [data-role='hermes.connect.row'] {
+    min-height: 30px;
+  }
+
+  /* What an MCP row runs or contacts, under its name, in full. */
+  [data-role='hermes.connect.launch'] {
+    margin: -4px 0 4px 22px;
+    font: 400 11.5px/16px var(--mono) !important;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+
+  /* The mark's lane is one width, so a spinner does not push its row's name over. */
+  [data-role='hermes.connect.row'] > :is(.sf-icon, .sf-spinner) {
     flex: none;
-    padding: 2px 10px !important;
-    border-radius: 999px;
-    box-shadow: inset 0 0 0 1px var(--l3);
+    width: 14px;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  [data-role='hermes.connect.foot'] {
+    margin-top: 4px;
+    padding-top: 6px;
+    box-shadow: inset 0 1px 0 var(--l2);
+  }
+
+  [data-role='hermes.connect.foot'] > .sf-text,
+  [data-role='hermes.connect.note'] {
+    font-size: 12.5px !important;
+  }
+
+  :is(
+      [data-role='hermes.connect.open'],
+      [data-role='hermes.connect.approve'],
+      [data-role='hermes.connect.retry'],
+      [data-role='hermes.connect.continue'],
+      [data-role='hermes.connect.skip'],
+      [data-role='hermes.connect.busy']
+    ) {
+    flex: none;
+    justify-content: center;
+    min-width: 76px;
+    padding: 1px 10px !important;
+    border-radius: 6px;
     font: 500 12px/20px var(--sans) !important;
     cursor: pointer;
   }
 
-  [data-role='hermes.connect.open'] {
+  :is([data-role='hermes.connect.open'], [data-role='hermes.connect.approve'], [data-role='hermes.connect.retry']) {
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sf-p-accent, var(--sf-c-accent)) 35%, transparent);
+    background: color-mix(in srgb, var(--sf-p-accent, var(--sf-c-accent)) 10%, transparent);
     color: var(--sf-p-accent, var(--sf-c-accent)) !important;
   }
 
   [data-role='hermes.connect.continue'] {
-    background: var(--t1);
-    color: var(--card) !important;
-    box-shadow: none;
+    box-shadow: inset 0 0 0 1px var(--l3);
+    color: var(--t1) !important;
   }
 
-  [data-role='hermes.connect.open']:hover,
-  [data-role='hermes.connect.continue']:hover {
-    opacity: 0.85;
+  [data-role='hermes.connect.skip'] {
+    min-width: 0;
+    padding: 1px 6px !important;
+    color: var(--t2) !important;
   }
 
-  [data-role='hermes.connect.row'] {
-    min-height: 28px;
-    font: 400 13px/22px var(--sans) !important;
+  [data-role='hermes.connect.busy'] {
+    box-shadow: inset 0 0 0 1px var(--l2);
+    color: var(--t3) !important;
+    cursor: default;
+  }
+
+  :is([data-role='hermes.connect.open'], [data-role='hermes.connect.approve'], [data-role='hermes.connect.retry'], [data-role='hermes.connect.continue']):hover {
+    background: color-mix(in srgb, var(--sf-p-accent, var(--sf-c-accent)) 18%, transparent);
+  }
+
+  [data-role='hermes.connect.skip']:hover {
+    background: var(--l2);
+    color: var(--t1) !important;
   }
 
   /* An image the next prompt carries: Tern's omp chip (thumbnail, name, size) with a ✕ after

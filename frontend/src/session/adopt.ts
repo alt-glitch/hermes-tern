@@ -34,7 +34,7 @@ import type { SessionTitle } from './title.js'
  */
 export type Snapshot = Pick<AdaptedSnapshot, 'session_id'> &
   Partial<Pick<AdaptedSnapshot, 'messages' | 'subscription_id'>> &
-  Partial<Pick<SessionResumeResult, 'inflight' | 'running' | 'status' | 'stored_session_id' | 'turn_started_at'>> & {
+  Partial<Pick<SessionResumeResult, 'inflight' | 'pending_connection' | 'running' | 'status' | 'stored_session_id' | 'turn_started_at'>> & {
     info?: SessionInfo
   }
 
@@ -56,7 +56,7 @@ export interface AdoptHost {
   readonly activity: Pick<Activity, 'busy' | 'endCompaction' | 'set'>
   readonly agents: Pick<Agents, 'adopt' | 'scan'>
   readonly automation: Pick<Automation, 'adopt'>
-  readonly connect: Pick<ConnectWatcher, 'watch'>
+  readonly connect: Pick<ConnectWatcher, 'restore' | 'watch'>
   readonly media: Pick<Media, 'showAll'>
   readonly notices: Pick<NoticeStrip, 'reset'>
   readonly processes: Pick<Processes, 'poke'>
@@ -173,6 +173,9 @@ export function adoptSteps(host: AdoptHost): readonly Adoptable[] {
         }
       }
     },
+    // A connect card the session's tool still waits on comes back on its call (after the turn's
+    // rows: a row the history lacks is added to the running turn).
+    { adopt: ({ r, ref }) => host.connect.restore(r.pending_connection, ref.live) },
     { adopt: () => host.changed() }
   ]
 }
