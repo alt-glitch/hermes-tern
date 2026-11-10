@@ -12,9 +12,9 @@ var __commonJS = (cb, mod) => function __require() {
     throw mod = 0, e;
   }
 };
-var __export = (target, all8) => {
+var __export = (target2, all8) => {
   for (var name in all8)
-    __defProp(target, name, { get: all8[name], enumerable: true });
+    __defProp(target2, name, { get: all8[name], enumerable: true });
 };
 var __copyProps = (to, from, except, desc) => {
   if (from && typeof from === "object" || typeof from === "function") {
@@ -24,12 +24,12 @@ var __copyProps = (to, from, except, desc) => {
   }
   return to;
 };
-var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+var __toESM = (mod, isNodeMode, target2) => (target2 = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
   // If the importer is in node compatibility mode or this is not an ESM
   // file that has been converted to a CommonJS file using a Babel-
   // compatible transform (i.e. "__esModule" has not been set), then set
   // "default" to the CommonJS "module.exports" for node compatibility.
-  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target2, "default", { value: mod, enumerable: true }) : target2,
   mod
 ));
 var __toBinaryNode = Uint8Array.fromBase64 || ((base642) => new Uint8Array(Buffer.from(base642, "base64")));
@@ -62,16 +62,16 @@ var require_extend = __commonJS({
       }
       return typeof key2 === "undefined" || hasOwn.call(obj, key2);
     };
-    var setProperty = function setProperty2(target, options) {
+    var setProperty = function setProperty2(target2, options) {
       if (defineProperty2 && options.name === "__proto__") {
-        defineProperty2(target, options.name, {
+        defineProperty2(target2, options.name, {
           enumerable: true,
           configurable: true,
           value: options.newValue,
           writable: true
         });
       } else {
-        target[options.name] = options.newValue;
+        target2[options.name] = options.newValue;
       }
     };
     var getProperty = function getProperty2(obj, name) {
@@ -86,25 +86,25 @@ var require_extend = __commonJS({
     };
     module.exports = function extend3() {
       var options, name, src, copy, copyIsArray, clone2;
-      var target = arguments[0];
+      var target2 = arguments[0];
       var i = 1;
       var length = arguments.length;
       var deep = false;
-      if (typeof target === "boolean") {
-        deep = target;
-        target = arguments[1] || {};
+      if (typeof target2 === "boolean") {
+        deep = target2;
+        target2 = arguments[1] || {};
         i = 2;
       }
-      if (target == null || typeof target !== "object" && typeof target !== "function") {
-        target = {};
+      if (target2 == null || typeof target2 !== "object" && typeof target2 !== "function") {
+        target2 = {};
       }
       for (; i < length; ++i) {
         options = arguments[i];
         if (options != null) {
           for (name in options) {
-            src = getProperty(target, name);
+            src = getProperty(target2, name);
             copy = getProperty(options, name);
-            if (target !== copy) {
+            if (target2 !== copy) {
               if (deep && copy && (isPlainObject3(copy) || (copyIsArray = isArray(copy)))) {
                 if (copyIsArray) {
                   copyIsArray = false;
@@ -112,15 +112,15 @@ var require_extend = __commonJS({
                 } else {
                   clone2 = src && isPlainObject3(src) ? src : {};
                 }
-                setProperty(target, { name, newValue: extend3(deep, clone2, copy) });
+                setProperty(target2, { name, newValue: extend3(deep, clone2, copy) });
               } else if (typeof copy !== "undefined") {
-                setProperty(target, { name, newValue: copy });
+                setProperty(target2, { name, newValue: copy });
               }
             }
           }
         }
       }
-      return target;
+      return target2;
     };
   }
 });
@@ -213,14 +213,14 @@ function leadsWithParameter(bytes, at) {
   return bytes[i] === 59;
 }
 function chunkEnd(body, start, limit) {
-  const target = start + Math.max(1, limit);
-  if (target >= body.length)
+  const target2 = start + Math.max(1, limit);
+  if (target2 >= body.length)
     return body.length;
   const safe4 = (at) => ((body[at] ?? 0) & 192) !== 128 && !leadsWithParameter(body, at);
-  for (let at = target; at > start; at--)
+  for (let at = target2; at > start; at--)
     if (safe4(at))
       return at;
-  for (let at = target + 1; at < body.length; at++)
+  for (let at = target2 + 1; at < body.length; at++)
     if (safe4(at))
       return at;
   return body.length;
@@ -344,13 +344,13 @@ function mods(raw2) {
     return void 0;
   return list9.filter((m) => m === "shift" || m === "ctrl" || m === "alt" || m === "meta");
 }
-function defined(target, fields) {
+function defined(target2, fields) {
   for (const key2 in fields) {
     const value = fields[key2];
     if (value !== void 0)
-      Reflect.set(target, key2, value);
+      Reflect.set(target2, key2, value);
   }
-  return target;
+  return target2;
 }
 function decodeEvent(raw2) {
   const ev = str(raw2, "ev");
@@ -1355,12 +1355,12 @@ function describe(part) {
 function node(kind, props, children3) {
   return createNode(kind, props ?? null, children3);
 }
-function withKey(target, key2) {
-  if (key2 === void 0 || target.props["key"] !== void 0)
-    return target;
-  if (target instanceof FragmentNode)
-    return new FragmentNode(target.parts, { ...target.props, key: key2 });
-  return new Node(target.kind, { ...target.props, key: key2 }, target.children, target.handlers);
+function withKey(target2, key2) {
+  if (key2 === void 0 || target2.props["key"] !== void 0)
+    return target2;
+  if (target2 instanceof FragmentNode)
+    return new FragmentNode(target2.parts, { ...target2.props, key: key2 });
+  return new Node(target2.kind, { ...target2.props, key: key2 }, target2.children, target2.handlers);
 }
 
 // node_modules/@stencil-hq/tern/dist/jsx-runtime.js
@@ -4042,466 +4042,12 @@ function launchEnv() {
   return launch ??= readLaunchEnv();
 }
 
-// src/connections/cards.ts
-import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { join } from "node:path";
-
 // src/core/errors.ts
 function errorText(error) {
   return error instanceof Error ? error.message : String(error);
 }
 function errorCode(error) {
   return error instanceof Error && "code" in error && typeof error.code === "string" ? error.code : void 0;
-}
-
-// src/core/result.ts
-function attempt(fn) {
-  try {
-    return { kind: "ok", value: fn() };
-  } catch (error) {
-    return { error, kind: "failed" };
-  }
-}
-
-// src/core/assert.ts
-function isNonEmpty(list9) {
-  return list9.length > 0;
-}
-function assertNever(value, what = "variant") {
-  throw new Error(`Unexpected ${what}: ${shown(value)}`);
-}
-function isDefined(value) {
-  return value !== void 0 && value !== null;
-}
-function optional2(key2, value) {
-  const out = {};
-  if (value !== void 0) {
-    out[key2] = value;
-  }
-  return out;
-}
-function oneOf(values) {
-  const known2 = new Set(values);
-  return (value) => known2.has(value);
-}
-function shown(value) {
-  try {
-    return typeof value === "string" ? value : JSON.stringify(value) ?? String(value);
-  } catch {
-    return String(value);
-  }
-}
-
-// src/tools/bridge.ts
-var BRIDGE = "tool_call";
-var BATCH = "connectors__execute";
-var TITLES = {
-  discord: "Discord",
-  figma: "Figma",
-  github: "GitHub",
-  gmail: "Gmail",
-  googlecalendar: "Google Calendar",
-  googledocs: "Google Docs",
-  googledrive: "Google Drive",
-  jira: "Jira",
-  linear: "Linear",
-  notion: "Notion",
-  outlook: "Outlook",
-  slack: "Slack",
-  stripe_mcp: "Stripe",
-  todoist: "Todoist"
-};
-function appTitle(slug) {
-  const known2 = TITLES[slug.trim().toLowerCase()];
-  if (known2) {
-    return known2;
-  }
-  const words3 = slug.split(/[-_\s]+/).filter(Boolean);
-  if (words3.length > 1 && words3.at(-1)?.toLowerCase() === "mcp") {
-    words3.pop();
-  }
-  return words3.map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
-}
-function actionPhrase(tool, app2 = "") {
-  const prefix2 = `${app2.replace(/-/g, "_").toUpperCase()}_`;
-  const text15 = app2 && tool.toUpperCase().startsWith(prefix2) ? tool.slice(prefix2.length) : tool;
-  return text15.split(/[-_\s]+/).filter(Boolean).join(" ").toLowerCase();
-}
-function appOf(name, args) {
-  const [prefix2, connector, ...tool] = name.split("__");
-  if (prefix2 === "connectors" && connector && tool.length && name !== BATCH) {
-    const alias = typeof args?.["connector_alias"] === "string" && args["connector_alias"].trim() ? ` (${args["connector_alias"].trim()})` : "";
-    return { action: actionPhrase(tool.join("__"), connector) + alias, app: appTitle(connector), kind: "connector" };
-  }
-  const mcp = /^mcp__(?<app>.+?)__(?<tool>.+)$/.exec(name)?.groups;
-  return mcp ? { action: actionPhrase(mcp["tool"] ?? ""), app: appTitle(mcp["app"] ?? ""), kind: "mcp" } : void 0;
-}
-function entriesOf(args) {
-  const list9 = Array.isArray(args["calls"]) ? args["calls"] : [args];
-  return list9.flatMap((e) => {
-    const r = record2(e);
-    const name = r?.["name"];
-    return typeof name === "string" && name ? [{ args: record2(r?.["arguments"]) ?? {}, name }] : [];
-  });
-}
-function unwrap(name, args) {
-  const direct = { args, name, via: { kind: "direct" } };
-  if (name !== BRIDGE && name !== BATCH) {
-    return direct;
-  }
-  const entries = entriesOf(args);
-  const [only] = entries;
-  if (only && entries.length === 1) {
-    return { ...only, via: { kind: "bridged" } };
-  }
-  const batch = entries.map((e) => ({ ...e, outcome: { kind: "running" } }));
-  return isNonEmpty(batch) ? { args, name, via: { entries: batch, kind: "batch" } } : direct;
-}
-function nextVia(prev, next2) {
-  return next2.kind !== "direct" ? next2 : prev.kind === "batch" ? { kind: "bridged" } : prev;
-}
-function batchOf(call) {
-  return call.via.kind === "batch" ? call.via.entries : void 0;
-}
-function batchResults(result) {
-  const results = record2(result)?.["results"];
-  if (!Array.isArray(results)) {
-    return void 0;
-  }
-  return results.map((e) => {
-    const r = record2(e) ?? {};
-    const err = r["error"];
-    return err === void 0 || err === null ? { result: r["response"] } : { error: typeof err === "string" ? err : String(record2(err)?.["message"] ?? "") || JSON.stringify(err) };
-  });
-}
-function settleBridge(call) {
-  if (call.via.kind === "direct") {
-    return void 0;
-  }
-  const outcomes = batchResults(call.result);
-  if (!outcomes) {
-    return void 0;
-  }
-  if (call.via.kind === "batch") {
-    const entries = call.via.entries;
-    entries.forEach((e, i) => {
-      const o2 = outcomes[i];
-      e.outcome = o2?.error ? { error: o2.error, kind: "error" } : { kind: "done", result: o2?.result };
-    });
-    return entries.every((e) => e.outcome.kind === "error");
-  }
-  const o = outcomes[0];
-  call.result = o?.error ? { error: o.error } : o?.result;
-  return Boolean(o?.error);
-}
-function appsOf(call) {
-  const apps = (batchOf(call) ?? [call]).map((e) => appOf(e.name, e.args)?.app);
-  const named2 = apps.filter((a2) => Boolean(a2));
-  return named2.length === apps.length ? [...new Set(named2)] : [];
-}
-function callApp(call) {
-  const batch = batchOf(call);
-  if (batch) {
-    const apps = batch.map((e) => appOf(e.name, e.args));
-    const first2 = apps[0];
-    return first2 && apps.every((a2) => a2?.app === first2.app) ? { ...first2, action: `${batch.length} calls` } : void 0;
-  }
-  return appOf(call.name, call.args);
-}
-
-// src/wire/files.ts
-import { readFileSync } from "node:fs";
-
-// src/wire/schemas.ts
-var loose = (schema2) => _catch(optional(schema2), void 0);
-function rowsOf(item3, items) {
-  return items.flatMap((raw2) => {
-    const row2 = item3.safeParse(raw2);
-    return row2.success ? [row2.data] : [];
-  });
-}
-var processRow = object({
-  session_id: string2(),
-  command: loose(string2()),
-  status: loose(string2()),
-  exit_code: loose(nullable(number2())),
-  started_epoch: loose(nullable(number2())),
-  uptime_seconds: loose(nullable(number2())),
-  exited_at: loose(nullable(number2())),
-  completion_reason: loose(nullable(string2())),
-  output_tail: loose(nullable(string2())),
-  output_preview: loose(string2())
-});
-var processList = pipe(
-  _catch(object({ processes: nullish(array(unknown())) }), {}),
-  transform((answer) => rowsOf(processRow, answer.processes ?? []))
-);
-var PENDING_STATUSES = ["queued", "started", "unknown", "terminal"];
-var isPendingStatus = oneOf(PENDING_STATUSES);
-var pendingRow = object({
-  admission_id: pipe(string2(), transform(admissionId)),
-  /** The submission id the submitter chose (this pane's `submission_id`). */
-  input_id: loose(pipe(string2(), transform(inputId))),
-  status: pipe(optional(unknown()), transform((status) => isPendingStatus(status) ? status : "other")),
-  /** The prompt's text. */
-  user: _catch(string2(), "")
-});
-function pendingRows(info) {
-  const { pending_submissions: rows2 } = info ?? {};
-  return Array.isArray(rows2) ? rowsOf(pendingRow, rows2) : void 0;
-}
-var settle = _catch(object({ admission_id: loose(string2()), outcome: optional(unknown()) }), {});
-function cancelledAdmission(payload) {
-  const { admission_id: id, outcome: outcome2 } = settle.parse(payload ?? {});
-  return outcome2 === "cancelled" && id !== void 0 ? admissionId(id) : void 0;
-}
-var counter = pipe(optional(unknown()), transform((value) => Number(value ?? 0)));
-var tick = _catch(
-  object({
-    prompt_tokens: counter,
-    cache_read_tokens: counter,
-    total_tokens: counter,
-    tokens_per_s: loose(number2())
-  }),
-  { cache_read_tokens: 0, prompt_tokens: 0, tokens_per_s: void 0, total_tokens: 0 }
-);
-function usageCounters(payload) {
-  const parsed2 = tick.parse(payload);
-  const counters = { prompt: parsed2.prompt_tokens, read: parsed2.cache_read_tokens, total: parsed2.total_tokens };
-  return Object.values(counters).every(Number.isFinite) ? { counters, tps: parsed2.tokens_per_s } : void 0;
-}
-
-// src/wire/files.ts
-function readJsonFile(file2) {
-  try {
-    return parseJson(readFileSync(file2, "utf8"));
-  } catch {
-    return void 0;
-  }
-}
-function isObject2(value) {
-  return typeof value === "object" && value !== null;
-}
-var settingsFile = _catch(
-  object({
-    theme: loose(_enum(["tern", "nous", "skin"])),
-    thoughts: loose(boolean2()),
-    jobCharts: loose(boolean2())
-  }),
-  {}
-);
-function readSettings(file2) {
-  return settingsOf(readStoredSettings(file2));
-}
-function settingsOf(stored) {
-  return settingsFile.parse(stored);
-}
-function readStoredSettings(file2) {
-  const stored = readJsonFile(file2);
-  return isObject2(stored) ? stored : {};
-}
-var watchSpec = object({
-  sid: pipe(string2(), transform(liveSessionId)),
-  stored: loose(pipe(string2(), transform(storedSessionId))),
-  subagent: string2(),
-  name: _catch(string2(), ""),
-  goal: _catch(string2(), ""),
-  index: _catch(number2(), 0),
-  log: loose(string2()),
-  startedAt: _catch(number2(), 0)
-});
-function readWatchSpecText(raw2) {
-  const spec = watchSpec.safeParse(raw2 ? parseJson(raw2) : void 0);
-  return spec.success ? spec.data : void 0;
-}
-var SETTLED_BY = ["all_resolved", "continued", "deadline", "error", "superseded"];
-var cardFile = object({
-  /** Each app's row: kept as written, read by connections/cards.ts as a tool result's rows are. */
-  targets: array(unknown()),
-  error: loose(string2()),
-  /** Epoch seconds of the watcher's last write. */
-  updated_at: loose(number2()),
-  /** Why the card stopped; another value reads as none. */
-  settled_by: loose(_enum(SETTLED_BY)),
-  watching: loose(boolean2()),
-  /** The watcher's process. */
-  pid: loose(number2())
-});
-function readCardFile(file2) {
-  const card = cardFile.safeParse(readJsonFile(file2));
-  return card.success ? card.data : void 0;
-}
-var created = object({ created_at: number2() });
-function cardCreatedAt(file2) {
-  return created.safeParse(readJsonFile(file2)).data?.created_at ?? 0;
-}
-var linksFile = _catch(
-  object({
-    /** Session id → the conversation root its links are filed under; a non-text root reads as none. */
-    aliases: _catch(record(string2(), loose(string2())), {}),
-    /** Root → its links, read by links.ts as a tool result's are. */
-    conversations: _catch(record(string2(), unknown()), {})
-  }),
-  { aliases: {}, conversations: {} }
-);
-function readLinksFile(file2) {
-  const data = readJsonFile(file2);
-  if (data === null) {
-    throw new TypeError("pull-requests.json holds null");
-  }
-  return data === void 0 ? void 0 : linksFile.parse(data);
-}
-var skipped = object({ skip: number2() });
-function chartSkip(value) {
-  return skipped.safeParse(value).data;
-}
-
-// src/connections/cards.ts
-var CONNECT_TOOL = "manage_connections";
-var POLL_MS = 2e3;
-var STALE_MS = 2 * 6e4;
-var dataDir = (env2 = process.env) => join(env2["HERMES_HOME"] || join(homedir(), ".hermes"), "plugin-data", "hermes-tern");
-var safe = (part) => part.replace(/[^A-Za-z0-9_-]/g, "_");
-var cardStem = (callId, opId) => opId ? `${safe(callId)}.${safe(opId)}` : safe(callId);
-var alive = (pid) => {
-  if (pid === void 0) {
-    return true;
-  }
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    return errorCode(error) === "EPERM";
-  }
-};
-function readCard(key2, dir2 = dataDir(), now = Date.now()) {
-  const data = readCardFile(join(dir2, "connections", `${key2}.json`));
-  if (!data) {
-    return void 0;
-  }
-  const error = data.error || void 0;
-  const updated = data.updated_at === void 0 ? now : data.updated_at * 1e3;
-  let settled2;
-  if (data.settled_by) {
-    settled2 = data.settled_by;
-  } else if (data.watching !== true) {
-    settled2 = error ? "error" : data.targets.some((t) => waiting({ state: String(record2(t)?.["state"] ?? "") })) ? "deadline" : "all_resolved";
-  } else if (!alive(data.pid) || now - updated > STALE_MS) {
-    settled2 = "stopped";
-  }
-  return { error, key: key2, settled: settled2, targets: data.targets, told: existsSync(join(dir2, "connections", `${key2}.told`)) };
-}
-function findCard(call, dir2 = dataDir()) {
-  const op = record2(call.result)?.["op_id"];
-  const prefix2 = `${safe(call.id)}.`;
-  if (typeof op === "string" && op) {
-    return existsSync(join(dir2, "connections", `${cardStem(call.id, op)}.json`)) ? cardStem(call.id, op) : void 0;
-  }
-  let names;
-  try {
-    names = readdirSync(join(dir2, "connections"));
-  } catch {
-    return void 0;
-  }
-  const keys2 = names.flatMap((n) => {
-    const key2 = n.endsWith(".json") ? n.slice(0, -5) : "";
-    return key2 === safe(call.id) || key2.startsWith(prefix2) && !key2.slice(prefix2.length).includes(".") ? [key2] : [];
-  });
-  if (keys2.length < 2) {
-    return keys2[0];
-  }
-  const createdAt = (key2) => cardCreatedAt(join(dir2, "connections", `${key2}.json`)) * 1e3;
-  return keys2.map((key2) => ({ gap: Math.abs(createdAt(key2) - call.startedAt), key: key2 })).sort((a2, b) => a2.gap - b.gap)[0]?.key;
-}
-function claimTold(key2, dir2 = dataDir()) {
-  const claim = attempt(() => writeFileSync(join(dir2, "connections", `${key2}.told`), "", { flag: "wx" }));
-  if (claim.kind === "ok") {
-    return { kind: "claimed" };
-  }
-  return errorCode(claim.error) === "EEXIST" ? { kind: "taken" } : { error: claim.error, kind: "failed" };
-}
-function mayTell(card, dir2 = dataDir()) {
-  return !card.key || claimTold(card.key, dir2).kind !== "taken";
-}
-var TERN_PANE_VARS = ["TERN_PANE", "TERN_PANE_SOCKET", "TERN_WINDOW_KEY", "TERN_WINDOW_SOCKET", "TERN_DAEMON_SOCKET"];
-function ternPane(env2 = process.env) {
-  const vars = Object.fromEntries(TERN_PANE_VARS.flatMap((k) => env2[k] ? [[k, env2[k]]] : []));
-  return vars["TERN_PANE"] ? vars : void 0;
-}
-function markViewer(sid, previous3, dir2 = dataDir(), env2 = process.env) {
-  const viewers = join(dir2, "viewers");
-  try {
-    if (previous3 && previous3 !== sid) {
-      rmSync(join(viewers, `${previous3}.json`), { force: true });
-    }
-    if (sid) {
-      mkdirSync(viewers, { recursive: true });
-      writeFileSync(join(viewers, `${sid}.json`), JSON.stringify({ pid: process.pid, tern: ternPane(env2) }));
-    }
-  } catch {
-  }
-}
-function connectTargets(call, card) {
-  if (call.name !== CONNECT_TOOL) {
-    return [];
-  }
-  const targets = card?.targets ?? record2(call.result)?.["targets"];
-  return parseTargets(Array.isArray(targets) ? targets : []);
-}
-function loadConnect(call, dir2 = dataDir(), now = Date.now()) {
-  if (call.name !== CONNECT_TOOL) {
-    return void 0;
-  }
-  const key2 = call.connect?.key ?? findCard(call, dir2);
-  const file2 = key2 ? readCard(key2, dir2, now) : void 0;
-  const targets = connectTargets(call, file2);
-  if (!targets.length) {
-    return void 0;
-  }
-  return {
-    error: file2?.error,
-    key: file2?.key,
-    opened: call.connect?.opened ?? [],
-    // Continue settles the card at once, as on the desktop; the watcher sees the claim on its next read.
-    settled: file2?.settled ?? (file2?.told || call.connect?.told ? "continued" : void 0),
-    targets,
-    told: Boolean(file2?.told || call.connect?.told)
-  };
-}
-function parseTargets(targets) {
-  return targets.flatMap((t) => {
-    const r = record2(t);
-    const name = typeof r?.["name"] === "string" ? r["name"] : "";
-    return name ? [
-      {
-        alias: typeof r?.["alias"] === "string" && r["alias"] ? r["alias"] : void 0,
-        detail: typeof r?.["detail"] === "string" && r["detail"] ? r["detail"] : void 0,
-        name,
-        state: typeof r?.["state"] === "string" ? r["state"] : "pending",
-        title: appTitle(name),
-        url: typeof r?.["connect_url"] === "string" && r["connect_url"] ? r["connect_url"] : void 0
-      }
-    ] : [];
-  });
-}
-var waiting = (t) => t.state === "initiated" || t.state === "pending";
-var allConnected = (card) => {
-  const own14 = card.targets.filter((t) => t.state !== "superseded");
-  return own14.length > 0 && own14.every((t) => t.state === "connected");
-};
-function isConnectCall(call) {
-  const card = call.connect;
-  return card ? card.settled !== "superseded" && card.targets.some((t) => t.url) : connectTargets(call).some((t) => t.url);
-}
-var and = (names) => names.length < 3 ? names.join(" and ") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
-function continueMessage(targets) {
-  const names = targets.filter((t) => t.state === "connected" || waiting(t)).map((t) => t.title);
-  return `I've authorized ${and(names) || "the apps"}. Check with manage_connections status and carry on.`;
-}
-function connectedMessage(targets) {
-  const names = targets.filter((t) => t.state === "connected").map((t) => t.title);
-  return `${and(names)} ${names.length === 1 ? "is" : "are"} connected now. Carry on.`;
 }
 
 // src/core/scheduler.ts
@@ -5004,43 +4550,6 @@ function firstAnswer(answers) {
   return Array.isArray(first2) ? first2.join(", ") : typeof first2 === "string" ? first2 : "";
 }
 
-// src/tools/fields.ts
-function text(v) {
-  return typeof v === "string" && v ? v : void 0;
-}
-function num2(v) {
-  return typeof v === "number" ? v : void 0;
-}
-function list(v) {
-  return Array.isArray(v) ? v : void 0;
-}
-function records(v) {
-  return Array.isArray(v) ? v.map((i) => record2(i)) : [];
-}
-function objects(v) {
-  return records(v).filter((r) => r !== void 0);
-}
-function texts(v) {
-  return Array.isArray(v) ? v.map((i) => text(i)).filter((t) => t !== void 0) : [];
-}
-
-// src/tools/terminal.ts
-function terminalDetail({ args, result }) {
-  return {
-    background: args["background"] === true || typeof result?.["session_id"] === "string",
-    command: text(args["command"]),
-    error: text(result?.["error"]),
-    exit: num2(result?.["exit_code"]),
-    output: text(result?.["output"]),
-    tool: "terminal"
-  };
-}
-var TERN_ENV = /^\s*(?:export (?:TERN_[A-Z_]+=(?:'[^']*'|"[^"]*"|[^\s;]+) ?)+; ?)?(?:unset (?:TERN_[A-Z_]+ ?)+; ?)?/;
-function withoutTernEnv(command2) {
-  const m = TERN_ENV.exec(command2);
-  return m?.[0] ? command2.slice(m[0].length) : command2;
-}
-
 // src/view/ui/button.tsx
 function button(b) {
   return /* @__PURE__ */ jsxs(
@@ -5065,6 +4574,35 @@ function actionsRow(buttons) {
     /* @__PURE__ */ jsx("spacer", { grow: 1 }, "fill"),
     buttons.map(button)
   ] }, "actions");
+}
+
+// src/core/assert.ts
+function isNonEmpty(list9) {
+  return list9.length > 0;
+}
+function assertNever(value, what = "variant") {
+  throw new Error(`Unexpected ${what}: ${shown(value)}`);
+}
+function isDefined(value) {
+  return value !== void 0 && value !== null;
+}
+function optional2(key2, value) {
+  const out = {};
+  if (value !== void 0) {
+    out[key2] = value;
+  }
+  return out;
+}
+function oneOf(values) {
+  const known2 = new Set(values);
+  return (value) => known2.has(value);
+}
+function shown(value) {
+  try {
+    return typeof value === "string" ? value : JSON.stringify(value) ?? String(value);
+  } catch {
+    return String(value);
+  }
 }
 
 // src/prompts/ask.tsx
@@ -5225,7 +4763,7 @@ var APPROVALS = [
 ];
 function approvalOverlay(host, prompt) {
   const { description, req, smartDenied } = prompt;
-  const command2 = prompt.command && withoutTernEnv(prompt.command);
+  const command2 = prompt.command;
   const choices = APPROVALS.filter((c) => prompt.choices.includes(c.id));
   const key2 = promptKey(req.id);
   const sending = { busy: false, error: "" };
@@ -5278,25 +4816,25 @@ function approvalOverlay(host, prompt) {
 }
 
 // node_modules/@hermes/shared/src/node/prompt-history.ts
-import { appendFileSync as appendFileSync2, existsSync as existsSync2, mkdirSync as mkdirSync2, readFileSync as readFileSync2 } from "node:fs";
-import { homedir as homedir2 } from "node:os";
-import { join as join2 } from "node:path";
+import { appendFileSync as appendFileSync2, existsSync, mkdirSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 var MAX = 1e3;
-var dir = process.env.HERMES_HOME ?? join2(homedir2(), ".hermes");
-var file = join2(dir, ".hermes_history");
+var dir = process.env.HERMES_HOME ?? join(homedir(), ".hermes");
+var file = join(dir, ".hermes_history");
 var cache = null;
 function load() {
   if (cache) {
     return cache;
   }
   try {
-    if (!existsSync2(file)) {
+    if (!existsSync(file)) {
       cache = [];
       return cache;
     }
     const entries = [];
     let current = [];
-    for (const line of readFileSync2(file, "utf8").split("\n")) {
+    for (const line of readFileSync(file, "utf8").split("\n")) {
       if (line.startsWith("+")) {
         current.push(line.slice(1));
       } else if (current.length) {
@@ -5327,8 +4865,8 @@ function append(line) {
     items.splice(0, items.length - MAX);
   }
   try {
-    if (!existsSync2(dir)) {
-      mkdirSync2(dir, { recursive: true });
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
     }
     const ts = (/* @__PURE__ */ new Date()).toISOString().replace("T", " ").replace("Z", "");
     const encoded = trimmed.split("\n").map((l) => `+${l}`).join("\n");
@@ -5876,9 +5414,9 @@ var Composer = class {
     const onEdge = dir2 < 0 ? start === 0 : end === this.text.length;
     if (!onEdge) {
       const col = this.cursor - start;
-      const target = dir2 < 0 ? lineStart(this.text, start - 1) : end + 1;
-      const line = this.text.slice(target, lineEnd(this.text, target));
-      return this.#move(target + boundaryAt(line, Math.min(col, line.length)));
+      const target2 = dir2 < 0 ? lineStart(this.text, start - 1) : end + 1;
+      const line = this.text.slice(target2, lineEnd(this.text, target2));
+      return this.#move(target2 + boundaryAt(line, Math.min(col, line.length)));
     }
     return this.#history(dir2);
   }
@@ -6298,7 +5836,7 @@ function maskedOverlay(host, prompt) {
     node: () => /* @__PURE__ */ jsx("overlay", { anchor: "bottom", modal: true, role: "omp.overlay.ask", size: "md", children: /* @__PURE__ */ jsxs("col", { gap: "md", children: [
       /* @__PURE__ */ jsx("md", { role: "omp.ask.question", text: title }, "question"),
       note ? /* @__PURE__ */ jsx("text", { spans: [{ s: method === "secret" ? "mono dim" : "muted", t: note }], wrap: "word" }, "note") : null,
-      prompt.command ? /* @__PURE__ */ jsx("code", { lang: "bash", text: withoutTernEnv(prompt.command) }, "command") : null,
+      prompt.command ? /* @__PURE__ */ jsx("code", { lang: "bash", text: prompt.command }, "command") : null,
       fields.map((f, i) => /* @__PURE__ */ jsx(
         "input",
         {
@@ -6455,7 +5993,7 @@ var promptHandlers = {
 };
 
 // node_modules/@hermes/shared/src/usage-tick.ts
-var num3 = (value) => value !== null && value !== void 0 && Number.isFinite(value) ? value : void 0;
+var num2 = (value) => value !== null && value !== void 0 && Number.isFinite(value) ? value : void 0;
 var round1 = (value) => Math.round(value * 10) / 10;
 var pct = (part, whole) => Math.max(0, Math.min(100, Math.round(part / whole * 100)));
 var COUNTERS = [
@@ -6468,9 +6006,9 @@ var COUNTERS = [
   ["total", ["total_tokens"]]
 ];
 function contextFields(p3) {
-  const used = num3(p3.last_prompt_tokens) ?? 0;
-  const max = num3(p3.context_length) ?? 0;
-  const compressions = num3(p3.compression_count);
+  const used = num2(p3.last_prompt_tokens) ?? 0;
+  const max = num2(p3.context_length) ?? 0;
+  const compressions = num2(p3.compression_count);
   const fields = p3.context_source == null || compressions === void 0 ? {} : { compressions };
   if (!used || !max) {
     return fields;
@@ -6488,11 +6026,11 @@ function contextFields(p3) {
 }
 function rateFields(p3) {
   const fields = {};
-  const promptTotal = num3(p3.prompt_tokens) ?? 0;
-  const cacheRead = num3(p3.cache_read_tokens) ?? 0;
-  const latency = num3(p3.avg_latency_s);
-  const tps = num3(p3.tokens_per_s);
-  const subagents = num3(p3.active_subagents);
+  const promptTotal = num2(p3.prompt_tokens) ?? 0;
+  const cacheRead = num2(p3.cache_read_tokens) ?? 0;
+  const latency = num2(p3.avg_latency_s);
+  const tps = num2(p3.tokens_per_s);
+  const subagents = num2(p3.active_subagents);
   if (promptTotal > 0 && cacheRead > 0) {
     fields.cache_hit_pct = pct(cacheRead, promptTotal);
   }
@@ -6516,7 +6054,7 @@ function usageFromTick(payload) {
   }
   const usage = {};
   for (const [key2, sources] of COUNTERS) {
-    const values = sources.map((source2) => num3(payload[source2]));
+    const values = sources.map((source2) => num2(payload[source2]));
     const value = values.find(Boolean) ?? values.find((v) => v !== void 0);
     if (value !== void 0) {
       usage[key2] = value;
@@ -6543,6 +6081,65 @@ function userText(text15, images) {
 }
 function userImages(images) {
   return images.map((i) => ({ kind: "image", name: i.name, ...i.preview ? { source: i.preview } : {} }));
+}
+
+// src/wire/schemas.ts
+var loose = (schema2) => _catch(optional(schema2), void 0);
+function rowsOf(item3, items) {
+  return items.flatMap((raw2) => {
+    const row2 = item3.safeParse(raw2);
+    return row2.success ? [row2.data] : [];
+  });
+}
+var processRow = object({
+  session_id: string2(),
+  command: loose(string2()),
+  status: loose(string2()),
+  exit_code: loose(nullable(number2())),
+  started_epoch: loose(nullable(number2())),
+  uptime_seconds: loose(nullable(number2())),
+  exited_at: loose(nullable(number2())),
+  completion_reason: loose(nullable(string2())),
+  output_tail: loose(nullable(string2())),
+  output_preview: loose(string2())
+});
+var processList = pipe(
+  _catch(object({ processes: nullish(array(unknown())) }), {}),
+  transform((answer) => rowsOf(processRow, answer.processes ?? []))
+);
+var PENDING_STATUSES = ["queued", "started", "unknown", "terminal"];
+var isPendingStatus = oneOf(PENDING_STATUSES);
+var pendingRow = object({
+  admission_id: pipe(string2(), transform(admissionId)),
+  /** The submission id the submitter chose (this pane's `submission_id`). */
+  input_id: loose(pipe(string2(), transform(inputId))),
+  status: pipe(optional(unknown()), transform((status) => isPendingStatus(status) ? status : "other")),
+  /** The prompt's text. */
+  user: _catch(string2(), "")
+});
+function pendingRows(info) {
+  const { pending_submissions: rows2 } = info ?? {};
+  return Array.isArray(rows2) ? rowsOf(pendingRow, rows2) : void 0;
+}
+var settle = _catch(object({ admission_id: loose(string2()), outcome: optional(unknown()) }), {});
+function cancelledAdmission(payload) {
+  const { admission_id: id, outcome: outcome2 } = settle.parse(payload ?? {});
+  return outcome2 === "cancelled" && id !== void 0 ? admissionId(id) : void 0;
+}
+var counter = pipe(optional(unknown()), transform((value) => Number(value ?? 0)));
+var tick = _catch(
+  object({
+    prompt_tokens: counter,
+    cache_read_tokens: counter,
+    total_tokens: counter,
+    tokens_per_s: loose(number2())
+  }),
+  { cache_read_tokens: 0, prompt_tokens: 0, tokens_per_s: void 0, total_tokens: 0 }
+);
+function usageCounters(payload) {
+  const parsed2 = tick.parse(payload);
+  const counters = { prompt: parsed2.prompt_tokens, read: parsed2.cache_read_tokens, total: parsed2.total_tokens };
+  return Object.values(counters).every(Number.isFinite) ? { counters, tps: parsed2.tokens_per_s } : void 0;
 }
 
 // src/gateway/handlers/session.ts
@@ -6610,19 +6207,105 @@ var sessionHandlers = {
 import { DatabaseSync as DatabaseSync2 } from "node:sqlite";
 
 // src/github/links.ts
-import { homedir as homedir4 } from "node:os";
-import { join as join4 } from "node:path";
+import { homedir as homedir3 } from "node:os";
+import { join as join3 } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
 // src/hermes/paths.ts
-import { homedir as homedir3 } from "node:os";
-import { join as join3 } from "node:path";
+import { homedir as homedir2 } from "node:os";
+import { join as join2 } from "node:path";
 function stateDbPath(env2 = process.env) {
-  return join3(env2["HERMES_HOME"] || join3(homedir3(), ".hermes"), "state.db");
+  return join2(env2["HERMES_HOME"] || join2(homedir2(), ".hermes"), "state.db");
+}
+
+// src/wire/files.ts
+import { readFileSync as readFileSync2 } from "node:fs";
+function readJsonFile(file2) {
+  try {
+    return parseJson(readFileSync2(file2, "utf8"));
+  } catch {
+    return void 0;
+  }
+}
+function isObject2(value) {
+  return typeof value === "object" && value !== null;
+}
+var settingsFile = _catch(
+  object({
+    theme: loose(_enum(["tern", "nous", "skin"])),
+    thoughts: loose(boolean2()),
+    jobCharts: loose(boolean2())
+  }),
+  {}
+);
+function readSettings(file2) {
+  return settingsOf(readStoredSettings(file2));
+}
+function settingsOf(stored) {
+  return settingsFile.parse(stored);
+}
+function readStoredSettings(file2) {
+  const stored = readJsonFile(file2);
+  return isObject2(stored) ? stored : {};
+}
+var watchSpec = object({
+  sid: pipe(string2(), transform(liveSessionId)),
+  stored: loose(pipe(string2(), transform(storedSessionId))),
+  subagent: string2(),
+  name: _catch(string2(), ""),
+  goal: _catch(string2(), ""),
+  index: _catch(number2(), 0),
+  log: loose(string2()),
+  startedAt: _catch(number2(), 0)
+});
+function readWatchSpecText(raw2) {
+  const spec = watchSpec.safeParse(raw2 ? parseJson(raw2) : void 0);
+  return spec.success ? spec.data : void 0;
+}
+var SETTLED_BY = ["all_resolved", "continued", "deadline", "error", "superseded"];
+var cardFile = object({
+  /** Each app's row: kept as written, read by connections/cards.ts as a tool result's rows are. */
+  targets: array(unknown()),
+  error: loose(string2()),
+  /** Epoch seconds of the watcher's last write. */
+  updated_at: loose(number2()),
+  /** Why the card stopped; another value reads as none. */
+  settled_by: loose(_enum(SETTLED_BY)),
+  watching: loose(boolean2()),
+  /** The watcher's process. */
+  pid: loose(number2())
+});
+function readCardFile(file2) {
+  const card = cardFile.safeParse(readJsonFile(file2));
+  return card.success ? card.data : void 0;
+}
+var created = object({ created_at: number2() });
+function cardCreatedAt(file2) {
+  return created.safeParse(readJsonFile(file2)).data?.created_at ?? 0;
+}
+var linksFile = _catch(
+  object({
+    /** Session id → the conversation root its links are filed under; a non-text root reads as none. */
+    aliases: _catch(record(string2(), loose(string2())), {}),
+    /** Root → its links, read by links.ts as a tool result's are. */
+    conversations: _catch(record(string2(), unknown()), {})
+  }),
+  { aliases: {}, conversations: {} }
+);
+function readLinksFile(file2) {
+  const data = readJsonFile(file2);
+  if (data === null) {
+    throw new TypeError("pull-requests.json holds null");
+  }
+  return data === void 0 ? void 0 : linksFile.parse(data);
+}
+var skipped = object({ skip: number2() });
+function chartSkip(value) {
+  return skipped.safeParse(value).data;
 }
 
 // src/wire/sqlite.ts
-var text2 = _catch(nullable(string2()), null);
+var text = _catch(nullable(string2()), null);
 var utf8 = new TextDecoder();
 var textBytes = _catch(
   pipe(
@@ -6676,7 +6359,7 @@ function storedArgs(raw2) {
 // src/github/links.ts
 var LINK_TOOLS = /* @__PURE__ */ new Set(["link_pull_request", "list_pull_requests", "unlink_pull_request"]);
 function linksPath(env2 = process.env) {
-  return join4(env2["HERMES_HOME"] || join4(homedir4(), ".hermes"), "plugin-data", "hermes-tern", "pull-requests.json");
+  return join3(env2["HERMES_HOME"] || join3(homedir3(), ".hermes"), "plugin-data", "hermes-tern", "pull-requests.json");
 }
 function refOf(v) {
   const r = record2(v);
@@ -6696,7 +6379,7 @@ var marker = (k) => `COALESCE(json_extract(CASE WHEN json_valid(c.model_config) 
 var CONTINUES = `SELECT p.id AS p FROM sessions c JOIN sessions p ON p.id = c.parent_session_id
   WHERE c.id = ? AND p.end_reason = 'compression' AND COALESCE(c.source, '') != 'tool'
     AND ${["_branched_from", "_delegate_from", "_reset_from"].map(marker).join(" AND ")}`;
-var parentRow = object({ p: text2 });
+var parentRow = object({ p: text });
 function ancestry(sid, db = stateDbPath()) {
   const chain = [sid];
   try {
@@ -6814,6 +6497,266 @@ function statusEffect(payload, last) {
 function counted(text15) {
   const tokens2 = lineTokens(text15);
   return tokens2.before || tokens2.after ? { tokens: tokens2 } : {};
+}
+
+// src/connections/cards.ts
+import { existsSync as existsSync2, readdirSync, writeFileSync } from "node:fs";
+import { homedir as homedir4 } from "node:os";
+import { join as join4 } from "node:path";
+
+// src/core/result.ts
+function attempt(fn) {
+  try {
+    return { kind: "ok", value: fn() };
+  } catch (error) {
+    return { error, kind: "failed" };
+  }
+}
+
+// src/tools/bridge.ts
+var BRIDGE = "tool_call";
+var BATCH = "connectors__execute";
+var TITLES = {
+  discord: "Discord",
+  figma: "Figma",
+  github: "GitHub",
+  gmail: "Gmail",
+  googlecalendar: "Google Calendar",
+  googledocs: "Google Docs",
+  googledrive: "Google Drive",
+  jira: "Jira",
+  linear: "Linear",
+  notion: "Notion",
+  outlook: "Outlook",
+  slack: "Slack",
+  stripe_mcp: "Stripe",
+  todoist: "Todoist"
+};
+function appTitle(slug) {
+  const known2 = TITLES[slug.trim().toLowerCase()];
+  if (known2) {
+    return known2;
+  }
+  const words3 = slug.split(/[-_\s]+/).filter(Boolean);
+  if (words3.length > 1 && words3.at(-1)?.toLowerCase() === "mcp") {
+    words3.pop();
+  }
+  return words3.map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+}
+function actionPhrase(tool, app2 = "") {
+  const prefix2 = `${app2.replace(/-/g, "_").toUpperCase()}_`;
+  const text15 = app2 && tool.toUpperCase().startsWith(prefix2) ? tool.slice(prefix2.length) : tool;
+  return text15.split(/[-_\s]+/).filter(Boolean).join(" ").toLowerCase();
+}
+function appOf(name, args) {
+  const [prefix2, connector, ...tool] = name.split("__");
+  if (prefix2 === "connectors" && connector && tool.length && name !== BATCH) {
+    const alias = typeof args?.["connector_alias"] === "string" && args["connector_alias"].trim() ? ` (${args["connector_alias"].trim()})` : "";
+    return { action: actionPhrase(tool.join("__"), connector) + alias, app: appTitle(connector), kind: "connector" };
+  }
+  const mcp = /^mcp__(?<app>.+?)__(?<tool>.+)$/.exec(name)?.groups;
+  return mcp ? { action: actionPhrase(mcp["tool"] ?? ""), app: appTitle(mcp["app"] ?? ""), kind: "mcp" } : void 0;
+}
+function entriesOf(args) {
+  const list9 = Array.isArray(args["calls"]) ? args["calls"] : [args];
+  return list9.flatMap((e) => {
+    const r = record2(e);
+    const name = r?.["name"];
+    return typeof name === "string" && name ? [{ args: record2(r?.["arguments"]) ?? {}, name }] : [];
+  });
+}
+function unwrap(name, args) {
+  const direct = { args, name, via: { kind: "direct" } };
+  if (name !== BRIDGE && name !== BATCH) {
+    return direct;
+  }
+  const entries = entriesOf(args);
+  const [only] = entries;
+  if (only && entries.length === 1) {
+    return { ...only, via: { kind: "bridged" } };
+  }
+  const batch = entries.map((e) => ({ ...e, outcome: { kind: "running" } }));
+  return isNonEmpty(batch) ? { args, name, via: { entries: batch, kind: "batch" } } : direct;
+}
+function nextVia(prev, next2) {
+  return next2.kind !== "direct" ? next2 : prev.kind === "batch" ? { kind: "bridged" } : prev;
+}
+function batchOf(call) {
+  return call.via.kind === "batch" ? call.via.entries : void 0;
+}
+function batchResults(result) {
+  const results = record2(result)?.["results"];
+  if (!Array.isArray(results)) {
+    return void 0;
+  }
+  return results.map((e) => {
+    const r = record2(e) ?? {};
+    const err = r["error"];
+    return err === void 0 || err === null ? { result: r["response"] } : { error: typeof err === "string" ? err : String(record2(err)?.["message"] ?? "") || JSON.stringify(err) };
+  });
+}
+function settleBridge(call) {
+  if (call.via.kind === "direct") {
+    return void 0;
+  }
+  const outcomes = batchResults(call.result);
+  if (!outcomes) {
+    return void 0;
+  }
+  if (call.via.kind === "batch") {
+    const entries = call.via.entries;
+    entries.forEach((e, i) => {
+      const o2 = outcomes[i];
+      e.outcome = o2?.error ? { error: o2.error, kind: "error" } : { kind: "done", result: o2?.result };
+    });
+    return entries.every((e) => e.outcome.kind === "error");
+  }
+  const o = outcomes[0];
+  call.result = o?.error ? { error: o.error } : o?.result;
+  return Boolean(o?.error);
+}
+function appsOf(call) {
+  const apps = (batchOf(call) ?? [call]).map((e) => appOf(e.name, e.args)?.app);
+  const named2 = apps.filter((a2) => Boolean(a2));
+  return named2.length === apps.length ? [...new Set(named2)] : [];
+}
+function callApp(call) {
+  const batch = batchOf(call);
+  if (batch) {
+    const apps = batch.map((e) => appOf(e.name, e.args));
+    const first2 = apps[0];
+    return first2 && apps.every((a2) => a2?.app === first2.app) ? { ...first2, action: `${batch.length} calls` } : void 0;
+  }
+  return appOf(call.name, call.args);
+}
+
+// src/connections/cards.ts
+var CONNECT_TOOL = "manage_connections";
+var POLL_MS = 2e3;
+var STALE_MS = 2 * 6e4;
+var dataDir = (env2 = process.env) => join4(env2["HERMES_HOME"] || join4(homedir4(), ".hermes"), "plugin-data", "hermes-tern");
+var safe = (part) => part.replace(/[^A-Za-z0-9_-]/g, "_");
+var cardStem = (callId, opId) => opId ? `${safe(callId)}.${safe(opId)}` : safe(callId);
+var alive = (pid) => {
+  if (pid === void 0) {
+    return true;
+  }
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return errorCode(error) === "EPERM";
+  }
+};
+function readCard(key2, dir2 = dataDir(), now = Date.now()) {
+  const data = readCardFile(join4(dir2, "connections", `${key2}.json`));
+  if (!data) {
+    return void 0;
+  }
+  const error = data.error || void 0;
+  const updated = data.updated_at === void 0 ? now : data.updated_at * 1e3;
+  let settled2;
+  if (data.settled_by) {
+    settled2 = data.settled_by;
+  } else if (data.watching !== true) {
+    settled2 = error ? "error" : data.targets.some((t) => waiting({ state: String(record2(t)?.["state"] ?? "") })) ? "deadline" : "all_resolved";
+  } else if (!alive(data.pid) || now - updated > STALE_MS) {
+    settled2 = "stopped";
+  }
+  return { error, key: key2, settled: settled2, targets: data.targets, told: existsSync2(join4(dir2, "connections", `${key2}.told`)) };
+}
+function findCard(call, dir2 = dataDir()) {
+  const op = record2(call.result)?.["op_id"];
+  const prefix2 = `${safe(call.id)}.`;
+  if (typeof op === "string" && op) {
+    return existsSync2(join4(dir2, "connections", `${cardStem(call.id, op)}.json`)) ? cardStem(call.id, op) : void 0;
+  }
+  let names;
+  try {
+    names = readdirSync(join4(dir2, "connections"));
+  } catch {
+    return void 0;
+  }
+  const keys2 = names.flatMap((n) => {
+    const key2 = n.endsWith(".json") ? n.slice(0, -5) : "";
+    return key2 === safe(call.id) || key2.startsWith(prefix2) && !key2.slice(prefix2.length).includes(".") ? [key2] : [];
+  });
+  if (keys2.length < 2) {
+    return keys2[0];
+  }
+  const createdAt = (key2) => cardCreatedAt(join4(dir2, "connections", `${key2}.json`)) * 1e3;
+  return keys2.map((key2) => ({ gap: Math.abs(createdAt(key2) - call.startedAt), key: key2 })).sort((a2, b) => a2.gap - b.gap)[0]?.key;
+}
+function claimTold(key2, dir2 = dataDir()) {
+  const claim = attempt(() => writeFileSync(join4(dir2, "connections", `${key2}.told`), "", { flag: "wx" }));
+  if (claim.kind === "ok") {
+    return { kind: "claimed" };
+  }
+  return errorCode(claim.error) === "EEXIST" ? { kind: "taken" } : { error: claim.error, kind: "failed" };
+}
+function mayTell(card, dir2 = dataDir()) {
+  return !card.key || claimTold(card.key, dir2).kind !== "taken";
+}
+function connectTargets(call, card) {
+  if (call.name !== CONNECT_TOOL) {
+    return [];
+  }
+  const targets = card?.targets ?? record2(call.result)?.["targets"];
+  return parseTargets(Array.isArray(targets) ? targets : []);
+}
+function loadConnect(call, dir2 = dataDir(), now = Date.now()) {
+  if (call.name !== CONNECT_TOOL) {
+    return void 0;
+  }
+  const key2 = call.connect?.key ?? findCard(call, dir2);
+  const file2 = key2 ? readCard(key2, dir2, now) : void 0;
+  const targets = connectTargets(call, file2);
+  if (!targets.length) {
+    return void 0;
+  }
+  return {
+    error: file2?.error,
+    key: file2?.key,
+    opened: call.connect?.opened ?? [],
+    // Continue settles the card at once, as on the desktop; the watcher sees the claim on its next read.
+    settled: file2?.settled ?? (file2?.told || call.connect?.told ? "continued" : void 0),
+    targets,
+    told: Boolean(file2?.told || call.connect?.told)
+  };
+}
+function parseTargets(targets) {
+  return targets.flatMap((t) => {
+    const r = record2(t);
+    const name = typeof r?.["name"] === "string" ? r["name"] : "";
+    return name ? [
+      {
+        alias: typeof r?.["alias"] === "string" && r["alias"] ? r["alias"] : void 0,
+        detail: typeof r?.["detail"] === "string" && r["detail"] ? r["detail"] : void 0,
+        name,
+        state: typeof r?.["state"] === "string" ? r["state"] : "pending",
+        title: appTitle(name),
+        url: typeof r?.["connect_url"] === "string" && r["connect_url"] ? r["connect_url"] : void 0
+      }
+    ] : [];
+  });
+}
+var waiting = (t) => t.state === "initiated" || t.state === "pending";
+var allConnected = (card) => {
+  const own14 = card.targets.filter((t) => t.state !== "superseded");
+  return own14.length > 0 && own14.every((t) => t.state === "connected");
+};
+function isConnectCall(call) {
+  const card = call.connect;
+  return card ? card.settled !== "superseded" && card.targets.some((t) => t.url) : connectTargets(call).some((t) => t.url);
+}
+var and = (names) => names.length < 3 ? names.join(" and ") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+function continueMessage(targets) {
+  const names = targets.filter((t) => t.state === "connected" || waiting(t)).map((t) => t.title);
+  return `I've authorized ${and(names) || "the apps"}. Check with manage_connections status and carry on.`;
+}
+function connectedMessage(targets) {
+  const names = targets.filter((t) => t.state === "connected").map((t) => t.title);
+  return `${and(names)} ${names.length === 1 ? "is" : "are"} connected now. Carry on.`;
 }
 
 // src/turn/fanout.ts
@@ -7806,12 +7749,32 @@ function withoutEscapes(text15) {
   return text15.replace(ESCAPES, "");
 }
 
+// src/tools/fields.ts
+function text2(v) {
+  return typeof v === "string" && v ? v : void 0;
+}
+function num3(v) {
+  return typeof v === "number" ? v : void 0;
+}
+function list(v) {
+  return Array.isArray(v) ? v : void 0;
+}
+function records(v) {
+  return Array.isArray(v) ? v.map((i) => record2(i)) : [];
+}
+function objects(v) {
+  return records(v).filter((r) => r !== void 0);
+}
+function texts(v) {
+  return Array.isArray(v) ? v.map((i) => text2(i)).filter((t) => t !== void 0) : [];
+}
+
 // src/tools/ask.ts
 function askDetail({ args, result }) {
-  const asked2 = list(args["questions"]) ?? (text(args["question"]) ? [args] : []);
+  const asked2 = list(args["questions"]) ?? (text2(args["question"]) ? [args] : []);
   return {
     answered: result !== void 0,
-    questions: objects(asked2).map((q2) => ({ choices: texts(q2["choices"]), question: text(q2["question"]) })),
+    questions: objects(asked2).map((q2) => ({ choices: texts(q2["choices"]), question: text2(q2["question"]) })),
     responses: records(result?.["responses"]).map((r) => {
       if (!r) {
         return void 0;
@@ -7826,24 +7789,24 @@ function askDetail({ args, result }) {
 // src/tools/files.ts
 function readDetail({ args, result }) {
   return {
-    content: text(result?.["content"]),
-    path: text(args["path"]),
+    content: text2(result?.["content"]),
+    path: text2(args["path"]),
     tool: "read_file",
-    totalLines: num2(result?.["total_lines"])
+    totalLines: num3(result?.["total_lines"])
   };
 }
 function editDetail(tool) {
-  return ({ args, result }) => ({ content: text(args["content"]), diff: text(result?.["diff"]), path: text(args["path"]), tool });
+  return ({ args, result }) => ({ content: text2(args["content"]), diff: text2(result?.["diff"]), path: text2(args["path"]), tool });
 }
 
 // src/tools/misc.ts
 function genericFields({ args, result }) {
   return {
-    prompt: text(args["prompt"]),
-    query: text(args["query"]),
-    question: text(args["question"]),
-    said: text(result?.["analysis"]) ?? text(result?.["text_summary"]),
-    url: text(args["url"])
+    prompt: text2(args["prompt"]),
+    query: text2(args["query"]),
+    question: text2(args["question"]),
+    said: text2(result?.["analysis"]) ?? text2(result?.["text_summary"]),
+    url: text2(args["url"])
   };
 }
 function plainDetail(tool) {
@@ -7857,32 +7820,32 @@ function processDetail(raw2) {
 }
 function evalDetail({ args, result }) {
   return {
-    code: text(args["code"]),
-    error: text(result?.["error"]) ?? text(result?.["stderr"]),
-    output: text(result?.["output"]) ?? text(result?.["stdout"]),
+    code: text2(args["code"]),
+    error: text2(result?.["error"]) ?? text2(result?.["stderr"]),
+    output: text2(result?.["output"]) ?? text2(result?.["stdout"]),
     tool: "execute_code"
   };
 }
 function memoryDetail({ args, result }) {
-  return { action: text(args["action"]), tool: "memory", usage: text(result?.["usage"]) };
+  return { action: text2(args["action"]), tool: "memory", usage: text2(result?.["usage"]) };
 }
 function skillsDetail({ result }) {
   const skills = list(result?.["skills"]) ?? [];
   return {
-    message: text(result?.["message"]),
-    names: skills.map((s2) => text(record2(s2)?.["name"]) ?? text(s2)).filter((n) => n !== void 0),
+    message: text2(result?.["message"]),
+    names: skills.map((s2) => text2(record2(s2)?.["name"]) ?? text2(s2)).filter((n) => n !== void 0),
     tool: "skills_list"
   };
 }
 function skillDetail({ args, result }) {
-  return { content: text(result?.["content"]), name: text(args["name"]), tool: "skill_view" };
+  return { content: text2(result?.["content"]), name: text2(args["name"]), tool: "skill_view" };
 }
 function toolSearchDetail(raw2) {
   const { args } = raw2;
   const queries = list(args["queries"]);
   return {
     ...genericFields(raw2),
-    queries: queries ? queries.filter((q2) => typeof q2 === "string") : texts([text(args["queries"]) ?? text(args["query"])]),
+    queries: queries ? queries.filter((q2) => typeof q2 === "string") : texts([text2(args["queries"]) ?? text2(args["query"])]),
     tool: "tool_search"
   };
 }
@@ -7891,7 +7854,7 @@ function toolDescribeDetail(raw2) {
   return { ...genericFields(raw2), names: texts(Array.isArray(names) ? names : [names]), tool: "tool_describe" };
 }
 function pullRequestDetail(tool) {
-  return (raw2) => ({ ...genericFields(raw2), number: num2(raw2.args["number"]), repository: text(raw2.args["repository"]), tool });
+  return (raw2) => ({ ...genericFields(raw2), number: num3(raw2.args["number"]), repository: text2(raw2.args["repository"]), tool });
 }
 
 // src/tools/search.ts
@@ -7901,14 +7864,14 @@ function searchDetail({ args, result }) {
     files: list(result?.["files"]) ? texts(result?.["files"]) : void 0,
     filesOnly: args["target"] === "files",
     matches: matches2 ? objects(matches2).map((m) => ({
-      line: num2(m["line"]) ?? 0,
-      path: text(m["path"]) ?? "",
+      line: num3(m["line"]) ?? 0,
+      path: text2(m["path"]) ?? "",
       text: typeof m["content"] === "string" ? m["content"] : ""
     })) : void 0,
-    path: text(args["path"]),
-    pattern: text(args["pattern"]),
+    path: text2(args["path"]),
+    pattern: text2(args["pattern"]),
     tool: "search_files",
-    total: num2(result?.["total_count"])
+    total: num3(result?.["total_count"])
   };
 }
 
@@ -7916,30 +7879,42 @@ function searchDetail({ args, result }) {
 function taskDetail({ args, result }) {
   return {
     background: result?.["mode"] === "background",
-    briefs: records(args["tasks"]).map((t) => text(t?.["context"])),
-    context: text(args["context"]),
+    briefs: records(args["tasks"]).map((t) => text2(t?.["context"])),
+    context: text2(args["context"]),
     dispatched: result?.["status"] === "dispatched",
     failed: Boolean(result?.["error"]),
-    goal: text(args["goal"]),
-    results: records(result?.["results"]).map((r) => r && { error: text(r["error"]), status: text(r["status"]), summary: text(r["summary"]) }),
-    tasks: objects(args["tasks"]).map((t) => ({ context: text(t["context"]), goal: text(t["goal"]) })),
+    goal: text2(args["goal"]),
+    results: records(result?.["results"]).map((r) => r && { error: text2(r["error"]), status: text2(r["status"]), summary: text2(r["summary"]) }),
+    tasks: objects(args["tasks"]).map((t) => ({ context: text2(t["context"]), goal: text2(t["goal"]) })),
     tool: "delegate_task"
+  };
+}
+
+// src/tools/terminal.ts
+function terminalDetail({ args, result }) {
+  return {
+    background: args["background"] === true || typeof result?.["session_id"] === "string",
+    command: text2(args["command"]),
+    error: text2(result?.["error"]),
+    exit: num3(result?.["exit_code"]),
+    output: text2(result?.["output"]),
+    tool: "terminal"
   };
 }
 
 // src/tools/web.ts
 function source(r) {
-  return { content: text(r["content"]), title: text(r["title"]), url: text(r["url"]) };
+  return { content: text2(r["content"]), title: text2(r["title"]), url: text2(r["url"]) };
 }
 function webSearchDetail({ args, result }) {
   const web = list(record2(result?.["data"])?.["web"]);
-  return { hits: objects(web ?? result?.["results"]).map(source), query: text(args["query"]), tool: "web_search" };
+  return { hits: objects(web ?? result?.["results"]).map(source), query: text2(args["query"]), tool: "web_search" };
 }
 function fetchDetail({ args, result }) {
   return {
     pages: objects(result?.["results"]).map(source),
     tool: "web_extract",
-    url: text(args["url"]),
+    url: text2(args["url"]),
     urls: (list(args["urls"]) ?? []).filter((u) => typeof u === "string")
   };
 }
@@ -8757,8 +8732,8 @@ function shellTitle(a2) {
 function searchTitle(a2) {
   const pattern = operand(a2, /* @__PURE__ */ new Set(["-e", "-g", "--glob", "-t", "--type", "-A", "-B", "-C", "-m"]));
   const where = operands(a2).at(-1);
-  const target = where && where !== pattern ? ` in ${base(where)}` : "";
-  return pattern ? `Search for ${quote(pattern)}${target}` : "Search";
+  const target2 = where && where !== pattern ? ` in ${base(where)}` : "";
+  return pattern ? `Search for ${quote(pattern)}${target2}` : "Search";
 }
 function npmTitle(a2) {
   const [sub, script] = operands(a2);
@@ -8800,8 +8775,8 @@ function powershellScript(text15) {
   const said = [...new Set(used.map((c) => CMDLETS[c] ?? (c.startsWith("get-") ? `read ${c.slice(4)}` : void 0)).filter(Boolean))];
   return said.length ? said.slice(0, 2).join(" and ") : void 0;
 }
-function hostOf(target) {
-  const m = /^(?:[^@\s]+@)?([A-Za-z0-9][\w.-]*):/.exec(target) ?? /^[^@\s]+@([\w.-]+)$/.exec(target);
+function hostOf(target2) {
+  const m = /^(?:[^@\s]+@)?([A-Za-z0-9][\w.-]*):/.exec(target2) ?? /^[^@\s]+@([\w.-]+)$/.exec(target2);
   return m?.[1];
 }
 function sections(script) {
@@ -11644,7 +11619,7 @@ function foldEntry(prev, entry, now) {
   const output = entry.output_tail ?? entry.output_preview ?? prev?.output ?? "";
   const startedAt = typeof entry.started_epoch === "number" ? entry.started_epoch * 1e3 : prev?.startedAt ?? now - Math.max(0, entry.uptime_seconds ?? 0) * 1e3;
   const p3 = prev ?? { command: "", id: entry.session_id, lastLine: "", output: "", startedAt, state };
-  p3.command = withoutTernEnv((entry.command ?? "").trim()) || p3.command || "background process";
+  p3.command = (entry.command ?? "").trim() || p3.command || "background process";
   p3.state = state;
   p3.startedAt = startedAt;
   p3.output = output;
@@ -12549,8 +12524,8 @@ function transparentWrapperCommandIndex(wrapper, tokens2, index2) {
   if (wrapper === "nohup") {
     let targetIndex = index2 + 1;
     if (tokens2[targetIndex] === "--") targetIndex += 1;
-    const target = tokens2[targetIndex];
-    return target && !target.startsWith("-") ? targetIndex : null;
+    const target2 = tokens2[targetIndex];
+    return target2 && !target2.startsWith("-") ? targetIndex : null;
   }
   if (wrapper === "script") {
     return /^-[adkpqr]+$/u.test(tokens2[index2 + 1] ?? "") && tokens2[index2 + 3] !== void 0 ? index2 + 3 : null;
@@ -12802,8 +12777,8 @@ function wrappedShellCommandProgramName(wrapper, tokens2, start, depth, remainin
     if (indexAfterRedirection === null || indexAfterRedirection > wrappedTokens.length) break;
     targetIndex = indexAfterRedirection;
   }
-  const target = wrappedTokens[targetIndex];
-  if (target && /^[A-Za-z_][A-Za-z0-9_]*\+?=/u.test(target)) return null;
+  const target2 = wrappedTokens[targetIndex];
+  if (target2 && /^[A-Za-z_][A-Za-z0-9_]*\+?=/u.test(target2)) return null;
   const wrappedProgram = commandProgramNameInternal(
     serializeShellTokens(wrappedTokens),
     depth + 1,
@@ -12811,7 +12786,7 @@ function wrappedShellCommandProgramName(wrapper, tokens2, start, depth, remainin
     segmentsRemaining
   );
   if (wrappedProgram !== null) return wrappedProgram;
-  if (wrapper !== "exec" && target && target === target.toLowerCase() && NON_DESCRIPTIVE_SHELL_PROGRAMS.has(target) && !TERMINAL_SHELL_PROGRAMS.has(target) && remainingCommand) {
+  if (wrapper !== "exec" && target2 && target2 === target2.toLowerCase() && NON_DESCRIPTIVE_SHELL_PROGRAMS.has(target2) && !TERMINAL_SHELL_PROGRAMS.has(target2) && remainingCommand) {
     return commandProgramNameInternal(remainingCommand, depth, "shell", segmentsRemaining - 1);
   }
   return null;
@@ -31082,8 +31057,8 @@ function appendCommentToDocument(p3, token) {
 function stopParsing(p3, token) {
   p3.stopped = true;
   if (token.location) {
-    const target = p3.fragmentContext ? 0 : 2;
-    for (let i = p3.openElements.stackTop; i >= target; i--) {
+    const target2 = p3.fragmentContext ? 0 : 2;
+    for (let i = p3.openElements.stackTop; i >= target2; i--) {
       p3._setEndLocation(p3.openElements.items[i], token);
     }
     if (!p3.fragmentContext && p3.openElements.stackTop >= 0) {
@@ -42874,9 +42849,9 @@ var messageRow = object({
   id: number2(),
   role: _catch(string2(), ""),
   content: textBytes,
-  tool_calls: text2,
+  tool_calls: text,
   timestamp: real,
-  display_kind: text2
+  display_kind: text
 });
 var contentRow = object({ content: textBytes });
 function messageColumns(conn) {
@@ -43037,7 +43012,7 @@ var LISTABLE = `(s.parent_session_id IS NULL
 var POLICY_PREFIX = "gateway.local_policy.v1:";
 var receiptRow = object({ value: string2() });
 var lineageReceipt = object({ session_id: string2(), lineage: array(string2()) });
-var segmentRow = object({ id: string2(), end_reason: text2 });
+var segmentRow = object({ id: string2(), end_reason: text });
 function supersededSegments(conn) {
   let receipts;
   try {
@@ -43096,17 +43071,17 @@ ORDER BY sp.last_active DESC
 LIMIT ?`;
 var sessionRow = object({
   id: string2(),
-  title: text2,
-  source: text2,
-  cwd: text2,
-  repo_root: text2,
-  branch: text2,
-  model: text2,
+  title: text,
+  source: text,
+  cwd: text,
+  repo_root: text,
+  branch: text,
+  model: text,
   started_at: real,
   last_active: real,
   messages: optional(unknown()),
   pinned: optional(unknown()),
-  preview: text2
+  preview: text
 });
 function flat2(text15) {
   return (text15 ?? "").replace(/^\[[A-Z][A-Z -]+\][^\n]*\n?/gm, "").replace(/\s+/g, " ").trim();
@@ -43361,10 +43336,6 @@ function usageSince(now, before) {
     }
   }
   return out;
-}
-function shownArgs(args) {
-  const command2 = args["command"];
-  return typeof command2 === "string" ? { ...args, command: withoutTernEnv(command2) } : args;
 }
 
 // src/view/workLogModel.ts
@@ -44664,8 +44635,8 @@ function isUserTurn(row2) {
 }
 var lastUserTurn = (snapshot3) => (snapshot3.stored_messages ?? snapshot3.messages ?? []).findLast(isUserTurn);
 function lastTurnRewind(snapshot3) {
-  const target = lastUserTurn(snapshot3);
-  return target ? { target_message_id: target.row_id } : null;
+  const target2 = lastUserTurn(snapshot3);
+  return target2 ? { target_message_id: target2.row_id } : null;
 }
 var textPart2 = strictObject({ type: _enum(["input_text", "output_text", "text"]), text: string2() });
 function retryText(content5) {
@@ -44681,12 +44652,12 @@ function retryText(content5) {
   return text15.trim() ? text15 : "";
 }
 function retryTurnRewind(snapshot3) {
-  const target = lastUserTurn(snapshot3);
-  const text15 = target ? retryText(target.content) : "";
+  const target2 = lastUserTurn(snapshot3);
+  const text15 = target2 ? retryText(target2.content) : "";
   if (text15 === null) {
     throw new Error("/retry: retry does not support media or unknown content parts");
   }
-  return target && text15 ? { target_message_id: target.row_id } : null;
+  return target2 && text15 ? { target_message_id: target2.row_id } : null;
 }
 
 // src/commands/session.ts
@@ -44712,8 +44683,8 @@ async function rewind(host, intent) {
   if (intent === "undo") {
     return host.notice(`Undid ${plural(removed, "message")}.`);
   }
-  const target = result["target_message"];
-  const text15 = retryText(typeof target === "object" && target !== null && "content" in target ? target.content : void 0);
+  const target2 = result["target_message"];
+  const text15 = retryText(typeof target2 === "object" && target2 !== null && "content" in target2 ? target2.content : void 0);
   return text15 ? host.send(text15) : host.notice("Nothing to retry.");
 }
 function compressReport(summary4) {
@@ -45217,7 +45188,7 @@ async function openHelp(host) {
 }
 
 // src/session/pane.ts
-import { mkdirSync as mkdirSync3, rmSync as rmSync2, writeFileSync as writeFileSync2 } from "node:fs";
+import { mkdirSync as mkdirSync2, rmSync, writeFileSync as writeFileSync2 } from "node:fs";
 import { join as join7 } from "node:path";
 var paneFile = (pane, dir2 = dataDir()) => join7(dir2, "panes", `${pane}.json`);
 function markPane(launch3, sid, dir2 = dataDir()) {
@@ -45226,7 +45197,7 @@ function markPane(launch3, sid, dir2 = dataDir()) {
   }
   const record3 = { cwd: launch3.paneCwd, pid: process.pid, session_id: sid, updated_at: Date.now() / 1e3 };
   try {
-    mkdirSync3(join7(dir2, "panes"), { recursive: true });
+    mkdirSync2(join7(dir2, "panes"), { recursive: true });
     writeFileSync2(paneFile(launch3.pane, dir2), JSON.stringify(record3));
   } catch {
   }
@@ -45236,13 +45207,13 @@ function forgetPane(launch3, dir2 = dataDir()) {
     return;
   }
   try {
-    rmSync2(paneFile(launch3.pane, dir2), { force: true });
+    rmSync(paneFile(launch3.pane, dir2), { force: true });
   } catch {
   }
 }
 
 // src/settings.ts
-import { mkdirSync as mkdirSync4, writeFileSync as writeFileSync3 } from "node:fs";
+import { mkdirSync as mkdirSync3, writeFileSync as writeFileSync3 } from "node:fs";
 import { homedir as homedir9 } from "node:os";
 import { dirname, join as join8 } from "node:path";
 function settingsFile2(env2 = process.env) {
@@ -45253,7 +45224,7 @@ function loadSettings(file2 = settingsFile2()) {
 }
 function saveSettings(patch6, file2 = settingsFile2()) {
   const next2 = { ...readStoredSettings(file2), ...patch6 };
-  mkdirSync4(dirname(file2), { recursive: true });
+  mkdirSync3(dirname(file2), { recursive: true });
   writeFileSync3(file2, `${JSON.stringify(next2, null, 2)}
 `);
   return settingsOf(next2);
@@ -46284,9 +46255,9 @@ function completionRequestForInput(input2, scope = {}) {
 // src/commands/resolve.ts
 function canonOf(catalog) {
   const canon = /* @__PURE__ */ new Map();
-  for (const [alias, target] of Object.entries(catalog?.canon ?? {})) {
-    if (!HIDDEN_COMMANDS.has(target.replace(/^\//, "").toLowerCase())) {
-      canon.set(alias.toLowerCase(), target);
+  for (const [alias, target2] of Object.entries(catalog?.canon ?? {})) {
+    if (!HIDDEN_COMMANDS.has(target2.replace(/^\//, "").toLowerCase())) {
+      canon.set(alias.toLowerCase(), target2);
     }
   }
   for (const c of localCommands().filter((c2) => !HIDDEN_COMMANDS.has(c2.name))) {
@@ -46308,7 +46279,7 @@ function resolveSlashName(name, catalog) {
   if (exact) {
     return exact.toLowerCase() === needle ? null : { name: exact.slice(1) };
   }
-  const scored = [...canon].map(([alias, target]) => ({ score: scoreSlashMenuItem({ id: alias.slice(1) }, name.toLowerCase()), target })).filter((s2) => s2.score < 3);
+  const scored = [...canon].map(([alias, target2]) => ({ score: scoreSlashMenuItem({ id: alias.slice(1) }, name.toLowerCase()), target: target2 })).filter((s2) => s2.score < 3);
   const best = Math.min(...scored.map((s2) => s2.score));
   const matches2 = [...new Set(scored.filter((s2) => s2.score === best).map((s2) => s2.target))];
   const [only] = matches2;
@@ -49774,11 +49745,11 @@ var ConnectWatcher = class {
   open(ref, name) {
     const call = this.#call(ref);
     const card = call?.connect;
-    const target = card?.targets.find((t) => t.name === name);
-    if (!call || !card || !target?.url) {
+    const target2 = card?.targets.find((t) => t.name === name);
+    if (!call || !card || !target2?.url) {
       return;
     }
-    this.#host.openUrl(target.url);
+    this.#host.openUrl(target2.url);
     this.#host.transcript.mutateCall(call, () => card.opened = [.../* @__PURE__ */ new Set([...card.opened, name])]);
     this.#host.changed();
   }
@@ -50243,12 +50214,12 @@ var headNode = object({
 var byHead = object({
   repository: nullish(object({ pullRequests: nullish(object({ nodes: nullish(array(headNode)) })) }))
 });
-async function branchPullRequest(gh, target) {
-  const [o, r] = target.repository.split("/");
-  const data = byHead.parse(await gh.graphql(target.host, BY_HEAD, { h: target.head, o, r }));
+async function branchPullRequest(gh, target2) {
+  const [o, r] = target2.repository.split("/");
+  const data = byHead.parse(await gh.graphql(target2.host, BY_HEAD, { h: target2.head, o, r }));
   const prs = (data.repository?.pullRequests?.nodes ?? []).filter((p3) => p3.headRepositoryOwner.login.toLowerCase() === o);
   const pr = prs.find((p3) => p3.state === "OPEN") ?? prs[0];
-  return pr ? { host: target.host, number: pr.number, repository: target.repository, url: pr.url } : void 0;
+  return pr ? { host: target2.host, number: pr.number, repository: target2.repository, url: pr.url } : void 0;
 }
 function stackQuery(refs) {
   const variables = {};
@@ -50333,13 +50304,13 @@ function tokens(env2 = process.env, hosts = githubHosts(env2)) {
 }
 var MAX_REDIRECTS = 3;
 async function send(url, origin, first2) {
-  let target = url;
+  let target2 = url;
   let init = first2;
   for (let hop = 0; ; hop++) {
-    if (target.origin !== origin) {
-      throw new GitHubError(hop ? `GitHub redirected to ${target.host}; tern does not send your token there.` : untrustedText(target.host));
+    if (target2.origin !== origin) {
+      throw new GitHubError(hop ? `GitHub redirected to ${target2.host}; tern does not send your token there.` : untrustedText(target2.host));
     }
-    const res = await fetch(target, { ...init, redirect: "manual", signal: AbortSignal.timeout(3e4) });
+    const res = await fetch(target2, { ...init, redirect: "manual", signal: AbortSignal.timeout(3e4) });
     const location2 = res.status >= 300 && res.status < 400 ? res.headers.get("location") : null;
     if (location2 === null && res.type !== "opaqueredirect") {
       return res;
@@ -50348,7 +50319,7 @@ async function send(url, origin, first2) {
     if (location2 === null || hop >= MAX_REDIRECTS) {
       throw new GitHubError(`GitHub answered ${res.status}: a redirect tern does not follow`, res.status);
     }
-    target = new URL(location2, target);
+    target2 = new URL(location2, target2);
     if (res.status === 303 || (res.status === 301 || res.status === 302) && init.method?.toUpperCase() === "POST") {
       const headers = new Headers(init.headers);
       headers.delete("content-type");
@@ -50668,22 +50639,22 @@ var PullRequests = class {
       this.#branch = void 0;
       return;
     }
-    const target = await this.#branchOf(cwd);
+    const target2 = await this.#branchOf(cwd);
     if (!ticket.isCurrent()) {
       return;
     }
-    const same = b && b.cwd === cwd && b.target?.head === target?.head && b.target?.repository === target?.repository;
+    const same = b && b.cwd === cwd && b.target?.head === target2?.head && b.target?.repository === target2?.repository;
     if (same && now - b.at < (b.ref ? BRANCH_HIT_MS : BRANCH_MISS_MS)) {
       return;
     }
     let ref;
     try {
-      ref = target ? await branchPullRequest(this.#gh, target) : void 0;
+      ref = target2 ? await branchPullRequest(this.#gh, target2) : void 0;
     } catch {
       ref = same ? b.ref : void 0;
     }
     if (ticket.isCurrent()) {
-      this.#branch = { at: now, cwd, ref, target };
+      this.#branch = { at: now, cwd, ref, target: target2 };
     }
   }
   /** Which PRs sit in a GitHub stack, and that stack's layers; new layers are read next round. */
@@ -51069,8 +51040,61 @@ var OverlayStack = class {
   }
 };
 
+// src/hermes/viewer.ts
+var TERN_PANE_VARS = ["TERN_PANE", "TERN_PANE_SOCKET", "TERN_WINDOW_KEY", "TERN_WINDOW_SOCKET", "TERN_DAEMON_SOCKET"];
+function ternPane(env2 = process.env) {
+  const vars = Object.fromEntries(TERN_PANE_VARS.flatMap((k) => env2[k] ? [[k, env2[k]]] : []));
+  return vars["TERN_PANE"] ? vars : void 0;
+}
+var VIEWER_SET = "plugin.hermes-tern.viewer.set";
+var VIEWER_CLEAR = "plugin.hermes-tern.viewer.clear";
+var VIEWER_SHOWN = "plugin.hermes-tern.viewer.shown";
+var CLEAR_WAIT_MS = 300;
+var target = (ref) => ({ session_id: ref.live, ...ref.stored && String(ref.stored) !== String(ref.live) ? { stored: ref.stored } : {} });
+var Viewer = class {
+  #gw;
+  #tern;
+  #pid;
+  constructor(gw2, env2 = process.env, pid = process.pid) {
+    this.#gw = gw2;
+    this.#tern = ternPane(env2) ?? {};
+    this.#pid = pid;
+  }
+  /** This pane shows `now`, and no longer `before`. */
+  show(now, before) {
+    if (before?.live && before.live !== now.live) {
+      void this.#call(VIEWER_CLEAR, { ...target(before), pid: this.#pid });
+    }
+    if (now.live) {
+      void this.#call(VIEWER_SET, { ...target(now), pid: this.#pid, tern: this.#tern });
+    }
+  }
+  /** This pane stops showing `ref` (it quits): waits a moment for the gateway to hear it. */
+  async leave(ref) {
+    if (!ref.live) {
+      return;
+    }
+    await Promise.race([this.#call(VIEWER_CLEAR, { ...target(ref), pid: this.#pid }), new Promise((r) => setTimeout(r, CLEAR_WAIT_MS))]);
+  }
+  /** Whether a live pane shows conversation `id`; false when the gateway cannot say. */
+  async shown(id) {
+    try {
+      const r = await this.#gw.request(VIEWER_SHOWN, { ids: [id] });
+      return typeof r === "object" && r !== null && "shown" in r && r.shown === true;
+    } catch {
+      return false;
+    }
+  }
+  async #call(method, params) {
+    try {
+      await this.#gw.request(method, params);
+    } catch {
+    }
+  }
+};
+
 // src/processes/widgets/memory.ts
-import { mkdirSync as mkdirSync5, readdirSync as readdirSync2, rmSync as rmSync3, statSync as statSync2, writeFileSync as writeFileSync4 } from "node:fs";
+import { mkdirSync as mkdirSync4, readdirSync as readdirSync2, rmSync as rmSync2, statSync as statSync2, writeFileSync as writeFileSync4 } from "node:fs";
 import { join as join11 } from "node:path";
 var KEEP_MS = 7 * 24 * 36e5;
 var safe3 = (id) => /^[\w.-]{1,128}$/.test(id);
@@ -51097,12 +51121,12 @@ function chartMemory(dir2 = join11(dataDir(), "charts"), now = Date.now) {
         return;
       }
       try {
-        mkdirSync5(dir2, { recursive: true });
+        mkdirSync4(dir2, { recursive: true });
         writeFileSync4(join11(dir2, `${id}.json`), JSON.stringify(value));
         for (const name of readdirSync2(dir2)) {
           const file2 = join11(dir2, name);
           if (now() - statSync2(file2).mtimeMs > KEEP_MS) {
-            rmSync3(file2, { force: true });
+            rmSync2(file2, { force: true });
           }
         }
       } catch {
@@ -51257,7 +51281,7 @@ function adoptSteps(host) {
     { adopt: ({ ref }) => host.showThoughts(ref.live) },
     {
       adopt: ({ previous: previous3, ref }) => {
-        host.markViewer(durable(ref), previous3.stored);
+        host.markViewer(ref, previous3);
         host.markPane(durable(ref));
       }
     },
@@ -51687,10 +51711,23 @@ var SessionLifecycle = class {
   async #restore(id) {
     const host = this.#host;
     let r;
+    const fresh = () => this.newSession(void 0, host.launch.sessionCwd ? host.launch.paneCwd : "");
+    const since = this.#switches.since();
+    if (await host.shownElsewhere(id)) {
+      if (!since.isCurrent()) {
+        return;
+      }
+      await fresh();
+      host.transcript.notice("Another pane shows this pane's last session; started a new one.", "warning");
+      return;
+    }
+    if (!since.isCurrent()) {
+      return;
+    }
     try {
       r = await this.#resume(id);
     } catch (error) {
-      await this.newSession();
+      await fresh();
       host.transcript.notice(`Could not resume this pane's last session (${errorText(error)}); started a new one.`, "warning");
       return;
     }
@@ -51712,7 +51749,7 @@ var SessionLifecycle = class {
     host.changed();
   }
   /** Closes the open session and starts a fresh one with an empty transcript, named `title` if given. */
-  async newSession(title) {
+  async newSession(title, cwd = this.#host.launch.sessionCwd) {
     if (this.#refuseSwitch()) {
       return;
     }
@@ -51731,7 +51768,7 @@ var SessionLifecycle = class {
       const r = await rpc(
         host.gw,
         "session.create",
-        createParams({ canonical: host.gw.isCanonical, cols: host.cols(), create: host.launch.create, cwd: host.launch.sessionCwd })
+        createParams({ canonical: host.gw.isCanonical, cols: host.cols(), create: host.launch.create, cwd })
       );
       if (!this.#switches.current(token)) {
         this.#views.superseded(r);
@@ -52440,9 +52477,9 @@ var Transcript = class {
   #addCall(turn, p3, at) {
     const u = unwrap(p3.name, p3.args ?? {});
     const call = {
-      args: shownArgs(u.args),
+      args: u.args,
       argsText: p3.args_text ?? "",
-      context: withoutTernEnv(p3.context ?? ""),
+      context: p3.context ?? "",
       id: toolCallId(p3.tool_id),
       name: u.name,
       outcome: { kind: "running" },
@@ -52481,7 +52518,7 @@ var Transcript = class {
     call.diff = p3.inline_diff ?? void 0;
     if (p3.args) {
       const u = unwrap(p3.name, p3.args);
-      call.args = shownArgs(u.args);
+      call.args = u.args;
       call.name = u.name;
       call.via = nextVia(call.via, u.via);
     }
@@ -52693,12 +52730,12 @@ var Activity = class {
 
 // src/turn/queue.ts
 var NEXT = { kind: "next" };
-function waitsFor(target, ref) {
-  switch (target.kind) {
+function waitsFor(target2, ref) {
+  switch (target2.kind) {
     case "next":
       return true;
     case "session":
-      return target.ref.live === ref.live || target.ref.stored !== null && target.ref.stored === ref.stored;
+      return target2.ref.live === ref.live || target2.ref.stored !== null && target2.ref.stored === ref.stored;
   }
 }
 var PromptQueue = class {
@@ -52715,15 +52752,15 @@ var PromptQueue = class {
     return this.#held.map((h2) => h2.prompt);
   }
   /** Holds `prompt` behind the others, for `target` (the session adopted next by default). */
-  hold(prompt, target = NEXT) {
-    this.#held.push({ prompt, target });
+  hold(prompt, target2 = NEXT) {
+    this.#held.push({ prompt, target: target2 });
   }
   /**
    * Holds `prompt` ahead of the others, for `target` (the session adopted next by default): a send
    * that found a switch in flight, or one a turn overtook while its `{!cmd}`s ran.
    */
-  holdFirst(prompt, target = NEXT) {
-    this.#held.unshift({ prompt, target });
+  holdFirst(prompt, target2 = NEXT) {
+    this.#held.unshift({ prompt, target: target2 });
   }
   /**
    * Session `ref` is adopted: the prompts held for another session go back to the composer, oldest
@@ -53072,11 +53109,11 @@ var PromptRouter = class {
     const s2 = host.gates();
     const gate = canSend(s2);
     if (gate.kind === "hold" || !s2.canonical) {
-      const target = gate.kind === "hold" ? { kind: "next" } : { kind: "session", ref: { live: gate.sid, stored: host.session.ref.stored } };
+      const target2 = gate.kind === "hold" ? { kind: "next" } : { kind: "session", ref: { live: gate.sid, stored: host.session.ref.stored } };
       if (first2) {
-        host.queue.holdFirst(prompt, target);
+        host.queue.holdFirst(prompt, target2);
       } else {
-        host.queue.hold(prompt, target);
+        host.queue.hold(prompt, target2);
       }
       host.queue.drain();
       return host.changed();
@@ -53147,6 +53184,7 @@ function chatStores(chat, { act, gw: gw2, launch: launch3, settings: settings2, 
   const saved = settings2.load();
   const jobCharts = saved.jobCharts !== false;
   const session2 = new SessionState(changed);
+  const viewer = new Viewer(gw2);
   const transcript = new Transcript();
   const activity = new Activity();
   const live = {
@@ -53266,6 +53304,7 @@ function chatStores(chat, { act, gw: gw2, launch: launch3, settings: settings2, 
       gw: gw2,
       launch: launch3,
       rename: (sid, text15) => title.rename(sid, text15),
+      shownElsewhere: (id) => viewer.shown(id),
       request: (req) => act().onRequest(req),
       sheets: sheets2,
       state: session2,
@@ -53278,7 +53317,7 @@ function chatStores(chat, { act, gw: gw2, launch: launch3, settings: settings2, 
       },
       imageLanded: (call) => act().imageLanded(call),
       markPane: (id) => markPane(launch3, id),
-      markViewer,
+      markViewer: (now, before) => viewer.show(now, before),
       readBusyMode: () => void act().readBusyMode(),
       reportCwd: () => act().reportCwd(),
       showThoughts: (sid) => showThoughts({ gw: gw2, notice: (text15, tone) => chat.notice(text15, tone), settings: settings2 }, sid)
@@ -53287,7 +53326,7 @@ function chatStores(chat, { act, gw: gw2, launch: launch3, settings: settings2, 
   const theme = new Theme({ palette: (palette) => surface().palette(palette), settings: settings2 }, saved.theme ?? "tern");
   const completion2 = new Completion(chat, gw2, () => session2.ref.live);
   const welcome = { version: version2 && version2 !== "unknown" ? `v${version2}` : "" };
-  return { ...shared, attachments, completion: completion2, cron, life, router, stack, theme, warned, welcome };
+  return { ...shared, attachments, completion: completion2, cron, life, router, stack, theme, viewer, warned, welcome };
 }
 function disposeStores(s2) {
   s2.timers.dispose();
@@ -53400,7 +53439,10 @@ var App = class {
       onKey: (key2) => onKey(key2, this.#act.keys, this.overlays.at(-1))
     }).then(() => this.#end());
     const code7 = await this.#done.promise;
-    await Promise.race([s2.life.leaveAll("tui_shutdown"), new Promise((resolve5) => s2.timers.timeout(() => resolve5(void 0), QUIT_DETACH_MS))]);
+    await Promise.all([
+      s2.viewer.leave(this.session.ref),
+      Promise.race([s2.life.leaveAll("tui_shutdown"), new Promise((resolve5) => s2.timers.timeout(() => resolve5(void 0), QUIT_DETACH_MS))])
+    ]);
     this.dispose();
     await this.#tern.close();
     this.#gw.kill("exit");
@@ -53473,7 +53515,6 @@ var App = class {
    * pane's session, which `hermes tern` resumes if it starts again in the pane.
    */
   #end(code7 = 0) {
-    markViewer(null, durable(this.session.ref));
     this.#done.resolve(code7);
   }
   control() {
@@ -54758,12 +54799,12 @@ import { DatabaseSync as DatabaseSync5 } from "node:sqlite";
 var messageRow2 = object({
   id: number2(),
   role: _catch(string2(), ""),
-  content: text2,
-  tool_call_id: text2,
-  tool_calls: text2,
-  tool_name: text2,
+  content: text,
+  tool_call_id: text,
+  tool_calls: text,
+  tool_name: text,
   timestamp: real,
-  reasoning: text2
+  reasoning: text
 });
 var childRow = object({ id: string2() });
 var lastRow = object({ id: real });
