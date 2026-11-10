@@ -14,6 +14,7 @@ import { type EffortHost, openEffortPicker } from '../overlays/effort.js'
 import { type ModelsHost, openModelPicker, switchModel } from '../overlays/models.js'
 import { confirmOverlay } from '../overlays/prompts.js'
 import { prsCommand, type PullRequestsSheetHost } from '../overlays/pullRequests.js'
+import { openRewind } from '../overlays/rewind.js'
 import { openSessionPicker, type SessionsHost } from '../overlays/sessions.js'
 import { isThemeMode, openThemePicker, type ThemeHost } from '../overlays/theme.js'
 import { LEVELS } from '../session/effort.js'
@@ -236,6 +237,11 @@ const COMMANDS: readonly LocalCommand[] = [
     help: 'Pull requests Hermes linked, beside the chat (/prs 22 opens #22)',
     name: 'prs',
     run: (host, arg) => prsCommand(host, arg)
+  },
+  {
+    help: 'Go back to an earlier prompt: rewind to it, or branch from it',
+    name: 'rewind',
+    run: host => openRewind(host)
   },
   {
     // The gateway refuses its own /copy and /history (cli_only); Ink runs them on its transcript, as these do.
