@@ -28,12 +28,12 @@ describe('stored compactions', () => {
   })
 
   it('reads every compaction of a conversation page by page, newest page first, oldest first in the answer', async () => {
-    const pages: Record<string, { rows: StoredTranscriptRow[]; next_cursor: string | null; reset: boolean }> = {
-      first: { next_cursor: 'p2', reset: true, rows: [handoff(300, 'c'), message(310)] },
-      p2: { next_cursor: 'p3', reset: false, rows: [message(150), handoff(200, 'b')] },
-      p3: { next_cursor: null, reset: false, rows: [handoff(100, 'a'), message(110)] }
-    }
-    const gw = new FakeGateway({ replies: { 'session.transcript': p => must(pages[typeof p['cursor'] === 'string' ? p['cursor'] : 'first']) } })
+    const pages = new Map<unknown, { rows: StoredTranscriptRow[]; next_cursor: string | null; reset: boolean }>([
+      [null, { next_cursor: 'p2', reset: true, rows: [handoff(300, 'c'), message(310)] }],
+      ['p2', { next_cursor: 'p3', reset: false, rows: [message(150), handoff(200, 'b')] }],
+      ['p3', { next_cursor: null, reset: false, rows: [handoff(100, 'a'), message(110)] }]
+    ])
+    const gw = new FakeGateway({ replies: { 'session.transcript': p => must(pages.get(p['cursor'])) } })
 
     expect(await allCompactions(gw.client, 's', () => true)).toEqual([
       { at: 100_000, messages: 4, summary: 'a' },

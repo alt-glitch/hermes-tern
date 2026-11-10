@@ -6,6 +6,7 @@
 
 import type { StoredTranscriptResult, StoredTranscriptRow } from '@hermes/shared/gateway-events'
 
+import { optional } from '../core/assert.js'
 import { type Requester, rpc } from '../wire/rpc.js'
 
 import type { StoredCompaction } from './compactions.js'
@@ -40,24 +41,22 @@ export function readTranscript(gw: Requester, id: string, cursor: string | null,
 
 /** A compaction handoff row as the transcript shows it: when it was written, its summary and the messages it covers. */
 export function compactionOf(row: StoredTranscriptRow): StoredCompaction | undefined {
-  if (row.row_kind !== 'compaction' || typeof row.timestamp !== 'number') {
+  const { compacted_messages: messages, text, timestamp } = row
+
+  if (row.row_kind !== 'compaction' || timestamp === null || timestamp === undefined) {
     return undefined
   }
 
-  return {
-    at: row.timestamp * 1000,
-    ...(row.text ? { summary: row.text } : {}),
-    ...(typeof row.compacted_messages === 'number' ? { messages: row.compacted_messages } : {})
-  }
+  return { at: timestamp * 1000, ...optional('summary', text || undefined), ...optional('messages', messages ?? undefined) }
 }
 
 /** The preview's lines for one row; none for a row it does not show (system rows, empty ones). */
 export function previewRows(r: StoredTranscriptRow): PreviewRow[] {
   const text = (r.text ?? '').trim()
-  const key = typeof r.row_id === 'number' ? `row${r.row_id}` : `${r.role}|${r.timestamp ?? ''}|${r.tool_call_id ?? text}`
+  const key = r.row_id === null || r.row_id === undefined ? `${r.role}|${r.timestamp ?? ''}|${r.tool_call_id ?? text}` : `row${r.row_id}`
 
   if (r.row_kind === 'compaction') {
-    const covered = typeof r.compacted_messages === 'number' ? ` (${r.compacted_messages} messages)` : ''
+    const covered = r.compacted_messages === null || r.compacted_messages === undefined ? '' : ` (${r.compacted_messages} messages)`
 
     return [{ key, kind: 'note', text: `Context compacted${covered}: the agent continued from a summary.`, tone: 'muted' }]
   }
