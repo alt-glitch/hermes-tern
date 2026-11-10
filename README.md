@@ -35,7 +35,7 @@ hermes plugins install hermes-tern            # from the plugin catalog, once li
 hermes plugins install alt-glitch/hermes-tern # or from GitHub
 ```
 
-You need a Hermes Agent newer than the 0.23.0 release (run `hermes update`) and [Tern](https://stencil.so/tern). The plugin is built and tested on Tern 0.9.5.
+You need a Hermes Agent newer than the 0.23.0 release (run `hermes update`) and [Tern](https://stencil.so/tern). The plugin is built and tested on Tern 0.9.5. When the pane connects, it checks what the gateway supports. On a Hermes that is too old it opens no session and says to run `hermes update`.
 
 Then, in a Tern pane:
 
@@ -58,7 +58,7 @@ A pane remembers its conversation. If `hermes tern` dies in a pane (a crash, a k
 | --- | --- |
 | `hermes tern` | The chat in this plugin's Tern frontend. It runs in a Tern pane only |
 | `link_pull_request`, `unlink_pull_request`, `list_pull_requests` | Tools: the PRs a conversation works on, shown above the composer |
-| `transform_tool_result` hook | A connector's connect result becomes a card in the chat that started it |
+| Plugin RPC methods (`ctx.register_rpc`) | The pane's own calls to the plugin: which session it shows, a conversation's linked PRs, a chart's rules |
 | Per-session environment (`ctx.register_session_env`) | The agent's shell commands run with the chat's `TERN_PANE`, so `tern open` works beside the chat |
 | `tern_charts` auxiliary task | Writes the rules behind a background process's live chart (`auxiliary.tern_charts` picks its model) |
 | System prompt section | Tells the agent to link the PRs it opens |
@@ -191,9 +191,9 @@ This section lists what the plugin does beyond drawing the chat, so you can deci
 | --- | --- |
 | **Network** | GitHub's API, with the token that Hermes gives it: `GITHUB_TOKEN` to `api.github.com` only, and `GITHUB_ENTERPRISE_TOKEN` only to the hosts in `enterprise_hosts`. Redirects to another host are not followed. It is used for the pull request view and for the actions you click; merge and close ask first. The job charts send the command and samples of a background process's output to your own auxiliary model (`auxiliary.tern_charts`), once per process, after Hermes redacts them. Nothing else. **No telemetry.** |
 | **Commands** | The agent's shell commands get the chat's Tern pane variables (`TERN_PANE` and the window's) in their environment, through Hermes' per-session environment, in sessions that a Tern pane shows. The command itself is not changed: the approval sheet shows exactly what runs. `!cmd` and `{!cmd}` in the composer run through Hermes' own `shell.exec`, so its dangerous-command refusal applies. They run only when you type them: a pasted `{!cmd}` never runs. The composer's `/` commands are Hermes' own. |
-| **Processes** | `hermes tern` runs the frontend with Node, and the frontend runs `hermes gateway attach` each time it connects. Opening the sidebar, or a file beside the chat, runs Tern's own `tern` CLI. |
-| **Reads outside its data** | Hermes' session database, read-only: a conversation's compression lineage and its subagents' parents. The output of the session's background processes, and the log files that their commands write to (for charts). The files you open from the chat. |
-| **Stored data** | `$HERMES_HOME/plugin-data/hermes-tern/`: linked pull requests, the conversation each Tern pane last showed (to resume it after a crash), chart rules and connect cards. Which pane shows which session (with its Tern variables) is kept in the gateway's memory only. `$HERMES_HOME/hermes-tern/settings.json`: the theme and chart settings. |
+| **Processes** | `hermes tern` runs the frontend with Node, and the frontend runs `hermes gateway attach` each time it connects. A pasted image is read with `osascript` on macOS and with `hermes clipboard image` elsewhere. Opening the sidebar, or a file beside the chat, runs Tern's own `tern` CLI. |
+| **Reads outside its data** | Hermes' session database, read-only, from the plugin's Python half through Hermes' own `hermes_state` API: a conversation's compression lineage, its subagents' parents and the session a pane resumes. The frontend opens no Hermes file: sessions, transcripts and subagents come from the gateway. The output of the session's background processes, and the log files that their commands write to (for charts). The files you open from the chat. |
+| **Stored data** | `$HERMES_HOME/plugin-data/hermes-tern/`: linked pull requests, the conversation each Tern pane last showed (to resume it after a crash) and chart rules. Which pane shows which session (with its Tern variables) is kept in the gateway's memory only. `$HERMES_HOME/hermes-tern/settings.json`: the theme and chart settings. |
 
 ## How it works
 
@@ -205,18 +205,20 @@ flowchart LR
   F <-->|JSON-RPC| G[Hermes gateway<br/>shared by the profile]
   subgraph Hermes
     G --> A[agent + tools]
-    P[hermes-tern plugin<br/>tern_env.py · charts.py ·<br/>pull_requests.py · connections.py] -.hooks, RPC.-> G
+    P[hermes-tern plugin<br/>tern_env.py · viewers.py ·<br/>charts.py · pull_requests.py] -.session env, RPC, tools.-> G
   end
   A -->|shell commands, with<br/>the pane's TERN_PANE| T
 ```
 
 - **`launcher.py`** is `hermes tern`. It parses its own flags, picks the session (`-r`, `-c`, or the pane's own), and runs `node frontend/dist/entry.js` with `HERMES_TERN_*` variables: the session, the first prompt, the launch flags as `session.create` fields, and the command that runs this Hermes (this interpreter, so the same install and profile). On exit code 75 (no TSP) it says that the terminal is not a Tern pane, and exits. In a Tern pane whose last chat died, **`panes.py`** picks that pane's conversation: the frontend records each pane's conversation in `$HERMES_HOME/plugin-data/hermes-tern/panes/<TERN_PANE>.json`, because Tern's daemon restarts only omp after a crash. `-w`/`--worktree` and the "resume with" line Hermes prints when a chat exits are not supported: Hermes has no public API for them.
 - **`frontend/`** is the TSP frontend: a TypeScript app on [`@stencil-hq/tern`](https://www.npmjs.com/package/@stencil-hq/tern). It attaches to the profile's shared Hermes gateway with `hermes gateway attach --json` and talks to it (`hermes-gateway-v1`) through Hermes' shared Node client, `@hermes/shared/gateway-client`. `frontend/dist/entry.js` is committed, so an install needs no build step. CI builds it on `main` after each merge (`.github/workflows/bundle.yml`); pull requests carry source only. [`frontend/README.md`](frontend/README.md) maps its modules.
+- **What the frontend reads.** Everything about sessions comes from the gateway: the session picker from `session.list`, its preview and the compaction markers from `session.transcript`, subagent rows from the `subagent.*` events, and a subagent's transcript from `session.transcript` with `subagent_id`. The connect card is the gateway's own (`connection.request`). The frontend opens none of Hermes' files. At each connect it reads `runtime.describe` and needs the capabilities `plugin-rpc-v1`, `session-client-v1`, `session-list-picker-v1` and `session-transcript-v1`.
 - **`tern_env.py`** is needed because the agent's tools run in that shared gateway, not in the chat's pane. It registers the pane's `TERN_PANE` and window variables with Hermes' `ctx.register_session_env`: Hermes asks for them each time it starts a shell command for a session (in the foreground, in the background, and from a Python cell), and a subagent gets its parent conversation's pane. **`viewers.py`** knows which pane shows which session: each pane tells it over plugin RPC (`viewer.set` when it shows a session, also after a reconnect, and `viewer.clear` when it stops). The command is not changed, so the model, the approval sheet and the shell see the same text. So plain `tern open`, `tern split` and the rest of Tern's CLI act beside the chat. [`docs/tern-blocks.md`](docs/tern-blocks.md) is a short guide to scripting blocks that way: split, run, capture, wait and close.
+- **`pull_requests.py`** holds the link tools and serves `plugin.hermes-tern.pull_requests.linked`, which the pane reads its list from. When a link tool changes the list (also from a subagent), it sends the pane the event `pull_requests.changed`. **`sessions.py`** is the one module that reads Hermes' session database, through `hermes_state`.
 - **`charts.py`** serves the plugin RPC method `plugin.hermes-tern.charts.author`. The frontend calls it on its gateway connection when it wants a background process's chart rules. The Python half redacts the samples, asks the auxiliary model (task `tern_charts`, through `ctx.llm`) for one JSON answer, and sends the answer back to the session as a plugin event. The frontend validates the rules and runs them (`frontend/src/processes/widgets/`, ported from omp's job widgets). It uses Node's linear-time regex engine, so no rule can stall the chat.
 
 > [!NOTE]
-> **Compatibility.** The bundle inlines `@hermes/shared` (`apps/shared`) from the Hermes commit in `frontend/hermes-src.lock`: the gateway client, its types and skins. At run time it attaches with `hermes gateway attach --json` and speaks the gateway's public `hermes-gateway-v1` contract.
+> **Compatibility.** The bundle inlines `@hermes/shared` (`apps/shared`) from the Hermes commit in `frontend/hermes-src.lock`: the gateway client, its types and skins. At run time it attaches with `hermes gateway attach --json` and speaks the gateway's public `hermes-gateway-v1` contract. `requires_hermes` cannot say which `main` build the plugin needs, because every build since the release reports 0.23.0. The capability check at connect does.
 
 ## Development
 
