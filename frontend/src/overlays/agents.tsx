@@ -2,8 +2,9 @@
 // `picker` sheet, as omp's hub draws them (a tree when orchestrators spawned workers, status
 // dots, tool counts and timers), the selected one previewed as its live `agent` row, facts and
 // latest activity. Enter opens the agent beside the chat (watch/: its full transcript, live,
-// with a composer that steers it). T opens its timeline in this sheet instead (its live
-// transcript log, one row per step, following the newest). S steers a running agent (the
+// with a composer that steers it). T opens its timeline in this sheet instead (its stored
+// transcript from the gateway, one row per step, following the newest). The agent the sheet shows
+// is the one whose transcript the store reads. S steers a running agent (the
 // search line becomes the message), X stops it. P pauses (or resumes) new spawns, gateway-wide.
 
 import type { JSX, Key, PickerColumn, PickerItem } from '@stencil-hq/tern'
@@ -21,9 +22,9 @@ import {
   shownAgents,
   stepIds
 } from '../agents/hub.js'
-import type { LogEntry } from '../agents/liveLog.js'
 import { SUBAGENT_LOOK } from '../agents/look.js'
 import { agentName, isRunning } from '../agents/rows.js'
+import { type AgentStep, agentSteps } from '../agents/transcript.js'
 import type { ChatPorts } from '../app/ports.js'
 import { optional } from '../core/assert.js'
 import type { Subagent } from '../model.js'
@@ -94,9 +95,6 @@ export function openAgents(host: AgentsSheetHost, focus?: { id: string; watch?: 
 
         return void host.openAgent(effect.id)
 
-      case 'refresh':
-        return void host.agents.refresh(effect.agent)
-
       case 'steer':
         return void sendSteer(effect.agent, effect.text)
 
@@ -136,10 +134,15 @@ export function openAgents(host: AgentsSheetHost, focus?: { id: string; watch?: 
     modal: true,
     cancel: close,
     // Ends with the sheet, however it closed (Esc, a session switch replacing the overlays).
-    onClose: stopTicking,
+    onClose: () => {
+      stopTicking()
+      host.agents.follow(undefined)
+    },
     node: () => {
       const now = Date.now()
       const watched = state.view.kind === 'timeline' ? currentAgent(state, agents()) : undefined
+      // The agent previewed or opened is the one whose transcript is read.
+      host.agents.follow(currentAgent(state, agents()))
 
       return watched ? timelineNode(watched, now) : hubNode(now)
     },
@@ -236,7 +239,7 @@ export function openAgents(host: AgentsSheetHost, focus?: { id: string; watch?: 
   }
 
   function timelineNode(a: Subagent, now: number): JSX.Element {
-    const entries = a.log?.entries ?? []
+    const entries = agentSteps(a)
     const ids = stepIds(a)
     const step = state.view.kind === 'timeline' ? state.view.step : undefined
     const sel = step && ids.includes(step) ? step : ids.at(-1)
@@ -246,13 +249,10 @@ export function openAgents(host: AgentsSheetHost, focus?: { id: string; watch?: 
     return (
       <picker
         actions={actions(a, true)}
-        columns={[
-          { format: 'dim', head: 'At', id: 'at', min: 8, priority: 2 },
-          { format: 'elapsed', head: 'Took', id: 'took', priority: 4 }
-        ]}
+        columns={[{ format: 'dim', head: 'At', id: 'at', min: 8, priority: 2 }]}
         key={KEY}
         {...optional('confirm', stopping() ? { act: 'confirm', label: 'Stop', text: `Stop ${agentName(a)}? Its partial work returns to Hermes.` } : undefined)}
-        empty={a.logPath || a.log ? 'Nothing logged yet' : 'This agent has no live transcript'}
+        empty={a.steps ? 'Nothing stored yet' : 'Reading the transcript…'}
         icon="agent"
         items={entries.map((e, i) => stepItem(e, `e${i}`, a))}
         layout="timeline"
@@ -313,7 +313,7 @@ function briefFor(host: AgentsSheetHost, a: Subagent): string | undefined {
 }
 
 function hubPreview(a: Subagent, now: number, brief?: string): JSX.Element[] {
-  const recent = (a.log?.entries ?? []).slice(-RECENT)
+  const recent = agentSteps(a).slice(-RECENT)
   const look = SUBAGENT_LOOK[a.status]
 
   return [
@@ -354,7 +354,7 @@ function hubPreview(a: Subagent, now: number, brief?: string): JSX.Element[] {
           <section head="Recent activity" key="recent" role="omp.hub.activity">
             {recent.map((e, i) => (
               <row gap="sm" key={`r${i}`} role="omp.hub.activity.row">
-                <text key="at" spans={[{ s: 'dim mono', t: e.at }]} wrap="none" />
+                <text key="at" spans={[{ s: 'dim mono', t: clock(e.at) }]} wrap="none" />
                 <text grow={1} key="what" spans={stepSpans(e)} truncate="end" wrap="none" />
               </row>
             ))}
@@ -364,23 +364,22 @@ function hubPreview(a: Subagent, now: number, brief?: string): JSX.Element[] {
   ]
 }
 
-function stepItem(e: LogEntry, id: string, a: Subagent): PickerItem {
+function stepItem(e: AgentStep, id: string, a: Subagent): PickerItem {
   if (e.kind === 'tool') {
     return {
       detail: e.args,
-      ...optional('dot', e.status === 'error' ? 'error' : e.status === 'running' && isRunning(a) ? 'accent' : undefined),
-      facts: { at: e.at, took: e.took !== undefined ? duration(e.took) : '' },
+      ...optional('dot', e.running && isRunning(a) ? 'accent' : undefined),
+      facts: { at: clock(e.at) },
       icon: hubIconOf(e.name),
       id,
       label: e.name,
       mono: true,
-      node: 'tool',
-      ...optional('tone', e.status === 'error' ? 'error' : undefined)
+      node: 'tool'
     }
   }
 
   return {
-    facts: { at: e.at },
+    facts: { at: clock(e.at) },
     id,
     label: e.kind === 'kickoff' ? `Task: ${e.text}` : e.kind === 'think' ? `Thinking: ${e.text}` : e.text,
     node: e.kind === 'kickoff' ? 'user' : 'assistant',
@@ -390,16 +389,16 @@ function stepItem(e: LogEntry, id: string, a: Subagent): PickerItem {
 
 /**
  * One step of `a`'s timeline. Its kickoff is the whole prompt the agent got, from the delegation
- * (the goal, then its `brief`): the log keeps only a capped, flattened copy.
+ * (the goal, then its `brief`).
  */
-function stepPreview(e: LogEntry, a: Subagent, brief?: string): JSX.Element[] {
+function stepPreview(e: AgentStep, a: Subagent, brief?: string): JSX.Element[] {
   if (e.kind !== 'tool') {
     const head = { assistant: 'Answer', kickoff: 'Task', note: 'Note', think: 'Thinking' }[e.kind]
     const text = e.kind === 'kickoff' && a.goal ? (brief ? `${a.goal}\n\n---\n\n${brief}` : a.goal) : e.text
 
     return [
       <text key="title" role="omp.hub.title" text={head} />,
-      <text key="at" spans={[{ s: 'dim mono', t: e.at }]} />,
+      <text key="at" spans={[{ s: 'dim mono', t: clock(e.at) }]} />,
       <md key="body" text={text} {...optional('tone', e.kind === 'think' ? 'muted' : undefined)} />
     ]
   }
@@ -408,9 +407,8 @@ function stepPreview(e: LogEntry, a: Subagent, brief?: string): JSX.Element[] {
     <text key="title" role="omp.hub.title" spans={[{ s: 'mono strong', t: e.name }]} />,
     <kv
       items={facts([
-        ['Status', [{ s: e.status === 'error' ? 'error' : e.status === 'ok' ? 'success' : 'accent', t: e.status === 'ok' ? 'ok' : e.status }]],
-        ['Started', e.at],
-        ['Took', e.took !== undefined ? duration(e.took) : undefined]
+        ['Status', [{ s: e.running ? 'accent' : 'success', t: e.running ? 'running' : 'done' }]],
+        [e.running ? 'Started' : 'Returned', clock(e.at)]
       ])}
       key="facts"
       role="omp.hub.kv"
@@ -422,33 +420,36 @@ function stepPreview(e: LogEntry, a: Subagent, brief?: string): JSX.Element[] {
           </section>
         ]
       : []),
-    ...(e.result
-      ? [
-          <section head="Result" key="result">
-            <code key="code" text={e.result} wrap />
-          </section>
-        ]
-      : [])
   ]
 }
 
-function stepSpans(e: LogEntry): { s?: string; t: string }[] {
+function stepSpans(e: AgentStep): { s?: string; t: string }[] {
   switch (e.kind) {
     case 'tool':
       return [
-        { s: e.status === 'error' ? 'error mono' : 'mono', t: e.name },
+        { s: 'mono', t: e.name },
         { s: 'muted', t: ` ${e.args}` }
       ]
 
     case 'think':
-      return [{ s: 'muted', t: e.text }]
+      return [{ s: 'muted', t: oneLine(e.text) }]
 
     case 'kickoff':
-      return [{ s: 'dim', t: 'Task: ' }, { t: e.text }]
+      return [{ s: 'dim', t: 'Task: ' }, { t: oneLine(e.text) }]
 
     case 'assistant':
 
     case 'note':
-      return [{ t: e.text }]
+      return [{ t: oneLine(e.text) }]
   }
+}
+
+/** A step's time as the clock read it (`14:05:09`); '' for a row with no time. */
+function clock(at: number | undefined): string {
+  return at === undefined ? '' : new Date(at).toTimeString().slice(0, 8)
+}
+
+/** `text` on one line, for a row that does not wrap. */
+function oneLine(text: string): string {
+  return text.replace(/\s+/g, ' ').trim()
 }

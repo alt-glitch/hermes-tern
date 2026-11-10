@@ -11,7 +11,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { describe, expect, it } from 'vitest'
 import * as z from 'zod/mini'
 
-import { liveSessionId, storedSessionId } from '../core/ids.js'
+import { liveSessionId } from '../core/ids.js'
 import { parseStacks } from '../github/branch.js'
 import { chartMemory } from '../processes/widgets/memory.js'
 import { loadSettings, saveSettings } from '../settings.js'
@@ -80,11 +80,9 @@ describe('the watch spec', () => {
   const spec: WatchSpec = {
     goal: 'Survey the repo',
     index: 2,
-    log: '/tmp/a.log',
     name: 'scout',
     sid: liveSessionId('live-1'),
     startedAt: 1_700_000_000_000,
-    stored: storedSessionId('stored-1'),
     subagent: 'sa-1'
   }
 

@@ -9,7 +9,7 @@ import { readFileSync } from 'node:fs'
 
 import * as z from 'zod/mini'
 
-import { liveSessionId, storedSessionId } from '../core/ids.js'
+import { liveSessionId } from '../core/ids.js'
 import type { Settings } from '../settings.js'
 import type { WatchSpec } from '../watch/spec.js'
 
@@ -64,12 +64,10 @@ export function readStoredSettings(file: string): object {
 /** A spec needs the two ids; the rest reads leniently, as the launching pane always writes them. */
 const watchSpec: z.ZodMiniType<WatchSpec> = z.object({
   sid: z.pipe(z.string(), z.transform(liveSessionId)),
-  stored: loose(z.pipe(z.string(), z.transform(storedSessionId))),
   subagent: z.string(),
   name: z.catch(z.string(), ''),
   goal: z.catch(z.string(), ''),
   index: z.catch(z.number(), 0),
-  log: loose(z.string()),
   startedAt: z.catch(z.number(), 0)
 })
 

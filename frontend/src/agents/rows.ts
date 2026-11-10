@@ -1,18 +1,16 @@
 // The subagent rows of the Task cards, and how each source folds into them: a delegate_task
-// dispatch result makes the rows, a `subagent.*` event (where the gateway sends them) makes or
-// moves one, a `subagent.list` row moves one (or adds a nested child under its parent, or a
-// resumed session's child under the call that asked for it), a live log tells its timeline and
-// end, and an async-delegation completion tells an end nothing else did. Each row's node key is
-// fixed when it is made. Pure: the store (store.ts) does the reading and the polling, and is the
-// only writer of the rows.
+// dispatch result makes the rows, a `subagent.*` event makes or moves one (and tells its end), a
+// `subagent.list` row moves one (or adds a nested child under its parent, or a resumed session's
+// child under the call that asked for it), and an async-delegation completion tells an end
+// nothing else did. Each row's node key is fixed when it is made. Pure: the store (store.ts) does
+// the reading and the polling, and is the only writer of the rows.
 
 import type { SubagentEventPayload, SubagentSnapshot } from '@hermes/shared/gateway-events'
 
+import { optional } from '../core/assert.js'
 import { subagentKey } from '../core/ids.js'
 import type { Subagent, ToolCall } from '../model.js'
 import { parseJson, record } from '../wire/json.js'
-
-import { clockToMs, type LiveLog, runningTool } from './liveLog.js'
 
 /** One row of `subagent.list` (gateway/session_ancillary.py `_SUBAGENT_FIELDS`). */
 export type ListRow = SubagentSnapshot
@@ -36,8 +34,6 @@ export interface SubagentEvent {
 /** Each agent with the delegate_task call whose card shows it. */
 export type Owners = Map<Subagent, ToolCall>
 
-/** Logs are compact (one capped line per event); a runaway one is read from its tail. */
-export const MAX_LOG_BYTES = 2 * 1024 * 1024
 const ENDED = new Set(['cancelled', 'done', 'failed'])
 /** The note on a row that ended where nothing said how; the async-delegation completion replaces it. */
 export const OUTCOME_UNKNOWN = 'outcome unknown'
@@ -67,17 +63,16 @@ export function ownersOf(calls: readonly ToolCall[]): Owners {
 /** Orders a card's rows: by task, each task's nested children after it. */
 const byTask = (x: Subagent, y: Subagent) => x.index - y.index || (x.depth ?? 0) - (y.depth ?? 0)
 
-/** What a dispatched delegate_task call's result names: its delegation and, by task, goals, ids and logs. */
+/** What a dispatched delegate_task call's result names: its delegation and, by task, goals and ids. */
 export interface Dispatch {
   delegationId: string
   goals: string[]
   ids: unknown[]
-  paths: unknown[]
 }
 
 /** The dispatch a delegate_task result tells of; undefined for any other result (a foreground run's). */
 export function dispatchOf(result: unknown): Dispatch | undefined {
-  const { delegation_id: delegationId, goals, live_transcripts: paths, status, subagent_ids: ids } = record(result) ?? {}
+  const { delegation_id: delegationId, goals, status, subagent_ids: ids } = record(result) ?? {}
 
   if (status !== 'dispatched' || typeof delegationId !== 'string') {
     return undefined
@@ -86,8 +81,7 @@ export function dispatchOf(result: unknown): Dispatch | undefined {
   return {
     delegationId,
     goals: Array.isArray(goals) ? goals.map(g => (typeof g === 'string' ? g : '')) : [],
-    ids: Array.isArray(ids) ? ids : [],
-    paths: Array.isArray(paths) ? paths : []
+    ids: Array.isArray(ids) ? ids : []
   }
 }
 
@@ -104,10 +98,8 @@ export function dispatchRows(list: Subagent[], d: Dispatch, at: number) {
       list.push(a)
     }
 
-    const path = d.paths[i]
     a.delegationId = d.delegationId
     a.depth = 0
-    a.logPath = typeof path === 'string' ? path : undefined
   })
 
   list.sort(byTask)
@@ -188,7 +180,7 @@ export function askingCall(calls: readonly ToolCall[], row: ListRow): { call: To
 }
 
 /** Adds the row of resumed child `row` (task `index`) to `call`'s card. */
-export function attachRow(owners: Owners, call: ToolCall, index: number, row: ListRow, logPath: string | undefined): Subagent {
+export function attachRow(owners: Owners, call: ToolCall, index: number, row: ListRow): Subagent {
   const a: Subagent = {
     calls: 0,
     delegationId: row.delegation_id ?? undefined,
@@ -197,7 +189,6 @@ export function attachRow(owners: Owners, call: ToolCall, index: number, row: Li
     id: row.subagent_id,
     index,
     key: subagentKey(`p${index}`),
-    logPath,
     startedAt: Date.now(),
     status: 'running',
     tokens: 0,
@@ -227,6 +218,8 @@ export function applyListRow(a: Subagent, row: ListRow): boolean {
   }
 
   a.model = row.model ?? a.model
+  // A higher count is a new call, even of the same tool.
+  const started = (row.tool_count ?? 0) > a.toolCount
   a.toolCount = Math.max(a.toolCount, row.tool_count ?? 0)
   a.steerable = row.accepting_steer ?? a.steerable
   a.startedAt = typeof row.started_at === 'number' ? row.started_at * 1000 : a.startedAt
@@ -234,7 +227,9 @@ export function applyListRow(a: Subagent, row: ListRow): boolean {
   if (a.status === 'queued' || a.status === 'running') {
     a.status = 'running'
 
-    if (!a.log && row.last_tool && a.tool !== row.last_tool) {
+    // A row no tool event reaches (none at all, or a nested child's start and end only) shows the
+    // owner's last started tool; a top-level row's events name its own.
+    if ((!a.last || a.depth) && row.last_tool && (a.tool !== row.last_tool || started)) {
       a.tool = row.last_tool
       a.toolSince = { at: Date.now() }
     }
@@ -249,30 +244,6 @@ export function endUnseen(a: Subagent) {
   a.exitReason = OUTCOME_UNKNOWN
   a.duration = Date.now() - a.startedAt
   a.tool = undefined
-}
-
-/**
- * Tail `tail` (a log's last bytes, maybe cut mid-line) appended to the log text read so far: the
- * part past where the two overlap. With no overlap (the log grew past a tail between reads), the
- * gap stays and the tail's cut first line is dropped.
- */
-export function mergeTail(seen: string, tail: string): string {
-  const lines = seen.split(/(?<=\n)/)
-  let merged: string | undefined
-
-  // The overlap ends with the last lines read: the longest such run (up to 4 lines) the tail holds.
-  for (let n = Math.min(4, lines.length); n > 0 && merged === undefined; n--) {
-    const anchor = lines.slice(-n).join('')
-    const at = tail.indexOf(anchor)
-
-    if (at >= 0) {
-      merged = seen + tail.slice(at + anchor.length)
-    }
-  }
-
-  merged ??= seen + (seen && !seen.endsWith('\n') ? '\n' : '') + tail.slice(tail.indexOf('\n') + 1)
-
-  return merged.length > MAX_LOG_BYTES ? merged.slice(merged.indexOf('\n', merged.length - MAX_LOG_BYTES) + 1) : merged
 }
 
 /**
@@ -311,7 +282,7 @@ export function completionOutcomes(text: string): { delegationId: string; outcom
 const PLAIN_OUTCOMES = new Set(['cancelled', 'completed', 'error', 'failed', 'interrupted', 'success'])
 
 /**
- * Applies task status `status` from a completion to row `a`, which its log never told the end of;
+ * Applies task status `status` from a completion to row `a`, whose end the owner did not report;
  * false when the status says nothing (`?`).
  */
 export function applyOutcome(a: Subagent, status: string): boolean {
@@ -337,7 +308,7 @@ export type EndedStatus = Extract<Subagent['status'], 'cancelled' | 'done' | 'fa
 
 /**
  * An ended child's status as its row says it, whoever reports it: the owner's `subagent.complete`
- * (SubagentStatus), its log's final line, an async-delegation completion. Completed (or success,
+ * (SubagentStatus) or an async-delegation completion. Completed (or success,
  * or unknown: it ended, nothing says it failed) is done; interrupted or cancelled is cancelled;
  * any other end (failed, error, timeout, …) failed. Undefined for one that says nothing (`?`).
  */
@@ -354,19 +325,29 @@ export function endedStatus(status: string): EndedStatus | undefined {
 }
 
 /**
- * Folds `subagent.*` event `e` into `call`'s rows: the row for its subagent (a new one in task
- * order), its counts, its status and its current tool. An end that says nothing of how is a
- * failure, as the owner reports a success.
+ * Folds `subagent.*` event `e` into `call`'s rows and returns the row it moved: the row for its
+ * subagent (a new one in task order, or a nested child under its parent), its counts, its status
+ * and its current tool. An end that says nothing of how is a failure, as the owner reports a
+ * success.
  */
-export function foldEvent(call: ToolCall, { type, event, at }: SubagentEvent) {
+export function foldEvent(call: ToolCall, { type, event, at }: SubagentEvent): Subagent {
   const list = (call.subagents ??= [])
   const id = event.subagent_id ?? `task-${event.task_index}`
   let agent = list.find(a => a.id === id)
 
+  if (!agent && event.subagent_id && event.parent_id) {
+    agent = nestedChild(ownersOf([call]), {
+      ...optional('delegation_id', event.delegation_id),
+      goal: event.goal,
+      parent_id: event.parent_id,
+      subagent_id: event.subagent_id
+    })
+  }
+
   if (!agent) {
     agent = { calls: 0, goal: event.goal, id, index: event.task_index, key: subagentKey(id), startedAt: at, status: 'queued', tokens: 0, toolCount: 0 }
     list.push(agent)
-    list.sort((a, b) => a.index - b.index)
+    list.sort(byTask)
   }
 
   agent.last = event
@@ -384,8 +365,14 @@ export function foldEvent(call: ToolCall, { type, event, at }: SubagentEvent) {
     agent.tool = event.tool_name ?? agent.tool
     agent.toolPreview = event.tool_preview ?? event.text ?? undefined
     agent.toolSince = { at }
+  } else if (type === 'subagent.thinking') {
+    // The child asks its model again: the tool it ran has returned.
+    agent.status = 'running'
+    agent.tool = undefined
   } else if (type === 'subagent.complete') {
-    agent.status = endedStatus(event.status ?? '') ?? 'failed'
+    const status = event.status ?? ''
+    agent.status = endedStatus(status) ?? 'failed'
+    agent.exitReason = PLAIN_OUTCOMES.has(status) ? undefined : status || undefined
     agent.summary = event.summary ?? undefined
     agent.duration =
       typeof event.duration_seconds === 'number' ? Math.round(event.duration_seconds * 1000) : at - agent.startedAt
@@ -393,6 +380,15 @@ export function foldEvent(call: ToolCall, { type, event, at }: SubagentEvent) {
   } else if (event.status === 'running') {
     agent.status = 'running'
   }
+
+  return agent
+}
+
+/** The owner's `subagent.complete` told how `a` ended. */
+export function endReported(a: Subagent): boolean {
+  const status = a.last?.status
+
+  return status !== undefined && status !== null && status !== 'queued' && status !== 'running'
 }
 
 /** The task index a top-level child's id names (`sa-<i>-…`, tools/delegate_tool.py). */
@@ -416,42 +412,4 @@ function taskGoals(call: ToolCall): string[] {
   }
 
   return typeof goal === 'string' ? [goal.trim()] : []
-}
-
-/** Folds a parsed log into its row: timeline, current tool, counts and, once it ended, the outcome. */
-export function applyLog(a: Subagent, log: LiveLog) {
-  a.log = log
-  const tools = log.entries.filter(e => e.kind === 'tool').length
-  a.toolCount = Math.max(a.toolCount, tools)
-
-  if (log.status) {
-    // A final line that says nothing of how (`status=?`) is a failure, as the child reports a success.
-    a.status = endedStatus(log.status) ?? 'failed'
-    a.summary = log.summary ?? a.summary
-    a.duration = log.duration !== undefined ? Math.round(log.duration * 1000) : a.duration
-    a.exitReason = log.exitReason ?? log.error ?? a.exitReason
-    a.tool = undefined
-
-    return
-  }
-
-  if (log.entries.length && a.status === 'queued') {
-    a.status = 'running'
-  }
-
-  const now = runningTool(log)
-
-  if (!now) {
-    a.tool = undefined
-
-    return
-  }
-
-  const since = clockToMs(now.at)
-
-  if (a.tool !== now.name || a.toolSince?.at !== since) {
-    a.tool = now.name
-    a.toolPreview = now.args || undefined
-    a.toolSince = { at: since }
-  }
 }

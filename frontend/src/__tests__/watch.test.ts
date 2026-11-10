@@ -1,34 +1,58 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { Transcript } from '../transcript/store.js'
-import { toTranscript } from '../watch/child.js'
+import { liveSessionId } from '../core/ids.js'
+import type { SettingsSource } from '../settings.js'
+import { WatchApp } from '../watch/watchApp.js'
 
-describe('toTranscript', () => {
-  it("turns a child's stored rows into a transcript with tool cards and results", () => {
-    const rows = [
-      { content: 'Survey the repo', id: 1, reasoning: null, role: 'user', timestamp: 1, tool_call_id: null, tool_calls: null, tool_name: null },
-      {
-        content: '',
-        id: 2,
-        reasoning: null,
-        role: 'assistant',
-        timestamp: 2,
-        tool_call_id: null,
-        tool_calls: JSON.stringify([{ function: { arguments: '{"command":"ls"}', name: 'terminal' }, id: 'c1' }]),
-        tool_name: null
-      },
-      { content: '{"output":"lab"}', id: 3, reasoning: null, role: 'tool', timestamp: 3, tool_call_id: 'c1', tool_calls: null, tool_name: 'terminal' },
-      { content: 'Done.', id: 4, reasoning: null, role: 'assistant', timestamp: 4, tool_call_id: null, tool_calls: null, tool_name: null }
+import { FakeGateway, fakeTern, key, stub } from './fakes.js'
+
+const SPEC = { goal: 'Survey the repo', index: 0, name: 'Agent 1', sid: liveSessionId('s1'), startedAt: 0, subagent: 'sa-0-abcd' }
+
+/** The child's stored rows as `session.transcript` serves them, in two writes. */
+const FIRST = [
+  { role: 'user', row_kind: 'message', text: 'Survey the repo', timestamp: 1 },
+  { args: { command: 'ls' }, name: 'terminal', role: 'tool', row_kind: 'message', timestamp: 3, tool_call_id: 'c1' }
+]
+const LAST = [{ role: 'assistant', row_kind: 'message', text: 'Done.', timestamp: 4 }]
+
+describe('the subagent pane', () => {
+  afterEach(() => vi.useRealTimers())
+
+  it("draws the child's stored transcript live from its own connection, and stops reading once the child ended", async () => {
+    vi.useFakeTimers()
+    const pages = [
+      { available: true, next_cursor: 'c1', reset: true, rows: FIRST, running: true },
+      { available: true, next_cursor: 'c1', reset: false, rows: [], running: true },
+      { available: true, next_cursor: 'c2', reset: false, rows: LAST, running: false },
+      { available: true, next_cursor: 'c2', reset: false, rows: [], running: false }
     ]
+    const gw = new FakeGateway({
+      replies: {
+        'session.transcript': () => pages.shift(),
+        'subagent.list': () => ({ subagents: [{ last_tool: 'terminal', model: 'fake-model', subagent_id: 'sa-0-abcd', tool_count: 2 }] })
+      }
+    })
+    const tern = fakeTern()
+    const app = new WatchApp(tern.session, gw.client, SPEC, stub<SettingsSource>({ load: () => ({}) }))
+    const done = app.run()
 
-    const t = new Transcript()
-    t.load(toTranscript(rows))
-    const [user, turn] = t.entries
+    gw.event({ payload: {}, type: 'gateway.ready' })
+    await vi.advanceTimersByTimeAsync(0)
 
-    expect(user).toMatchObject({ kind: 'user', text: 'Survey the repo' })
-    expect(turn?.kind).toBe('turn')
-    const blocks = turn?.kind === 'turn' ? turn.blocks : []
-    expect(blocks.map(b => b.kind)).toEqual(['tool', 'text'])
-    expect(blocks[0]).toMatchObject({ call: { args: { command: 'ls' }, name: 'terminal', result: '{"output":"lab"}' } })
+    expect(gw.sent('session.transcript')[0]).toEqual({ limit: 200, order: 'oldest', session_id: 's1', subagent_id: 'sa-0-abcd' })
+    expect(app.transcript.entries.map(e => e.kind)).toEqual(['user', 'turn'])
+
+    await vi.advanceTimersByTimeAsync(1000)
+    const turn = app.transcript.entries.at(-1)
+    expect(turn?.kind === 'turn' ? turn.blocks.map(b => b.kind) : []).toEqual(['tool', 'text'])
+
+    // The child ended and the reads caught up: no more reads of either kind.
+    const sent = gw.calls.length
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(gw.calls).toHaveLength(sent)
+    expect(pages).toEqual([])
+
+    tern.press(key('d', { ctrl: true }))
+    expect(await done).toBe(0)
   })
 })
