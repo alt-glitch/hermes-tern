@@ -21,7 +21,7 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from . import viewers
+from . import sessions, viewers
 
 logger = logging.getLogger(__name__)
 
@@ -33,9 +33,7 @@ _ids: dict[str, list[str]] = {}
 
 def _viewer_ids(session_id: str) -> list[str]:
     if session_id not in _ids:
-        from . import connections, pull_requests
-
-        _ids[session_id] = list(reversed(connections._lineage(pull_requests._delegator(session_id))))
+        _ids[session_id] = list(reversed(sessions.lineage(sessions.delegator(session_id))))
     return _ids[session_id]
 
 
@@ -51,6 +49,4 @@ def pane_env(session_id: str) -> dict[str, Optional[str]]:
 
 
 def register(ctx) -> None:
-    # Hermes before per-session environments: commands keep the gateway's own values.
-    if hasattr(ctx, "register_session_env"):
-        ctx.register_session_env(list(TERN_VARS), pane_env)
+    ctx.register_session_env(list(TERN_VARS), pane_env)

@@ -9,7 +9,7 @@ In a Tern pane whose last ``hermes tern`` died (a crash, a kill, Tern's daemon r
 with no session flag resumes the conversation that pane showed (``panes.py``); ``--new`` starts fresh.
 """
 
-from . import charts, connections, launcher, pull_requests, tern_env, viewers
+from . import charts, launcher, pull_requests, tern_env, viewers
 
 
 def register(ctx) -> None:
@@ -24,6 +24,5 @@ def register(ctx) -> None:
         description="Writes the rules behind a background process's live chart in `hermes tern`, once per process.")
     charts.register(ctx)
     pull_requests.register(ctx)
-    connections.register(ctx)
     viewers.register(ctx)
     tern_env.register(ctx)

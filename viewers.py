@@ -10,15 +10,16 @@ The frontend tells the plugin over its gateway connection (plugin RPC methods):
 
 A gateway restart forgets everything; each pane sets its session again when it reattaches. A pane whose
 process died counts for nothing (its pid is checked on every read), as the marker files it replaces did.
-``tern_env.py`` and ``connections.py`` read this state.
+``tern_env.py`` reads this state.
 """
 
 from __future__ import annotations
 
-import contextlib
 import threading
 from dataclasses import dataclass, field
 from typing import Any, Optional
+
+from . import processes, sessions
 
 # The variables a Tern pane sets that Tern's CLI reads to find the pane and its window.
 TERN_VARS = ("TERN_PANE", "TERN_PANE_SOCKET", "TERN_WINDOW_KEY", "TERN_WINDOW_SOCKET", "TERN_DAEMON_SOCKET")
@@ -36,14 +37,8 @@ _lock = threading.Lock()
 _viewers: dict[str, list[Viewer]] = {}
 
 
-def _connections():
-    from . import connections
-
-    return connections
-
-
 def _alive(viewer: Optional[Viewer]) -> bool:
-    return viewer is not None and _connections()._alive(viewer.pid)
+    return viewer is not None and processes.running(viewer.pid)
 
 
 def viewer_of(ids: list[str]) -> Optional[Viewer]:
@@ -58,9 +53,8 @@ def _ids(session_id: str, stored: Any) -> list[str]:
     the same conversation (its compression lineage), so a client cannot claim another conversation."""
     ids = [session_id]
     if isinstance(stored, str) and stored and stored != session_id:
-        with contextlib.suppress(Exception):
-            if stored in _connections()._lineage(session_id):
-                ids.append(stored)
+        if stored in sessions.lineage(session_id):
+            ids.append(stored)
     return ids
 
 
@@ -110,15 +104,11 @@ def shown(params: dict, **_: Any) -> dict[str, bool]:
         raise ValueError("viewer.shown needs the ids of a conversation")
     lineage: list[str] = []
     for i in ids:
-        with contextlib.suppress(Exception):
-            lineage += _connections()._lineage(i)
+        lineage += sessions.lineage(i)
     return {"shown": viewer_of([*ids, *lineage]) is not None}
 
 
 def register(ctx) -> None:
-    # Hermes before plugin RPC methods: no pane state (the frontend's calls answer "unknown method").
-    if not hasattr(ctx, "register_rpc"):
-        return
     ctx.register_rpc("viewer.set", set_viewer)
     ctx.register_rpc("viewer.clear", clear_viewer)
     ctx.register_rpc("viewer.shown", shown)

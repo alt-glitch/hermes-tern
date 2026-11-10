@@ -1,5 +1,5 @@
 """panes.py: which conversation a restarted ``hermes tern`` pane resumes. Hermes is stubbed: the
-plugin's connections helpers answer from dicts, and state.db from ``sessions``."""
+plugin's data folder, process and session helpers answer from ``world``."""
 
 import json
 import os
@@ -7,7 +7,7 @@ import types
 
 import pytest
 
-from hermes_tern_plugin import panes
+from hermes_tern_plugin import panes, plugin_data, processes, sessions
 
 DEAD = 2**22 + 12345  # no such process
 
@@ -20,11 +20,10 @@ def world(tmp_path, monkeypatch):
         folder=folder, alive={os.getpid()},
         sessions={"root": {"cwd": "/work/repo"}, "tip": {"cwd": "/work/repo"}},
         lineage={"tip": ["root", "tip"]})
-    monkeypatch.setattr(panes, "_connections", lambda: types.SimpleNamespace(
-        _dir=lambda name: folder,
-        _alive=lambda pid: pid in w.alive,
-        _lineage=lambda sid: w.lineage.get(sid, [sid])))
-    monkeypatch.setattr(panes, "_session", lambda sid: w.sessions.get(sid))
+    monkeypatch.setattr(plugin_data, "folder", lambda name: folder)
+    monkeypatch.setattr(processes, "running", lambda pid: pid in w.alive)
+    monkeypatch.setattr(sessions, "lineage", lambda sid: w.lineage.get(sid, [sid]))
+    monkeypatch.setattr(sessions, "row", lambda sid: w.sessions.get(sid))
 
     def pane(name="7", **record):
         (folder / f"{name}.json").write_text(json.dumps(

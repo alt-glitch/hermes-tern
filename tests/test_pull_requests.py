@@ -1,14 +1,12 @@
 """pull_requests.py without Hermes: tools.registry is stubbed, storage goes to a temp dir."""
 
-import importlib.util
 import json
 import sys
 import types
-from pathlib import Path
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[1]
+from hermes_tern_plugin import pull_requests, sessions
 
 
 @pytest.fixture()
@@ -19,15 +17,11 @@ def prs(tmp_path, monkeypatch):
     monkeypatch.setitem(sys.modules, "tools", types.ModuleType("tools"))
     monkeypatch.setitem(sys.modules, "tools.registry", registry)
 
-    spec = importlib.util.spec_from_file_location("tern_pull_requests", ROOT / "pull_requests.py")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
     lineages = {"tip": ["root", "tip"]}
-    monkeypatch.setattr(module, "data_file", lambda: tmp_path / "pull-requests.json")
-    monkeypatch.setattr(module, "_lineage", lambda sid: lineages.get(sid, [sid]))
-    monkeypatch.setattr(module, "_cwd", lambda: "/work")
-    module.lineages = lineages
-    return module
+    monkeypatch.setattr(pull_requests, "data_file", lambda: tmp_path / "pull-requests.json")
+    monkeypatch.setattr(sessions, "lineage", lambda sid: lineages.get(sid, [sid]))
+    monkeypatch.setattr(pull_requests, "_cwd", lambda: "/work")
+    return pull_requests
 
 
 def test_parse_target_reads_urls_and_repository_number(prs):
