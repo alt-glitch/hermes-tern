@@ -18,6 +18,9 @@ from pathlib import Path
 
 from . import source
 from .memory import GlideMemory, MemoryNotReady
+from .skill_router import command as skill_router_command, command_install, command_list, command_rank, USAGE as skill_router_USAGE
+from .hill_climb import command as hill_climb_command, scaffold, run_round, status, create_stop, remove_stop, USAGE as hill_climb_USAGE
+from .offload import command as offload_command, offload_task, savings_card, USAGE as offload_USAGE
 
 RUNTIMES = ("ollama", "llama-server", "llama-cli", "lms", "vllm", "mlx_lm.server")
 _TIMEOUT = 20
@@ -182,7 +185,10 @@ USAGE = """/glide            show this machine and your memory
 /glide build      read your last 100 local sessions and keep the corrections you gave
 /glide on | off   quote up to three matching corrections into each turn
 /glide recall <words>   show what would be quoted
-/glide setup      guided first run: build, show what was kept, self-test recall"""
+/glide setup      guided first run: build, show what was kept, self-test recall
+/glide skill-router      install skill router catalog
+/glide hill-climb      optimize a target with KEEP/REVERT referee
+/glide offload      route tasks to local model, view savings card"""
 
 
 def _rows(m: dict) -> str:
@@ -238,6 +244,12 @@ def command(raw_args: str = "", session_id: str | None = None) -> str:
         return "\n".join(f"- ({h['score']}) {h['text']}" for h in hits) or "No matching correction."
     if verb == "json":
         return _json_call(home, rest, session_id or "")
+    if verb == "skill-router":
+        return skill_router_command(home, rest)
+    if verb == "hill-climb":
+        return hill_climb_command(home, rest)
+    if verb == "offload":
+        return offload_command(home, rest)
     if verb:
         return USAGE
     found = detect(home)

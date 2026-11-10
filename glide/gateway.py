@@ -37,6 +37,9 @@ VERBS = {
     "sync": (SyncParams, lambda home, p: core.sync(home, p.limit, p.session_id)),
     "enable": (EnableParams, lambda home, p: core.set_enabled(home, p.on)),
     "recall": (RecallParams, lambda home, p: {"hits": core.recall(home, p.query)}),
+    "skill_router": (SessionParams, lambda home, p: core.skill_router_command(home, p.session_id)),
+    "hill_climb": (SessionParams, lambda home, p: core.hill_climb_command(home, p.session_id)),
+    "offload": (SessionParams, lambda home, p: core.offload_command(home, p.session_id)),
 }
 
 

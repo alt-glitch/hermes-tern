@@ -113,7 +113,7 @@ def test_gateway_methods_are_namespaced_schema_checked_and_session_bound(home):
                                 register_gateway_method=lambda name, fn, schema: methods.__setitem__(name, (fn, schema)))
     gateway.register(ctx)
     assert hooks == ["pre_llm_call"] and commands == ["glide"]
-    assert sorted(methods) == [f"glide.{v}" for v in ("detect", "enable", "recall", "sync")]
+    assert sorted(methods) == [f"glide.{v}" for v in ("detect", "enable", "hill_climb", "offload", "recall", "skill_router", "sync")]
     assert all(schema.model_config["extra"] == "forbid" for _, schema in methods.values())
     request = types.SimpleNamespace(session_id="live", assert_attached=lambda: None)
     fn, _ = methods["glide.enable"]
