@@ -29,7 +29,7 @@ import { imageChip } from './image-chip.js'
 import { contextMeter } from './context.js'
 import { queuedNode } from './queued.js'
 import { statusNotices } from './statusNotice.js'
-import { checklistNode } from './todos.js'
+import { todoPanelNode } from './todos.js'
 import { pressable } from './ui/button.js'
 import { workingRow } from './ui/live.js'
 import { pill } from './ui/pill.js'
@@ -216,11 +216,7 @@ export function dockNodes(cx: DockContext, on: DockActions): JSX.Element[] {
   }
 
   if (p.todos?.open) {
-    nodes.push(
-      <col key="todos" role="hermes.todos">
-        {checklistNode(p.todos.list)}
-      </col>
-    )
+    nodes.push(todoPanelNode(p.todos.list))
   }
 
   const reconnect = reconnectNode(p.reconnecting, cx.now)

@@ -34,7 +34,6 @@ def test_parse_target_reads_urls_and_repository_number(prs):
     assert prs.parse_target({"url": "https://github.com/Acme/App/pull/12/files"}) == {
         "host": "github.com", "repository": "acme/app", "number": 12, "url": "https://github.com/acme/app/pull/12"}
     assert prs.parse_target({"repository": "acme/app", "number": 3})["url"] == "https://github.com/acme/app/pull/3"
-    assert prs.parse_target({"url": "https://github.example.com/a/b/pull/1"})["host"] == "github.example.com"
     for bad in ({"url": "https://gitlab.com/a/b/-/merge_requests/1"}, {"url": "https://github.com/a/b/issues/1"},
                 {"repository": "nope", "number": 1}, {"repository": "a/b", "number": 0}, {}):
         with pytest.raises(prs.TargetError):
@@ -100,3 +99,98 @@ def test_a_subagent_links_to_the_conversation_that_delegated_it(prs, monkeypatch
     assert [p["number"] for p in data["conversations"]["inherited"]] == [5]
     assert data["aliases"]["grandchild"] == "root"
     assert [p["number"] for p in json.loads(prs.list_pull_requests({}, session_id="child"))["linked"]] == [1, 2, 3]
+
+
+# ── Which hosts a link may name (the enterprise token goes only to a host the user listed) ─────
+
+KEY = "plugins.entries.hermes-tern.settings.enterprise_hosts"
+
+
+def configure(prs, monkeypatch, **settings):
+    """The plugin's settings as ``ctx.get_config`` reads them."""
+    ctx = types.SimpleNamespace(get_config=lambda key, default=None: settings.get(key, default))
+    monkeypatch.setattr(prs, "_ctx", ctx, raising=False)
+
+
+@pytest.mark.parametrize("args", [
+    {"url": "https://github.evil.com/a/b/pull/1"},
+    {"url": "https://github.com.evil.com/a/b/pull/1"},
+    {"url": "https://evil.com/github.com/a/b/pull/1"},
+    {"url": "evil.com/github.com/a/b/pull/1"},
+    {"url": "https://user@github.com/a/b/pull/1"},
+    {"url": "https://github.com:8443/a/b/pull/1"},
+    {"url": "https://140.82.112.3/a/b/pull/1"},
+    {"url": "https://[::1]/a/b/pull/1"},
+    {"url": "https://gist.github.com/a/b/pull/1"},
+    {"url": "https://github.mycompany.com/a/b/pull/1"},
+    {"url": "ftp://github.com/a/b/pull/1"},
+    {"url": "https://github.com/../b/pull/1"},
+    {"repository": "a/b", "number": 1, "host": "github.evil.com"},
+    {"repository": "a/b", "number": 1, "host": "user@github.com"},
+    {"repository": "a/b", "number": 1, "host": "github.com:8443"},
+    {"repository": "a/b", "number": 1, "host": "127.0.0.1"},
+    {"repository": "a/b", "number": 1, "host": "evil.com/github.com"},
+    {"repository": "a/b", "number": 1, "host": "github.mycompany.com"},
+], ids=lambda a: a.get("url") or f"host={a['host']}")
+def test_link_refuses_a_host_the_user_did_not_list(prs, args):
+    out = json.loads(prs.link_pull_request(args, session_id="s1"))
+
+    assert "error" in out
+    assert json.loads(prs.list_pull_requests({}, session_id="s1"))["linked"] == []
+
+
+def test_the_refusal_names_the_config_key(prs):
+    out = json.loads(prs.link_pull_request({"url": "https://github.evil.com/a/b/pull/1"}, session_id="s1"))
+
+    assert KEY in out["error"] and "github.evil.com" in out["error"]
+
+
+def test_hosts_are_normalised_before_they_are_compared(prs):
+    target = prs.parse_target({"url": "https://GitHub.COM./Acme/App/pull/7"})
+
+    assert (target["host"], target["url"]) == ("github.com", "https://github.com/acme/app/pull/7")
+    assert prs.parse_target({"repository": "a/b", "number": 1, "host": "GITHUB.com."})["host"] == "github.com"
+
+
+def test_a_listed_enterprise_host_links(prs, monkeypatch):
+    configure(prs, monkeypatch, enterprise_hosts=["GHE.Corp.Example.", "git.corp.example:8443", "user@x.example", "10.0.0.1"])
+
+    assert prs.enterprise_hosts() == ["ghe.corp.example", "git.corp.example:8443"]
+    assert prs.parse_target({"url": "https://ghe.corp.example/a/b/pull/1"})["host"] == "ghe.corp.example"
+    assert prs.parse_target({"url": "https://git.corp.example:8443/a/b/pull/2"})["url"] == "https://git.corp.example:8443/a/b/pull/2"
+    for refused in ("https://git.corp.example/a/b/pull/2", "https://ghe.corp.example:8443/a/b/pull/1",
+                    "https://evil.ghe.corp.example/a/b/pull/1"):
+        with pytest.raises(prs.TargetError):
+            prs.parse_target({"url": refused})
+
+
+def test_the_setting_may_be_one_string_and_never_retargets_github(prs, monkeypatch):
+    configure(prs, monkeypatch, enterprise_hosts="ghe.corp.example, github.com")
+    assert prs.enterprise_hosts() == ["ghe.corp.example"]
+
+    configure(prs, monkeypatch, enterprise_hosts={"not": "a list"})
+    assert prs.enterprise_hosts() == []
+
+    monkeypatch.setattr(prs, "_ctx", None, raising=False)
+    assert prs.enterprise_hosts() == []
+
+
+def test_a_legacy_link_to_an_unlisted_host_can_still_be_unlinked(prs):
+    # Written before hosts were checked: the tool refuses to link it now, but must let it go.
+    prs.data_file().write_text(json.dumps({"version": 1, "aliases": {}, "conversations": {"s1": [
+        {"host": "github.evil.com", "repository": "a/b", "number": 1, "url": "https://github.evil.com/a/b/pull/1"}]}}))
+
+    out = json.loads(prs.unlink_pull_request({"url": "https://github.evil.com/a/b/pull/1"}, session_id="s1"))
+
+    assert (out["was_linked"], out["linked"]) == (True, [])
+    assert "error" in json.loads(prs.unlink_pull_request({"url": "https://user@github.com/a/b/pull/1"}, session_id="s1"))
+
+
+def test_a_legacy_link_stored_with_a_trailing_dot_is_found_by_its_normalised_host(prs):
+    prs.data_file().write_text(json.dumps({"version": 1, "aliases": {}, "conversations": {"s1": [
+        {"host": "github.evil.com.", "repository": "a/b", "number": 1, "url": "https://github.evil.com./a/b/pull/1"},
+        {"host": "GitHub.com.", "repository": "a/b", "number": 2, "url": "https://GitHub.com./a/b/pull/2"}]}}))
+
+    assert json.loads(prs.unlink_pull_request({"url": "https://github.evil.com./a/b/pull/1"}, session_id="s1"))["was_linked"]
+    assert json.loads(prs.link_pull_request({"url": "https://github.com/a/b/pull/2"}, session_id="s1"))["already_linked"]
+    assert json.loads(prs.unlink_pull_request({"url": "https://github.com/a/b/pull/2"}, session_id="s1"))["linked"] == []

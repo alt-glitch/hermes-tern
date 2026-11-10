@@ -197,13 +197,22 @@ hermes config set GITHUB_TOKEN "$(gh auth token)"
 
 The plugin never reads another tool's login.
 
+The plugin reads PRs from github.com, and from a GitHub Enterprise Server only when you list its host. A PR link's host comes from the agent, so the plugin refuses every other host and sends a token to none of them:
+
+```sh
+hermes config set plugins.entries.hermes-tern.settings.enterprise_hosts '["github.mycompany.com"]'
+hermes config set GITHUB_ENTERPRISE_TOKEN <token>
+```
+
+Open a new pane after you change the list. `GITHUB_TOKEN` goes only to `api.github.com`, and `GITHUB_ENTERPRISE_TOKEN` goes only to the hosts you list. Write a host with a port (`github.mycompany.com:8443`) only if its web address has one. A link that an older version stored for another host stays on the list, marked as not read, until you unlink it.
+
 ## Security and privacy
 
 This section lists what the plugin does beyond drawing the chat, so you can decide before you install it.
 
 | | |
 | --- | --- |
-| **Network** | GitHub's API, with the token that Hermes gives it (`GITHUB_TOKEN`). It is used for the pull request view and for the actions you click; merge and close ask first. The job charts send the command and samples of a background process's output to your own auxiliary model (`auxiliary.tern_charts`), once per process, after Hermes redacts them. A dictation capture goes to the speech-to-text provider set in `stt`, which may be local. Nothing else. **No telemetry.** |
+| **Network** | GitHub's API, with the token that Hermes gives it: `GITHUB_TOKEN` to `api.github.com` only, and `GITHUB_ENTERPRISE_TOKEN` only to the hosts in `enterprise_hosts`. Redirects to another host are not followed. It is used for the pull request view and for the actions you click; merge and close ask first. The job charts send the command and samples of a background process's output to your own auxiliary model (`auxiliary.tern_charts`), once per process, after Hermes redacts them. A dictation capture goes to the speech-to-text provider set in `stt`, which may be local. Nothing else. **No telemetry.** |
 | **Commands** | A `tool_request` middleware adds `export TERN_PANE=…` (the chat's Tern pane) before the agent's shell commands, in sessions that a Tern pane shows. Approvals and guards see the command as it runs. `!cmd` and `{!cmd}` in the composer run through Hermes' own `shell.exec`, so its dangerous-command refusal applies. They run only when you type them: a pasted `{!cmd}` never runs. The composer's `/` commands are Hermes' own. |
 | **Processes** | `hermes tern` runs `hermes chat --tui` in the same process. The chart helper (`widget_author.py`) runs in Hermes' interpreter for one model request, then exits. After `/voice on`, the dictation helper (`dictation.py`) runs in Hermes' interpreter for each capture that you start: it opens the microphone, and exits when the capture ends. Opening the sidebar, or a file beside the chat, runs Tern's own `tern` CLI. |
 | **Reads outside its data** | Hermes' session database, read-only: a conversation's compression lineage and its subagents' parents. The output of the session's background processes, and the log files that their commands write to (for charts). The files you open from the chat. |

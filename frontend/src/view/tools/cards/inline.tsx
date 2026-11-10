@@ -5,6 +5,7 @@ import type { Todo, ToolCall } from '../../../model.js'
 import { memoryStagingReported } from '../../../tools/memory-staged.js'
 import type { MemoryDetail, SkillDetail, SkillsDetail } from '../../../tools/misc.js'
 import { unchangedSkillFile } from '../../../tools/skill-stub.js'
+import { todoProgress } from '../../../transcript/todos.js'
 import { checklistNode } from '../../todos.js'
 import { namedStep } from '../steps.js'
 import type { Card, ToolView } from '../types.js'
@@ -118,7 +119,10 @@ function todoCount(todos: Todo[] | undefined): string | undefined {
     return undefined
   }
 
-  return `${todos.filter(t => t.status === 'completed').length}/${todos.length}`
+  // As the pill and the panel count: a cancelled item drops out.
+  const { done, total } = todoProgress(todos)
+
+  return `${done}/${total}`
 }
 
 const MARK: Record<Todo['status'], string> = { cancelled: '✗', completed: '✓', in_progress: '→', pending: '○' }

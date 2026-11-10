@@ -12,6 +12,7 @@ import type { ToolCall } from '../model.js'
 
 import { type BranchTarget, branchPullRequest, branchTarget, parseStacks, type Stack, stackNumber, stackQuery } from './branch.js'
 import { type GitHub, github } from './client.js'
+import { type GitHubHosts, githubHosts, untrustedText } from './hosts.js'
 import { linkedFromResult, storedLinks } from './links.js'
 import {
   ACTIVITY_QUERY,
@@ -132,6 +133,8 @@ export class PullRequests {
   /** Hosts whose GraphQL has no stack fields (GHES): not asked again. */
   readonly #noStacks = new Set<string>()
   readonly #branchOf: (cwd: string) => Promise<BranchTarget | undefined>
+  /** The hosts a PR is read from; a link to any other (one stored before links were checked) is shown, never read. */
+  readonly #hosts: GitHubHosts
   /** Why nothing could be read at all (no token). */
   #error: string | undefined
   /** The poll: every minute while a listed PR is open, every 30 s while its checks run. */
@@ -146,12 +149,14 @@ export class PullRequests {
     host: PullRequestsHost,
     gh: GitHub = github(),
     links: (sid: DurableSessionId) => PrRef[] = sid => storedLinks(sid),
-    branchOf: (cwd: string) => Promise<BranchTarget | undefined> = branchTarget
+    branchOf: (cwd: string) => Promise<BranchTarget | undefined> = branchTarget,
+    hosts: GitHubHosts = githubHosts()
   ) {
     this.#host = host
     this.#gh = gh
     this.#links = links
     this.#branchOf = branchOf
+    this.#hosts = hosts
   }
 
   /**
@@ -407,7 +412,7 @@ export class PullRequests {
 
   /** How long until the next read: none while no listed PR is open. */
   #cadence(): number | 'off' {
-    const open = this.entries().filter(e => !e.pr || e.pr.state === 'open')
+    const open = this.entries().filter(e => (!e.pr || e.pr.state === 'open') && this.#hosts.trusted(e.ref.host))
 
     if (!open.length) {
       return 'off'
@@ -531,7 +536,11 @@ export class PullRequests {
     const byHost = new Map<string, Entry[]>()
 
     for (const e of entries) {
-      byHost.set(e.ref.host, [...(byHost.get(e.ref.host) ?? []), e])
+      if (this.#hosts.trusted(e.ref.host)) {
+        byHost.set(e.ref.host, [...(byHost.get(e.ref.host) ?? []), e])
+      } else {
+        e.error = untrustedText(e.ref.host)
+      }
     }
 
     let failed: string | undefined
