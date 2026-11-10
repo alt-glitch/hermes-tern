@@ -1,9 +1,9 @@
 // The file, row and reply readers of wire/files.ts and wire/sqlite.ts: each reads a valid file,
-// falls back where the reader before the schema fell back, and still reads what the Python hooks
-// write. What the new code writes stays readable by the reader before it (an old pane runs the old
+// falls back where the reader before the schema fell back, and still reads what the Python half
+// writes. What the new code writes stays readable by the reader before it (an old pane runs the old
 // bundle after a `git pull`): the `before*` functions below are those readers, kept as they were.
 
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { copyFileSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
@@ -11,7 +11,6 @@ import { DatabaseSync } from 'node:sqlite'
 import { describe, expect, it } from 'vitest'
 import * as z from 'zod/mini'
 
-import { readCard } from '../connections/cards.js'
 import { liveSessionId, storedSessionId } from '../core/ids.js'
 import { parseStacks } from '../github/branch.js'
 import { storedLinks } from '../github/links.js'
@@ -108,52 +107,6 @@ describe('the watch spec', () => {
     expect(readWatchSpec({})).toBeUndefined()
     expect(readWatchSpec({ [WATCH_ENV]: '{"sid":' })).toBeUndefined()
     expect(readWatchSpec({ [WATCH_ENV]: 'null' })).toBeUndefined()
-  })
-})
-
-describe('connection card files', () => {
-  /** A connections dir holding fixture `name` as card `key`. */
-  function cardDir(name: string, key = 'call_1.op_1'): string {
-    const dir = scratch()
-    mkdirSync(join(dir, 'connections'))
-    copyFileSync(join(FIXTURES, name), join(dir, 'connections', `${key}.json`))
-
-    return dir
-  }
-
-  it('reads a card the Python hook wrote while it watches', () => {
-    const card = readCard('call_1.op_1', cardDir('card-watching.json'), 1_792_500_011_000)
-
-    expect(card).toMatchObject({ error: undefined, key: 'call_1.op_1', settled: undefined, told: false })
-    expect(card?.targets).toHaveLength(2)
-  })
-
-  it('reads a card the Python hook settled with an error', () => {
-    expect(readCard('call_1.op_1', cardDir('card-settled.json'), 1_792_500_021_000)).toMatchObject({ error: 'connector read failed', settled: 'error' })
-  })
-
-  it('reads a watching card whose watcher has not written for long as stopped', () => {
-    expect(readCard('call_1.op_1', cardDir('card-watching.json'), 1_792_500_011_000 + 10 * 60_000)?.settled).toBe('stopped')
-  })
-
-  it('reads no card without a list of targets, or for text that is not JSON', () => {
-    const dir = scratch()
-    mkdirSync(join(dir, 'connections'))
-    writeFileSync(join(dir, 'connections', 'a.json'), '{"watching":true}')
-    writeFileSync(join(dir, 'connections', 'b.json'), '{"targets":')
-    writeFileSync(join(dir, 'connections', 'c.json'), 'null')
-
-    expect(readCard('a', dir)).toBeUndefined()
-    expect(readCard('b', dir)).toBeUndefined()
-    expect(readCard('c', dir)).toBeUndefined()
-  })
-
-  it('reads a settle reason it does not know as none, from before `settled_by`', () => {
-    const dir = scratch()
-    mkdirSync(join(dir, 'connections'))
-    writeFileSync(join(dir, 'connections', 'k.json'), JSON.stringify({ settled_by: 'later', targets: [{ name: 'gmail', state: 'pending' }], watching: false }))
-
-    expect(readCard('k', dir)?.settled).toBe('deadline')
   })
 })
 

@@ -198,7 +198,7 @@ export class AppActions {
       router: cx.router,
       setCompacting: (on, opts) => this.setCompacting(on, opts),
       state: cx.state,
-      submit: text => this.submit(text, true, 'queue'),
+      submit: text => this.submit(text, 'queue'),
       transcript
     }
   }
@@ -226,21 +226,20 @@ export class AppActions {
   submitDraft() {
     const pasted = [...this.#cx.composer.pasted]
 
-    this.submit(this.#cx.composer.take(), true, this.#cx.state.busyMode, pasted)
+    this.submit(this.#cx.composer.take(), this.#cx.state.busyMode, pasted)
   }
 
   /**
-   * Sends or queues a prompt, or runs a command; `draft`: the user entered it (it takes the draft's
-   * images). While a turn runs the prompt goes as `busy` says: the session's busy_input_mode for
-   * a typed one; a message the app writes (a connect result) waits behind the turn. `pasted`:
-   * the draft's pastes, whose `{!cmd}`s and leading `!` stay as written.
+   * Sends or queues a prompt the user entered, or runs a command; the prompt takes the draft's
+   * images. While a turn runs the prompt goes as `busy` says (the session's busy_input_mode by
+   * default). `pasted`: the draft's pastes, whose `{!cmd}`s and leading `!` stay as written.
    */
-  submit(raw: string, draft = true, busy: BusyMode = draft ? this.#cx.state.busyMode : 'queue', pasted: readonly string[] = []) {
+  submit(raw: string, busy: BusyMode = this.#cx.state.busyMode, pasted: readonly string[] = []) {
     const { attachments, composer, transcript } = this.#cx
     const text = raw.trim()
 
     // An image still uploading would miss the prompt: the words wait in the composer for it.
-    if (draft && attachments.uploading && !text.startsWith('/')) {
+    if (attachments.uploading && !text.startsWith('/')) {
       composer.set(raw, { pasted })
       transcript.notice('An image is still attaching. Send again in a moment.', 'warning')
 
@@ -248,7 +247,7 @@ export class AppActions {
     }
 
     // Images alone are a prompt: the bubble shows just them (the gateway gets Ink's stand-in words).
-    if (!text && !(draft && attachments.items.length)) {
+    if (!text && !attachments.items.length) {
       return
     }
 
@@ -266,12 +265,9 @@ export class AppActions {
     }
 
     // A connect card the tool waits on would hold the typed message until its deadline: it continues.
-    if (draft) {
-      this.#cx.connect.yieldOpen()
-    }
-
-    // The draft's images go with this prompt, whenever it is sent; a message the app writes leaves them.
-    this.#cx.router.route({ images: draft ? attachments.take() : [], kind: 'typed', pasted, text }, busy)
+    this.#cx.connect.yieldOpen()
+    // The draft's images go with this prompt, whenever it is sent.
+    this.#cx.router.route({ images: attachments.take(), kind: 'typed', pasted, text }, busy)
   }
 
   /** What the router's gates read: the session, the switch in flight, the turn, the compaction and the startup image. */

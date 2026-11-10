@@ -104,11 +104,6 @@ def test_bad_params_fail_the_call_before_any_model_request(params, session_id):
     assert not llm.calls and not ctx.events
 
 
-def test_an_older_hermes_without_plugin_rpc_gets_no_method():
-    ctx = types.SimpleNamespace(llm=Llm(None))
-    charts.register(ctx)  # no register_rpc: nothing to do, nothing raised
-
-
 def test_a_full_queue_refuses_and_a_request_that_waited_too_long_skips_the_model(monkeypatch):
     llm = Llm(result(parsed={}))
     ctx = Ctx(llm)

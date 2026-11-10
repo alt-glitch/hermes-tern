@@ -10,11 +10,10 @@ import {
   allConnected,
   cardRef,
   type ConnectCard,
+  connectCardOf,
   type ConnectTarget,
-  connectTargets,
   CONTINUE,
-  isConnectCall,
-  resultCard,
+  type LiveOp,
   sendingVerb,
   type SettleReason,
   unresolved,
@@ -31,7 +30,11 @@ import { genericCard, humanize } from './generic.js'
 /** The manage_connections tool's view: the connect card when the call has apps to show, else the generic card. */
 export const connectView: ToolView<'manage_connections'> = {
   action: 'other',
-  card: (call, d, now) => (isConnectCall(call) ? connectCard(call, now) : genericCard(call, d, { name: call.name, title: humanize(call.name) })),
+  card: (call, d, now) => {
+    const card = connectCardOf(call)
+
+    return card ? connectCard(call, card, now) : genericCard(call, d, { name: call.name, title: humanize(call.name) })
+  },
   step: namedStep
 }
 
@@ -79,19 +82,8 @@ function lookOf(card: ConnectCard, t: ConnectTarget): Look {
   return STATE[t.state] ?? NOT_CONNECTED
 }
 
-/** Why a card file settled short of connecting every app (the plugin's own watcher). */
-const FILE_NOTE: Record<SettleReason, string> = {
-  all_resolved: 'All connected.',
-  continued: 'Sent to Hermes.',
-  deadline: 'Stopped waiting after 15 minutes. Ask Hermes to connect again.',
-  error: 'Hermes stopped watching these links.',
-  interrupt: 'The turn was stopped before every app connected.',
-  stopped: 'Hermes stopped watching these links. Ask Hermes to connect again.',
-  superseded: 'A later request replaced this one.'
-}
-
-/** Why the gateway's wait ended without the user; none when every app resolved or the user pressed Continue. */
-const GATEWAY_NOTE: Partial<Record<SettleReason, string>> = {
+/** The line under a settled card: why the gateway's wait ended without the user; none when every app resolved or the user pressed Continue. */
+const NOTE: Partial<Record<SettleReason, string>> = {
   deadline: 'Hermes stopped waiting. Ask it to connect again.',
   interrupt: 'The turn stopped before every app connected.',
   stopped: 'Hermes stopped watching these links.'
@@ -111,20 +103,13 @@ const SENDING: Record<string, string> = { approve: 'Connecting…', retry: 'Retr
 
 /** A row's controls: its verb (Authorize, Connect, Try again) and Not now; one busy word while an answer is in flight. */
 function rowButtons(card: ConnectCard, ref: string, t: ConnectTarget): JSX.Element[] {
-  if (card.settled || card.told) {
+  if (card.settled || !card.op) {
     return []
   }
 
   const row = `${ref}:${t.name}`
   const open = (label: string) => button('go', label, 'hermes.connect.open', `connect-open=${row}`, t.url)
-
-  // A card file has links only: Authorize, and the agent hears about the rest from Continue.
-  if (!card.op) {
-    return t.url && waiting(t) ? [open('Authorize ↗')] : []
-  }
-
   const verb = verbOf(t)
-
   const sending = sendingVerb(card, t.name)
 
   if (sending) {
@@ -139,32 +124,9 @@ function rowButtons(card: ConnectCard, ref: string, t: ConnectTarget): JSX.Eleme
   ]
 }
 
-/** The line under a card nothing waits on any more, when it has something to say. */
-function noteOf(card: ConnectCard): string | undefined {
-  const { settled } = card
-
-  if (card.told) {
-    return settled && settled !== 'all_resolved' ? 'Sent to Hermes.' : 'All connected. Hermes carries on.'
-  }
-
-  if (!settled) {
-    return undefined
-  }
-
-  if (card.gateway) {
-    return GATEWAY_NOTE[settled]
-  }
-
-  return `${FILE_NOTE[settled]}${settled === 'error' && card.error ? ` ${card.error}` : ''}`
-}
-
 /** The foot's hint while apps wait: what to do, and how much longer the gateway waits. */
-function hintOf(card: ConnectCard, now: number): string {
-  if (!card.op) {
-    return 'Authorize in your browser. Hermes hears when every app is connected.'
-  }
-
-  const minutes = minutesLeft(card.op, now)
+function hintOf(card: ConnectCard, op: LiveOp, now: number): string {
+  const minutes = minutesLeft(op, now)
   const authorize = card.targets.some(t => verbOf(t) === 'open' && t.url) ? 'Authorize in your browser. ' : ''
 
   return `${authorize}Hermes waits up to ${minutes} more minute${minutes === 1 ? '' : 's'}.`
@@ -177,7 +139,7 @@ function hintOf(card: ConnectCard, now: number): string {
 function launchNode(card: ConnectCard, t: ConnectTarget, i: number): JSX.Element | null {
   const l = t.launch
 
-  if (!l || card.settled || card.told || !unresolved(t)) {
+  if (!l || card.settled || !unresolved(t)) {
     return null
   }
 
@@ -193,7 +155,7 @@ function launchNode(card: ConnectCard, t: ConnectTarget, i: number): JSX.Element
 /** One app's row: its mark, its name (and account), its state and why it failed, and its controls. */
 function rowNode(card: ConnectCard, ref: string, t: ConnectTarget, i: number): JSX.Element {
   const l = lookOf(card, t)
-  const live = !card.settled && !card.told
+  const live = !card.settled
   const why = live && t.detail && l.tone === 'error' ? [{ s: 'muted', t: ` · ${t.detail}` }] : []
   const needs = live && t.needs ? [{ s: 'muted', t: ` · needs ${t.needs.join(', ')}: set it up in Hermes Desktop` }] : []
 
@@ -218,23 +180,20 @@ function rowNode(card: ConnectCard, ref: string, t: ConnectTarget, i: number): J
   )
 }
 
-/**
- * The connect card `manage_connections` gets on the desktop. On a live card Continue ends the
- * tool's wait; on a card file it tells the agent the user is done (the tool's note asks it to wait
- * for that, then check status).
- */
-function connectCard(call: ToolCall, now: number): Card {
-  const card = call.connect ?? resultCard(call) ?? { opened: [], targets: connectTargets(call), told: false }
+/** The connect card `manage_connections` gets on the desktop; Continue ends the tool's wait. */
+function connectCard(call: ToolCall, card: ConnectCard, now: number): Card {
   const { targets } = card
   const ref = cardRef(call)
   const own = targets.filter(t => t.state !== 'superseded')
-  const open = card.settled || card.told ? [] : targets.filter(card.op ? unresolved : waiting)
-  const note = noteOf(card)
+  // A settled card, or a summary read back from the result, waits on nothing.
+  const op = card.settled ? undefined : card.op
+  const open = op ? targets.filter(unresolved) : []
+  const note = card.settled && NOTE[card.settled]
   const continuing = card.sending?.includes(CONTINUE)
 
-  const foot = open.length ? (
+  const foot = op && open.length ? (
     <row align="center" gap="sm" key="foot" role="hermes.connect.foot">
-      <text grow={1} key="hint" spans={[{ s: 'muted', t: hintOf(card, now) }]} wrap="word" />
+      <text grow={1} key="hint" spans={[{ s: 'muted', t: hintOf(card, op, now) }]} wrap="word" />
       {continuing ? button('go', 'Continuing…', '') : button('go', 'Continue', 'hermes.connect.continue', `connect-continue=${ref}`)}
     </row>
   ) : note ? (

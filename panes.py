@@ -29,6 +29,8 @@ import time
 from pathlib import Path
 from typing import Any, Iterator, Mapping, Optional
 
+from . import plugin_data, processes, sessions
+
 logger = logging.getLogger(__name__)
 
 # Tells the frontend its first session is the pane's, resumed after a restart (its notice).
@@ -37,12 +39,6 @@ RESTORED_ENV = "HERMES_TERN_RESTORED"
 LAUNCH_CWD_ENV = "HERMES_TERN_LAUNCH_CWD"
 # Pane files and claims of dead processes older than this are removed.
 STALE_S = 30 * 24 * 3600
-
-
-def _connections():
-    from . import connections
-
-    return connections
 
 
 def _read(path: Path) -> Optional[dict[str, Any]]:
@@ -79,48 +75,32 @@ def _real(path: Any) -> str:
     return os.path.realpath(str(path)) if path else ""
 
 
-def _session(session_id: str) -> Optional[dict[str, Any]]:
-    """The session's stored row, or None when it is gone or state.db cannot be read."""
-    with contextlib.suppress(Exception):
-        from hermes_state import SessionDB
-
-        db = SessionDB(read_only=True)
-        try:
-            return db.get_session(session_id)
-        finally:
-            with contextlib.suppress(Exception):
-                db.close()
-    return None
-
-
 def _prune(folder: Path, now: float) -> None:
     """Removes pane files and claims whose process died long ago: a pane's id is never reused."""
-    conn = _connections()
     for path in [*folder.glob("*.json"), *folder.glob("claims/*.json")]:
         data = _read(path) or {}
         with contextlib.suppress(OSError, TypeError, ValueError):
-            if not conn._alive(data.get("pid")) and now - float(data.get("updated_at") or path.stat().st_mtime) > STALE_S:
+            if not processes.running(data.get("pid")) and now - float(data.get("updated_at") or path.stat().st_mtime) > STALE_S:
                 path.unlink()
 
 
 def _restorable(pane: str, folder: Path, cwd: str) -> Optional[str]:
     """The root id of the conversation pane ``pane`` showed when its program died, if this launch may take it."""
-    conn = _connections()
     record = _read(folder / f"{pane}.json")
     if not record or not isinstance(record.get("session_id"), str) or not record["session_id"]:
         return None
-    if conn._alive(record.get("pid")):
+    if processes.running(record.get("pid")):
         return None  # the pane's program still runs (a `hermes tern` inside it)
     sid = record["session_id"]
-    session = _session(sid)
+    session = sessions.row(sid)
     if not session:
         return None
     if _real(cwd) not in {_real(record.get("cwd")), _real(session.get("cwd"))}:
         return None
-    lineage = conn._lineage(sid)
+    lineage = sessions.lineage(sid)
     root = lineage[0] if lineage else sid
     claim = _read(folder / "claims" / f"{root}.json")
-    if claim and claim.get("pid") != os.getpid() and conn._alive(claim.get("pid")):
+    if claim and claim.get("pid") != os.getpid() and processes.running(claim.get("pid")):
         return None
     return root
 
@@ -137,7 +117,7 @@ def plan(*, fresh: bool = False, explicit: bool = False, env: Optional[Mapping[s
     if not pane or not pane.isdigit():
         return None
     try:
-        folder = _connections()._dir("panes")
+        folder = plugin_data.folder("panes")
         (folder / "claims").mkdir(exist_ok=True)
         with _locked(folder):
             if fresh:

@@ -1,8 +1,8 @@
 // The connect card on the shared gateway's own wire (connections/live.ts): `connection.request`
 // draws it on the running tool row, its buttons answer through `connection.respond`,
 // `connectors.operation.wake` and `connectors.connect`, `connection.update` frames move its rows in
-// seq order, a resume's `pending_connection` brings it back, and the file path still works beside it.
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+// seq order, and a resume's `pending_connection` brings it back.
+import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -121,7 +121,7 @@ describe('the connect card on the gateway wire', () => {
     const { call } = await waitingOnFigma()
 
     expect(call.outcome.kind).toBe('running')
-    expect(call.connect).toMatchObject({ gateway: true, op: { id: 'op1', seq: 2, session: 's1' }, settled: undefined })
+    expect(call.connect).toMatchObject({ op: { id: 'op1', seq: 2, session: 's1' }, settled: undefined })
     expect(call.connect?.targets).toMatchObject([{ kind: 'connector', name: 'figma', state: 'initiated', title: 'Figma', url: FIGMA }])
     // The card stays out of the work group's fold while the tool runs.
     expect(ownsCard(call)).toBe(true)
@@ -296,7 +296,7 @@ describe('the connect card on the gateway wire', () => {
     await flush()
 
     const call = must(app.transcript.call(toolCallId('call_s')))
-    // Not read as a card file: the watcher leaves it alone.
+    // The summary is read from the result each draw; the watcher holds no card for it.
     expect(call.connect).toBeUndefined()
     expect(ownsCard(call)).toBe(true)
     const drawn = view(call)
@@ -441,27 +441,17 @@ describe('the connect card on the gateway wire', () => {
     expect(call.connect?.targets[0]?.state).toBe('connected')
   })
 
-  it('a card file still draws, and its Continue still tells the agent', async () => {
-    const dir = join(home, 'plugin-data', 'hermes-tern', 'connections')
-    mkdirSync(dir, { recursive: true })
-    writeFileSync(
-      join(dir, 'call_o.op9.json'),
-      JSON.stringify({ pid: process.pid, settled_by: null, targets: [{ connect_url: 'https://portal/x', name: 'googledrive', state: 'initiated' }], updated_at: Date.now() / 1000, watching: true })
-    )
+  it('a result with links and no operation is a plain tool row: no card, no buttons, nothing sent', async () => {
     const app = await started()
-    const result = { op_id: 'op9', status: 'initiated', targets: [{ name: 'googledrive', state: 'initiated' }] }
+    const result = { op_id: 'op9', status: 'initiated', targets: [{ connect_url: 'https://portal/x', name: 'googledrive', state: 'initiated' }] }
     gw.event({ payload: { name: 'manage_connections', result: JSON.stringify(result), tool_id: 'call_o' }, session_id: 's1', type: 'tool.complete' })
     await flush()
 
     const call = must(app.transcript.call(toolCallId('call_o')))
-    expect(call.connect).toMatchObject({ key: 'call_o.op9' })
-    expect(call.connect?.op).toBeUndefined()
-    expect(view(call)).toContain('connect-open=call_o.op9:googledrive')
-    expect(view(call)).not.toContain('connect-skip')
-
-    await click('connect-continue', 'call_o.op9')
-
+    expect(call.connect).toBeUndefined()
+    expect(ownsCard(call)).toBe(false)
+    expect(view(call)).not.toContain('connect-')
     expect(gw.sent('connection.respond')).toEqual([])
-    expect(gw.sent('prompt.submit').map(p => p['text'])).toEqual(["I've authorized Google Drive. Check with manage_connections status and carry on."])
+    expect(gw.sent('prompt.submit')).toEqual([])
   })
 })

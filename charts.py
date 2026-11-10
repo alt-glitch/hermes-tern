@@ -101,10 +101,6 @@ def write_spec(llm: Any, system: str, user: str, timeout: float = TIMEOUT_S) -> 
 
 
 def register(ctx) -> None:
-    # Hermes before plugin RPC methods: no charts (the frontend's call answers "unknown method").
-    if not hasattr(ctx, "register_rpc"):
-        return
-
     def author(params: dict, *, session_id: str | None = None, **_: Any) -> dict[str, str]:
         if not session_id:
             raise ValueError("charts.author needs the session_id whose viewers get the reply")

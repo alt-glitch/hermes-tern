@@ -38,15 +38,14 @@ def ctx():
 def test_registers_only_public_plugin_apis(ctx):
     assert {n for n, _, _ in ctx.calls} == {
         "register_cli_command", "register_auxiliary_task", "register_tool", "register_system_prompt_section",
-        "register_hook", "register_rpc", "register_session_env"}
+        "register_rpc", "register_session_env"}
 
 
-def test_the_tools_hook_and_middleware_are_the_declared_ones(ctx):
+def test_the_tools_are_the_declared_ones_and_there_is_no_hook_or_middleware(ctx):
     tools = [k["name"] for _, k in ctx.of("register_tool")]
     assert tools == ["link_pull_request", "unlink_pull_request", "list_pull_requests"]
     assert f"provides_tools: [{', '.join(tools)}]" in MANIFEST
-    assert [a[0] for a, _ in ctx.of("register_hook")] == ["transform_tool_result"]
-    assert "provides_hooks: [transform_tool_result]" in MANIFEST
+    assert not ctx.of("register_hook") and "provides_hooks" not in MANIFEST
     assert not ctx.of("register_middleware") and "provides_middleware" not in MANIFEST
 
 

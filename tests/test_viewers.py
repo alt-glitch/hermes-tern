@@ -5,15 +5,15 @@ import types
 
 import pytest
 
-from hermes_tern_plugin import viewers
+from hermes_tern_plugin import processes, sessions, viewers
 
 LINEAGE = {"live": ["stored", "live"]}
 
 
 @pytest.fixture(autouse=True)
 def world(monkeypatch):
-    monkeypatch.setattr(viewers, "_connections", lambda: types.SimpleNamespace(
-        _alive=lambda pid: pid == os.getpid(), _lineage=lambda sid: LINEAGE.get(sid, [sid])))
+    monkeypatch.setattr(processes, "running", lambda pid: pid == os.getpid())
+    monkeypatch.setattr(sessions, "lineage", lambda sid: LINEAGE.get(sid, [sid]))
     monkeypatch.setattr(viewers, "_viewers", {})
 
 

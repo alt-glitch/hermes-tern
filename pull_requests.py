@@ -31,6 +31,8 @@ import time
 from pathlib import Path
 from typing import Any
 
+from . import sessions
+
 logger = logging.getLogger(__name__)
 
 PLUGIN = "hermes-tern"
@@ -198,47 +200,6 @@ def data_file() -> Path:
     return plugin_data_dir(PLUGIN) / FILE
 
 
-def _lineage(session_id: str) -> list[str]:
-    """The conversation's session ids, root first: compression gives a conversation a new id."""
-    if not session_id:
-        return []
-    with contextlib.suppress(Exception):
-        from hermes_state import SessionDB
-
-        ids = SessionDB(read_only=True).get_compression_lineage(session_id)
-        if ids:
-            return [str(i) for i in ids]
-    return [session_id]
-
-
-def _delegated_from(row: dict[str, Any] | None) -> str:
-    """The session that delegated session ``row`` (core's delegate child: a ``_delegate_from`` marker
-    naming its parent, or a ``tool`` session), else ""."""
-    parent = str((row or {}).get("parent_session_id") or "")
-    if not parent:
-        return ""
-    config = row.get("model_config")
-    if isinstance(config, str):
-        with contextlib.suppress(ValueError):
-            config = json.loads(config)
-    marker = config.get("_delegate_from") if isinstance(config, dict) else None
-    return parent if marker == parent or row.get("source") == "tool" else ""
-
-
-def _delegator(session_id: str) -> str:
-    """The top session of a subagent's delegation chain (a nested child's parent is a subagent too),
-    else ``session_id`` itself."""
-    with contextlib.suppress(Exception):
-        from hermes_state import SessionDB
-
-        db = SessionDB(read_only=True)
-        seen = {session_id}
-        while (parent := _delegated_from(db.get_session(session_id))) and parent not in seen:
-            seen.add(parent)
-            session_id = parent
-    return session_id
-
-
 @contextlib.contextmanager
 def _locked(path: Path):
     """An exclusive lock on ``path``'s ``.lock`` file across processes (several panes and the gateway)."""
@@ -292,7 +253,7 @@ def _write(path: Path, data: dict[str, Any]) -> None:
 def _conversation(data: dict[str, Any], session_id: str) -> str:
     """The root the session's links live under (a subagent's: its delegator's); records every id of
     that lineage, and the subagent's own, as an alias."""
-    lineage = _lineage(_delegator(session_id) if session_id else session_id)
+    lineage = sessions.lineage(sessions.delegator(session_id) if session_id else session_id)
     aliases = data["aliases"]
     root = next((aliases[i] for i in lineage if i in aliases), lineage[0] if lineage else "")
     for i in dict.fromkeys([*lineage, session_id]):

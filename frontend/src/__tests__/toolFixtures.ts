@@ -88,7 +88,7 @@ export function fixtureCalls(): ToolCall[] {
     call('vision_analyze', { question: 'what?' }, { result: { analysis: 'A chart.', success: true } }),
     call('image_generate', { prompt: 'a red fox' }, { result: { image: '/h/fox.png', success: true } }),
     call('image_generate', { prompt: 'pending' }, { outcome: { kind: 'running' } }),
-    call('manage_connections', { action: 'connect' }, { result: { targets: [{ connect_url: 'https://auth/l', name: 'linear', state: 'initiated' }] } }),
+    call('manage_connections', { action: 'connect' }, { result: { op_id: 'op1', settled: true, settled_by: 'deadline', status: 'settled', targets: [{ name: 'linear', state: 'initiated' }] } }),
     call('manage_connections', { action: 'status' }, { result: { targets: [{ name: 'linear', state: 'connected' }] } }),
     call('unknown_tool', { url: 'https://x.io' }, { context: 'something\n  on two lines' }),
     call('weird-name', { query: 'q' }, { result: 'plain text result' }),

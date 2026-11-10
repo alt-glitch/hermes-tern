@@ -28,7 +28,7 @@ import sys
 from pathlib import Path
 from typing import Any, Optional
 
-from . import panes, pull_requests
+from . import panes, pull_requests, sessions
 
 FRONTEND = Path(__file__).resolve().parent / "frontend"
 
@@ -110,21 +110,9 @@ def _skills(args: argparse.Namespace) -> list[str]:
 # ── The session to open ──────────────────────────────────────────────────────────────────────
 
 
-@contextlib.contextmanager
-def _db():
-    from hermes_state import SessionDB
-
-    db = SessionDB(read_only=True)
-    try:
-        yield db
-    finally:
-        with contextlib.suppress(Exception):
-            db.close()
-
-
 def resolve_session(name_or_id: str) -> Optional[str]:
     """The id of the session ``name_or_id`` names (an id or a title), at its compression tip; None when none does."""
-    with contextlib.suppress(Exception), _db() as db:
+    with contextlib.suppress(Exception), sessions.database() as db:
         session = db.get_session(name_or_id)
         found = session["id"] if session else db.resolve_session_by_title(name_or_id)
         if found:
@@ -145,7 +133,7 @@ def _workspace() -> str:
 
 def latest_session() -> Optional[str]:
     """The last session of this workspace, else the last one anywhere."""
-    with contextlib.suppress(Exception), _db() as db:
+    with contextlib.suppress(Exception), sessions.database() as db:
         workspace = _workspace()
         # This workspace first, for either kind of session; only then anywhere.
         for scope in ({"workspace_key": workspace}, {}):
@@ -157,7 +145,7 @@ def latest_session() -> Optional[str]:
 
 
 def _session_cwd(session_id: str) -> Optional[str]:
-    with contextlib.suppress(Exception), _db() as db:
+    with contextlib.suppress(Exception), sessions.database() as db:
         cwd = ((db.get_session(session_id) or {}).get("cwd") or "").strip()
         return cwd if cwd and os.path.isdir(cwd) else None
     return None
