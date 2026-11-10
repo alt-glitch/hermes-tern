@@ -16,14 +16,9 @@ process.env['HERMES_HOME'] = mkdtempSync(join(tmpdir(), 'hermes-tern-ids-'))
 
 const spy = vi.hoisted(() => ({
   compactions: vi.fn((_sid: string) => []),
-  links: vi.fn((_sid: string) => []),
-  markViewer: vi.fn()
+  links: vi.fn((_sid: string) => [])
 }))
 
-vi.mock('../connections/cards.js', async importOriginal => ({
-  ...(await importOriginal<typeof import('../connections/cards.js')>()),
-  markViewer: spy.markViewer
-}))
 vi.mock('../hermes/compactions.js', async importOriginal => ({
   ...(await importOriginal<typeof import('../hermes/compactions.js')>()),
   storedCompactions: spy.compactions
@@ -85,7 +80,7 @@ describe('a session with a stored id', () => {
     expect(app.session.ref.live).toBe('live-1')
     expect(app.session.ref.stored).toBe('stored-1')
     expect(app.session.ref).toEqual({ live: 'live-1', stored: 'stored-1' })
-    expect(spy.markViewer.mock.calls).toEqual([['stored-1', null]])
+    expect(gw.sent('plugin.hermes-tern.viewer.set')).toMatchObject([{ pid: process.pid, session_id: 'live-1', stored: 'stored-1' }])
     expect(spy.links.mock.calls).toEqual([['stored-1']])
   })
 
@@ -103,19 +98,20 @@ describe('a session with a stored id', () => {
     await settle(gw)
 
     expect(app.session.ref.live).toBe('live-2')
-    expect(spy.markViewer.mock.calls.at(-1)).toEqual(['stored-2', 'stored-1'])
+    expect(gw.sent('plugin.hermes-tern.viewer.set').at(-1)).toMatchObject({ session_id: 'live-2', stored: 'stored-2' })
+    expect(gw.sent('plugin.hermes-tern.viewer.clear')).toEqual([{ pid: process.pid, session_id: 'live-1', stored: 'stored-1' }])
     expect(spy.compactions.mock.calls).toEqual([['stored-2']])
     expect(spy.links.mock.calls.at(-1)).toEqual(['stored-2'])
   })
 
-  it('unmarks the stored id on quit', async () => {
+  it('tells the plugin on quit that this pane stops showing it', async () => {
     const gw = gateway()
     const { app, done } = await started(gw)
 
     app.quit()
     await done
 
-    expect(spy.markViewer.mock.calls.at(-1)).toEqual([null, 'stored-1'])
+    expect(gw.sent('plugin.hermes-tern.viewer.clear')).toEqual([{ pid: process.pid, session_id: 'live-1', stored: 'stored-1' }])
   })
 
   it('keeps the stored id while the gateway is down, and reattaches under it', async () => {
@@ -179,13 +175,14 @@ describe('a session with no stored id', () => {
 
     expect(app.session.ref.stored).toBeNull()
     expect(app.session.ref).toEqual({ live: 'live-1', stored: null })
-    expect(spy.markViewer.mock.calls).toEqual([['live-1', null]])
+    expect(gw.sent('plugin.hermes-tern.viewer.set')).toMatchObject([{ pid: process.pid, session_id: 'live-1' }])
+    expect(gw.sent('plugin.hermes-tern.viewer.set')[0]).not.toHaveProperty('stored')
     expect(spy.links.mock.calls).toEqual([['live-1']])
 
     app.quit()
     await done
 
-    expect(spy.markViewer.mock.calls.at(-1)).toEqual([null, 'live-1'])
+    expect(gw.sent('plugin.hermes-tern.viewer.clear')).toEqual([{ pid: process.pid, session_id: 'live-1' }])
   })
 
   it('reloads a session that fell behind under its runtime id', async () => {

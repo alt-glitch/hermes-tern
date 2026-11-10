@@ -31,7 +31,9 @@ export interface LifecycleHost {
   readonly transcript: Pick<Transcript, 'notice'>
   readonly sheets: Pick<PromptSheets, 'dropShared'>
   /** The launcher's session to resume (the pane's own after a restart), and the folder a new session starts in. */
-  readonly launch: Pick<LaunchEnv, 'create' | 'restored' | 'resume' | 'sessionCwd'>
+  readonly launch: Pick<LaunchEnv, 'create' | 'paneCwd' | 'restored' | 'resume' | 'sessionCwd'>
+  /** Whether another live pane shows conversation `id` (the plugin knows: viewers.py). */
+  shownElsewhere(id: StoredSessionId): Promise<boolean>
   /** The pane's width, which a private gateway lays its output out for. */
   cols(): number
   /** Whether the view may move to another session now (not while a turn or a compaction runs). */
@@ -197,11 +199,31 @@ export class SessionLifecycle {
   async #restore(id: StoredSessionId) {
     const host = this.#host
     let r: Snapshot | undefined
+    // The launcher moved to the session's folder for the resume; a new session instead starts where the
+    // pane launched (a remote backend, which names no folder, still lets the gateway choose).
+    const fresh = () => this.newSession(undefined, host.launch.sessionCwd ? host.launch.paneCwd : '')
+    const since = this.#switches.since()
+
+    if (await host.shownElsewhere(id)) {
+      // The user switched (/new, a pick) while the plugin answered: that choice stands.
+      if (!since.isCurrent()) {
+        return
+      }
+
+      await fresh()
+      host.transcript.notice("Another pane shows this pane's last session; started a new one.", 'warning')
+
+      return
+    }
+
+    if (!since.isCurrent()) {
+      return
+    }
 
     try {
       r = await this.#resume(id)
     } catch (error) {
-      await this.newSession()
+      await fresh()
       // After the new session's adopt, which clears the transcript.
       host.transcript.notice(`Could not resume this pane's last session (${errorText(error)}); started a new one.`, 'warning')
 
@@ -230,7 +252,7 @@ export class SessionLifecycle {
   }
 
   /** Closes the open session and starts a fresh one with an empty transcript, named `title` if given. */
-  async newSession(title?: string) {
+  async newSession(title?: string, cwd: string = this.#host.launch.sessionCwd) {
     if (this.#refuseSwitch()) {
       return
     }
@@ -255,7 +277,7 @@ export class SessionLifecycle {
       const r: Snapshot = await rpc(
         host.gw,
         'session.create',
-        createParams({ canonical: host.gw.isCanonical, cols: host.cols(), create: host.launch.create, cwd: host.launch.sessionCwd })
+        createParams({ canonical: host.gw.isCanonical, cols: host.cols(), create: host.launch.create, cwd })
       )
 
       if (!this.#switches.current(token)) {

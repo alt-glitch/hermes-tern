@@ -12,9 +12,11 @@ plugin's own ``--new``), and the file's process is dead, the launcher resumes th
 
 - the shell runs in another folder than the pane's launch folder or the session's own;
 - the session is gone from ``state.db``;
-- a live ``hermes tern`` pane shows the conversation (its viewer marker, any id of its compression
-  lineage), or another launcher claimed it a moment ago (``panes/claims/<root>.json``, written under
-  a lock, so two panes restarting together never both take it).
+- another launcher claimed it a moment ago (``panes/claims/<root>.json``, written under a lock, so
+  two panes restarting together never both take it).
+
+Whether another live pane shows the conversation is known only to the gateway (``viewers.py``), so
+the frontend asks it (``viewer.shown``) before it resumes, and starts a new session if one does.
 """
 
 from __future__ import annotations
@@ -126,8 +128,6 @@ def _restorable(pane: str, folder: Path, cwd: str) -> Optional[str]:
         return None
     lineage = conn._lineage(sid)
     root = lineage[0] if lineage else sid
-    if conn.viewed_by_tern(sid):
-        return None
     claim = _read(folder / "claims" / f"{root}.json")
     if claim and claim.get("pid") != os.getpid() and conn._alive(claim.get("pid")):
         return None

@@ -65,9 +65,14 @@ def conn(tmp_path, monkeypatch):
     state.SessionDB = SessionDB
     monkeypatch.setitem(sys.modules, "hermes_state", state)
 
-    spec = importlib.util.spec_from_file_location("tern_connections", ROOT / "connections.py")
+    # Inside the plugin package, as Hermes loads it: viewers.py is its sibling.
+    spec = importlib.util.spec_from_file_location("hermes_tern_plugin.tern_connections", ROOT / "connections.py")
     module = importlib.util.module_from_spec(spec)
+    module.__package__ = "hermes_tern_plugin"
     spec.loader.exec_module(module)
+    from hermes_tern_plugin import viewers
+    monkeypatch.setattr(viewers, "_viewers", {})
+    monkeypatch.setattr(viewers, "_connections", lambda: module)
     monkeypatch.setattr(module, "POLL_SECONDS", 0.01)
     module.lists, module.accounts, module.lineages = lists, accounts, lineages
     module.root = tmp_path
@@ -75,8 +80,9 @@ def conn(tmp_path, monkeypatch):
 
 
 def view(conn, sid, pid=None):
-    (conn.root / "viewers").mkdir(exist_ok=True)
-    (conn.root / "viewers" / f"{sid}.json").write_text(json.dumps({"pid": pid or os.getpid()}))
+    """A pane says it shows ``sid`` (viewer.set)."""
+    from hermes_tern_plugin import viewers
+    viewers.set_viewer({"pid": pid or os.getpid()}, session_id=sid)
 
 
 def card(conn, call_id, op_id):

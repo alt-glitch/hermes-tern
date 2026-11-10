@@ -13,7 +13,6 @@ import type { LiveSessionId } from '../core/ids.js'
 import { Poller } from '../core/poller.js'
 import { withoutEscapes } from '../core/text.js'
 import type { BackgroundProcess, ProcessEnd, ProcessState, ToolCall } from '../model.js'
-import { withoutTernEnv } from '../tools/terminal.js'
 import { isWatchCall } from '../transcript/calls.js'
 import type { Transcript } from '../transcript/store.js'
 import { record } from '../wire/json.js'
@@ -80,7 +79,7 @@ export function foldEntry(prev: BackgroundProcess | undefined, entry: ProcessRow
 
   const p: BackgroundProcess = prev ?? { command: '', id: entry.session_id, lastLine: '', output: '', startedAt, state }
 
-  p.command = withoutTernEnv((entry.command ?? '').trim()) || p.command || 'background process'
+  p.command = (entry.command ?? '').trim() || p.command || 'background process'
   p.state = state
   p.startedAt = startedAt
   p.output = output
