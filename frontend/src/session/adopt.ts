@@ -60,7 +60,7 @@ export interface AdoptHost {
   readonly notices: Pick<NoticeStrip, 'reset'>
   readonly processes: Pick<Processes, 'poke'>
   readonly prs: Pick<PullRequests, 'adopt'>
-  readonly queue: Pick<PromptQueue, 'adopt'> & { readonly server: Pick<PromptQueue['server'], 'reset'> }
+  readonly queue: { readonly server: Pick<PromptQueue['server'], 'reset'> }
   readonly sheets: Pick<PromptSheets, 'dropAll'>
   readonly sidebar: Pick<Sidebar, 'adopt'>
   readonly title: Pick<SessionTitle, 'adopt'>
@@ -155,9 +155,6 @@ export function adoptSteps(host: AdoptHost): readonly Adoptable[] {
         }
       }
     },
-    // Prompts held for another session go back to the composer, not to this one. After the history:
-    // load() keeps only the welcome, so the notice that says so is written into the loaded transcript.
-    { adopt: ({ ref }) => host.queue.adopt(ref) },
     {
       adopt: ({ ref }) => {
         // The new session's processes, PRs and git state (and none of the last one's), and its open connect cards.

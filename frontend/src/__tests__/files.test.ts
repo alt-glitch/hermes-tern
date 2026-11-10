@@ -3,7 +3,7 @@
 // writes. What the new code writes stays readable by the reader before it (an old pane runs the old
 // bundle after a `git pull`): the `before*` functions below are those readers, kept as they were.
 
-import { copyFileSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
@@ -19,8 +19,6 @@ import { readWatchSpec, WATCH_ENV, type WatchSpec } from '../watch/spec.js'
 import { readJsonFile } from '../wire/files.js'
 import { decodeJson } from '../wire/json.js'
 import { first, rows, storedCalls, text } from '../wire/sqlite.js'
-
-const FIXTURES = join(import.meta.dirname, 'fixtures', 'files')
 
 const scratch = () => mkdtempSync(join(tmpdir(), 'files-'))
 

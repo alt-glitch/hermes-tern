@@ -1,10 +1,8 @@
 // Which session this pane shows, told to the plugin's Python half over plugin RPC (viewers.py):
 // `viewer.set` on every adopt (a new session, a resume, a reattach after a reconnect, so a gateway
 // restart learns it again), `viewer.clear` when the pane stops showing it. With it the agent's
-// commands get this pane's Tern variables (so `tern open` lands beside the chat) and the plugin's
-// connect results come here as a card. A restarted pane asks `viewer.shown` before it resumes its
-// last conversation. A gateway without the plugin's methods answers "unknown method": nothing
-// happens, as with no plugin at all.
+// commands get this pane's Tern variables (so `tern open` lands beside the chat). A restarted pane
+// asks `viewer.shown` before it resumes its last conversation.
 
 import type { SessionIds, SessionRef } from '../core/ids.js'
 import type { Requester } from '../wire/rpc.js'

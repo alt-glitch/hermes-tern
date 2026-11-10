@@ -253,7 +253,7 @@ describe('afterToolComplete', () => {
       agents: { scan: note('agents.scan') },
       connect: { watch: note('connect.watch') },
       processes: { poke: note('processes.poke') },
-      prs: { onCall: note('prs.onCall'), relink: note('prs.relink') },
+      prs: { onCall: note('prs.onCall') },
       showImage: note('media'),
       sidebar: { poke: note('sidebar.poke') },
       transcript: { call: () => CALL, calls: () => [CALL] }
@@ -266,7 +266,7 @@ describe('afterToolComplete', () => {
 
   it('tells the image, the agents, the PRs, the sidebar, the connect cards and the processes, in that order', () => {
     expect(told('read_file')).toEqual(['media', 'agents.scan'])
-    expect(told('delegate_task')).toEqual(['media', 'agents.scan', 'prs.relink'])
+    expect(told('delegate_task')).toEqual(['media', 'agents.scan'])
     expect(told('link_pull_request')).toEqual(['media', 'agents.scan', 'prs.onCall'])
     expect(told('patch')).toEqual(['media', 'agents.scan', 'sidebar.poke'])
     expect(told('manage_connections')).toEqual(['media', 'agents.scan', 'connect.watch'])

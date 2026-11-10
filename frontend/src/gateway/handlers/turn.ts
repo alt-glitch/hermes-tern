@@ -37,7 +37,7 @@ export interface TurnCx extends ToolFanout, MessageFanout {
   > & { readonly compactions: Pick<Compactions, 'compacted' | 'compacting' | 'uncompact'> }
   readonly activity: Pick<Activity, 'endBusy' | 'endCompaction' | 'relabel' | 'turnStarted'>
   readonly agents: Pick<Agents, 'scan' | 'settle'>
-  readonly prs: Pick<PullRequests, 'onCall' | 'poke' | 'relink'>
+  readonly prs: Pick<PullRequests, 'onCall' | 'poke'>
   readonly session: Pick<SessionState, 'usage'>
   readonly queue: { readonly server: Pick<PromptQueue['server'], 'settlesQueuedRow'> }
   /** The backend warnings shown already. */

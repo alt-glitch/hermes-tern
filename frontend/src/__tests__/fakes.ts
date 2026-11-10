@@ -31,8 +31,6 @@ export function key(name: string, mods: Partial<Key> = {}): Key {
 
 /** A shared-gateway stand-in: `request` answers from `handlers` (else `{}`), `event` feeds the app. */
 export class FakeGateway extends EventEmitter {
-  // overlays/sessions.tsx still branches on it until its own change lands.
-  readonly isCanonical = true
   attached = true
   readonly calls: Call[] = []
   readonly handlers: Map<string, Reply>

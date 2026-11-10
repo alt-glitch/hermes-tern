@@ -161,7 +161,7 @@ function recordingHost() {
     notices: { reset: rec('notices.reset') },
     processes: { poke: rec('processes.poke') },
     prs: { adopt: rec('prs.adopt') },
-    queue: { adopt: ref => void log.push(`queue.adopt ${ref.live}`), server: { reset: rec('queue.reset') } },
+    queue: { server: { reset: rec('queue.reset') } },
     readBusyMode: rec('readBusyMode'),
     restoreCompactions: rec('restoreCompactions'),
     reportCwd: rec('reportCwd'),
@@ -225,7 +225,6 @@ describe('adoptSteps', () => {
       'media.showAll',
       'restoreCompactions',
       // Held prompts for another session go back after the history, so their notice stays.
-      'queue.adopt b',
       'processes.poke',
       'connect.watch',
       'prs.adopt',
