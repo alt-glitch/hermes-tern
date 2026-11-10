@@ -2382,7 +2382,6 @@ function sessionHost(cx) {
       return cx.activity.busy !== null;
     },
     // A steer that fell back to the queue: steering carries no images.
-    canonical: cx.gw.isCanonical,
     enqueue: (text16) => cx.router.behind({ images: [], kind: "app", text: text16 }),
     gw: cx.gw,
     notice: (text16, tone) => {
@@ -3462,6 +3461,28 @@ var $ZodEnum = /* @__PURE__ */ $constructor("$ZodEnum", (inst, def) => {
     return payload;
   };
 });
+var $ZodLiteral = /* @__PURE__ */ $constructor("$ZodLiteral", (inst, def) => {
+  $ZodType.init(inst, def);
+  if (def.values.length === 0) {
+    throw new Error("Cannot create literal schema with no valid values");
+  }
+  const values = new Set(def.values);
+  inst._zod.values = values;
+  inst._zod.pattern = new RegExp(`^(${def.values.map((o) => typeof o === "string" ? escapeRegex(o) : o ? escapeRegex(o.toString()) : String(o)).join("|")})$`);
+  inst._zod.parse = (payload, _ctx) => {
+    const input2 = payload.value;
+    if (values.has(input2)) {
+      return payload;
+    }
+    payload.issues.push({
+      code: "invalid_value",
+      values: def.values,
+      input: input2,
+      inst
+    });
+    return payload;
+  };
+});
 var $ZodTransform = /* @__PURE__ */ $constructor("$ZodTransform", (inst, def) => {
   $ZodType.init(inst, def);
   inst._zod.optin = "optional";
@@ -3853,6 +3874,18 @@ function _enum(values, params) {
   return new ZodMiniEnum({
     type: "enum",
     entries,
+    ...normalizeParams(params)
+  });
+}
+var ZodMiniLiteral = /* @__PURE__ */ $constructor("ZodMiniLiteral", (inst, def) => {
+  $ZodLiteral.init(inst, def);
+  ZodMiniType.init(inst, def);
+});
+// @__NO_SIDE_EFFECTS__
+function literal(value, params) {
+  return new ZodMiniLiteral({
+    type: "literal",
+    values: Array.isArray(value) ? value : [value],
     ...normalizeParams(params)
   });
 }
@@ -14635,7 +14668,7 @@ async function applyEffort(host, value, scope) {
   session2.info = session2.info && withEffort(session2.info, value, void 0);
   host.changed();
   try {
-    if (scope === "session" && host.gw.isCanonical) {
+    if (scope === "session") {
       await mutateSession(host.gw, sid, "reasoning", { effort: value });
     } else {
       await rpc(host.gw, "config.set", { key: "reasoning", scope, session_id: sid, value });
@@ -14866,12 +14899,7 @@ async function mutateModel(host, value, confirmed2) {
   return { key: "model", value: result.model ?? "" };
 }
 async function switchModel(host, value, confirmed2 = false) {
-  const r = host.gw.isCanonical ? await mutateModel(host, value, confirmed2) : await rpc(host.gw, "config.set", {
-    confirm_expensive_model: confirmed2,
-    key: "model",
-    session_id: host.session.ref.live,
-    value
-  });
+  const r = await mutateModel(host, value, confirmed2);
   if (r.confirm_required) {
     return r;
   }
@@ -14886,8 +14914,8 @@ async function switchModel(host, value, confirmed2 = false) {
   host.changed();
   return r;
 }
-function pickerValue(model, provider, global) {
-  return `${model} --provider ${provider} ${global ? "--global" : "--session"}`;
+function pickerValue(model, provider) {
+  return `${model} --provider ${provider} --session`;
 }
 function openModelPicker(host) {
   let state = "loading";
@@ -14898,8 +14926,6 @@ function openModelPicker(host) {
   let query = "";
   let scope = ALL;
   let selected;
-  let global = false;
-  const canSave = !host.gw.isCanonical;
   const startEffort = host.session.info?.reasoning_effort || "";
   let effort2 = startEffort || "medium";
   let fast = Boolean(host.session.info?.fast);
@@ -14942,13 +14968,13 @@ function openModelPicker(host) {
     }
     busy = true;
     try {
-      const r = await switchModel(host, pickerValue(row2.model, row2.provider.slug, canSave && global), confirmed2);
+      const r = await switchModel(host, pickerValue(row2.model, row2.provider.slug), confirmed2);
       if (r.confirm_required) {
         confirm = { row: row2, text: r.confirm_message || r.warning || `${row2.model} is expensive. Switch anyway?` };
       } else {
         host.close(overlay2);
-        if (levelsFor(caps(row2)).some((l) => l.id === effort2) && (canSave && global || effort2 !== startEffort)) {
-          await host.setEffort(effort2, canSave && global ? "global" : "session");
+        if (levelsFor(caps(row2)).some((l) => l.id === effort2) && effort2 !== startEffort) {
+          await host.setEffort(effort2, "session");
         }
         if (fastTouched && fastable(row2)) {
           await setFast(host, fast ? "fast" : "normal");
@@ -15015,7 +15041,6 @@ function openModelPicker(host) {
         {
           actions: [
             ...row2 && fastable(row2) ? [{ id: "fast", keys: ["ctrl+f"], label: "\u26A1 Fast", on: fast }] : [],
-            ...canSave ? [{ id: "global", keys: ["ctrl+g"], label: "Save as default", on: global }] : [],
             { end: true, id: "close", keys: ["esc"], label: "Close" },
             { id: "use", keys: ["enter"], label: "Switch", primary: true }
           ],
@@ -15043,10 +15068,6 @@ function openModelPicker(host) {
             fast: () => {
               fast = !fast;
               fastTouched = true;
-              host.changed();
-            },
-            global: () => {
-              global = !global;
               host.changed();
             },
             retry: () => void load2(),
@@ -15104,10 +15125,6 @@ function openModelPicker(host) {
       }
       if (k.name === "enter") {
         void choose(selected);
-        return true;
-      }
-      if (canSave && k.ctrl && k.name === "g") {
-        global = !global;
         return true;
       }
       if (k.ctrl && k.name === "e") {
@@ -44688,9 +44705,6 @@ function retryTurnRewind(snapshot3) {
 
 // src/commands/session.ts
 async function rewind(host, intent) {
-  if (!host.canonical) {
-    return false;
-  }
   if (!host.sid) {
     return host.notice(`Nothing to ${intent}.`);
   }
@@ -44718,9 +44732,6 @@ function compressReport(summary4) {
   return [head2, ...[summary4?.token_line, summary4?.note].filter(Boolean).map((line) => `  ${line}`)].join("\n");
 }
 async function compress(host, arg) {
-  if (!host.canonical) {
-    return false;
-  }
   if (!host.sid) {
     return host.notice("No active session.", "warning");
   }
@@ -44768,9 +44779,6 @@ async function compress(host, arg) {
   }
 }
 async function branch(host, arg) {
-  if (!host.canonical) {
-    return false;
-  }
   if (!host.sid) {
     return host.notice("No active session.", "warning");
   }
@@ -44802,9 +44810,6 @@ async function reloadSkills(host) {
   host.panel("Reload Skills", r?.output?.trim() || "Skills reloaded.");
 }
 async function reloadMcp(host) {
-  if (!host.canonical) {
-    return false;
-  }
   const r = await rpc(host.gw, "reload.mcp", { confirm: true, ...host.sid ? { session_id: host.sid } : {} });
   host.panel("Reload MCP", r?.message?.trim() || "MCP servers reloaded.");
   if (r?.unavailable?.length) {
@@ -47548,7 +47553,6 @@ var AppActions = class {
     return {
       awaitingStartup: this.#cx.attachments.awaitingStartup,
       busy: activity.busy !== null,
-      canonical: this.#cx.gw.isCanonical,
       compacting: activity.compacting !== void 0,
       sid: this.#cx.state.ref.live,
       switching: this.#cx.life.switching
@@ -50142,13 +50146,18 @@ import { basename as basename4 } from "node:path";
 
 // src/hermes/clipboardImage.ts
 import { execFile as execFile6 } from "node:child_process";
-import { existsSync as existsSync2, statSync } from "node:fs";
+import { existsSync as existsSync2 } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { homedir as homedir11, tmpdir } from "node:os";
 import { join as join10, resolve as resolve4 } from "node:path";
-import { promisify as promisify4 } from "node:util";
-var execFileP = promisify4(execFile6);
-var runFile2 = async (file2, args, options) => (await execFileP(file2, args, options)).stdout;
+var runFile2 = (file2, args, options) => new Promise((done, fail) => {
+  execFile6(file2, args, { ...options, encoding: "utf8" }, (error, stdout, stderr) => {
+    if (error && !Number.isInteger(error.code)) {
+      return fail(error);
+    }
+    done({ code: error ? Number(error.code) : 0, stderr, stdout });
+  });
+});
 var IMAGE = /\.(png|jpe?g|gif|webp)$/i;
 var MAC_SCRIPT = `ObjC.import('AppKit');
 function run(argv) {
@@ -50168,40 +50177,49 @@ function run(argv) {
   }
   return d && !d.isNil() && d.writeToFileAtomically(argv[0], true) ? 'true' : 'false';
 }`;
-var LINUX_READERS = [
-  { script: 'wl-paste --no-newline --type image/png > "$1"', when: (env2) => Boolean(env2["WAYLAND_DISPLAY"]) },
-  { script: 'xclip -selection clipboard -t image/png -o > "$1"', when: (env2) => Boolean(env2["DISPLAY"]) }
-];
-async function extractClipboardImage(dest, env2, platform = process.platform, run6 = runFile2) {
-  if (platform === "darwin") {
-    let answer;
-    try {
-      answer = (await run6("osascript", ["-l", "JavaScript", "-e", MAC_SCRIPT, dest], { timeout: 5e3 })).trim();
-    } catch {
-      return void 0;
-    }
-    if (answer.startsWith("file:")) {
-      const file2 = answer.slice("file:".length);
-      return IMAGE.test(file2) && existsSync2(file2) ? file2 : void 0;
-    }
-    return answer === "true" && existsSync2(dest) ? dest : void 0;
+async function macClipboardImage(dest, run6) {
+  const ran = await run6("osascript", ["-l", "JavaScript", "-e", MAC_SCRIPT, dest], { timeout: 5e3 }).catch(() => void 0);
+  if (!ran || ran.code !== 0) {
+    return null;
   }
-  for (const reader of platform === "linux" ? LINUX_READERS.filter((r) => r.when(env2)) : []) {
-    try {
-      await run6("sh", ["-c", reader.script, "sh", dest], { env: env2, timeout: 5e3 });
-    } catch {
-      continue;
-    }
-    if (existsSync2(dest) && statSync(dest).size > 0) {
-      return dest;
-    }
+  const answer = ran.stdout.trim();
+  if (answer.startsWith("file:")) {
+    const file2 = answer.slice("file:".length);
+    return IMAGE.test(file2) && existsSync2(file2) ? file2 : void 0;
   }
-  return void 0;
+  return answer === "true" && existsSync2(dest) ? dest : void 0;
 }
-async function withClipboardImage(use, env2 = process.env, extract = extractClipboardImage) {
+var HERMES_TIMEOUT_MS = 15e3;
+var clipboardAnswer = union([
+  object({ ok: literal(true), path: string2() }),
+  object({ message: string2(), ok: literal(false), reason: string2() })
+]);
+async function hermesClipboardImage(dest, hermes, run6) {
+  if (!hermes) {
+    throw new Error("no Hermes command to read the clipboard with (start the pane with `hermes tern`)");
+  }
+  const [file2, ...args] = hermes.argv;
+  const ran = await run6(file2, [...args, "clipboard", "image", "--out", dest, "--json"], {
+    env: { ...process.env, ...hermes.env },
+    timeout: HERMES_TIMEOUT_MS
+  });
+  const answer = clipboardAnswer.safeParse(parseJson(ran.stdout.trim())).data;
+  if (answer?.ok && ran.code === 0) {
+    return answer.path;
+  }
+  if (answer && !answer.ok && answer.reason === "no_image") {
+    return void 0;
+  }
+  throw new Error(answer && !answer.ok && answer.message || ran.stderr.trim() || `hermes clipboard image exited ${ran.code}`);
+}
+async function extractClipboardImage(dest, hermes, platform = process.platform, run6 = runFile2) {
+  const mac2 = platform === "darwin" ? await macClipboardImage(dest, run6) : null;
+  return mac2 === null ? hermesClipboardImage(dest, hermes, run6) : mac2;
+}
+async function withClipboardImage(use, hermes, extract = extractClipboardImage) {
   const dir2 = await mkdtemp(join10(tmpdir(), "hermes-tern-clipboard-"));
   try {
-    const path2 = await extract(join10(dir2, "clipboard.png"), env2);
+    const path2 = await extract(join10(dir2, "clipboard.png"), hermes);
     return path2 ? await use(path2) : void 0;
   } finally {
     await rm(dir2, { force: true, recursive: true });
@@ -50238,8 +50256,8 @@ var Attachments = class {
   #pending = [];
   /** The launcher's startup image until it is attached to the first session (the queue waits for it). */
   #startup;
-  /** `startup`: the launcher's `--image` (''); `clipboard`: reads the clipboard's image (tests fake it). */
-  constructor(host, { clipboard = (use) => withClipboardImage(use), startup = "" } = {}) {
+  /** `clipboard`: reads the clipboard's image; `startup`: the launcher's `--image` (''). */
+  constructor(host, { clipboard, startup = "" }) {
     this.#host = host;
     this.#clipboard = clipboard;
     this.#startup = startup;
@@ -50301,20 +50319,16 @@ var Attachments = class {
     await this.#attach(path2, basename4(path2));
   }
   /**
-   * `hermes -q … --image …`: attaches the launcher's image to session `sid` (the first one): on the
-   * shared gateway to the startup query at the queue's head, else by path to the session itself.
-   * A failure is a warning, and the queue goes on without it.
+   * `hermes -q … --image …`: uploads the launcher's image to session `sid` (the first one) and puts
+   * it on the startup query at the queue's head. A failure is a warning, and the queue goes on
+   * without it.
    */
   async attachStartup(sid) {
     const path2 = this.#startup;
     try {
-      if (this.#host.gw.isCanonical) {
-        const image3 = this.#image(await uploadImage(this.#host.gw, sid, path2, this.#host.launchCwd), basename4(path2));
-        if (!this.#host.attachToHead(image3)) {
-          this.#items.push(image3);
-        }
-      } else {
-        await rpc(this.#host.gw, "image.attach", { path: path2, session_id: sid });
+      const image3 = this.#image(await uploadImage(this.#host.gw, sid, path2, this.#host.launchCwd), basename4(path2));
+      if (!this.#host.attachToHead(image3)) {
+        this.#items.push(image3);
       }
     } catch (error) {
       this.#host.note(`Could not attach ${path2}: ${errorText(error)}`, "warning");
@@ -50405,7 +50419,7 @@ var Attachments = class {
 
 // src/github/branch.ts
 import { execFile as execFile7 } from "node:child_process";
-import { promisify as promisify5 } from "node:util";
+import { promisify as promisify4 } from "node:util";
 
 // src/github/hosts.ts
 var GITHUB = "github.com";
@@ -50448,7 +50462,7 @@ function githubHosts(env2 = process.env) {
 var untrustedText = (host) => `Not read: ${host} is not github.com or a GitHub Enterprise host you listed, so tern sends it no token. If you trust it, add it to ${HOSTS_SETTING} and open a new pane.`;
 
 // src/github/branch.ts
-var run5 = promisify5(execFile7);
+var run5 = promisify4(execFile7);
 function parseRemote(url, hosts = githubHosts()) {
   const scp = /^[\w.-]+@(?<host>[^:/]+):(?<repo>[^/]+\/[^/]+?)(?:\.git)?\/?$/.exec(url)?.groups;
   const full = /^(?<scheme>https?|ssh|git):\/\/(?:[^@/]+@)?(?<host>[^/:]+)(?<port>:\d+)?\/(?<repo>[^/]+\/[^/]+?)(?:\.git)?\/?$/.exec(url)?.groups;
@@ -51380,7 +51394,7 @@ var Viewer = class {
 };
 
 // src/processes/widgets/memory.ts
-import { mkdirSync as mkdirSync4, readdirSync, rmSync as rmSync2, statSync as statSync2, writeFileSync as writeFileSync3 } from "node:fs";
+import { mkdirSync as mkdirSync4, readdirSync, rmSync as rmSync2, statSync, writeFileSync as writeFileSync3 } from "node:fs";
 import { join as join11 } from "node:path";
 var KEEP_MS = 7 * 24 * 36e5;
 var safe2 = (id) => /^[\w.-]{1,128}$/.test(id);
@@ -51411,7 +51425,7 @@ function chartMemory(dir2 = join11(dataDir(), "charts"), now = Date.now) {
         writeFileSync3(join11(dir2, `${id}.json`), JSON.stringify(value));
         for (const name of readdirSync(dir2)) {
           const file2 = join11(dir2, name);
-          if (now() - statSync2(file2).mtimeMs > KEEP_MS) {
+          if (now() - statSync(file2).mtimeMs > KEEP_MS) {
             rmSync2(file2, { force: true });
           }
         }
@@ -51782,16 +51796,6 @@ var Automation = class {
   }
 };
 
-// src/hermes/create.ts
-function createParams({
-  canonical,
-  cols,
-  create: create5,
-  cwd
-}) {
-  return canonical ? { ...create5, ...cwd ? { cwd } : {} } : { cols, ...cwd ? { cwd } : {} };
-}
-
 // src/hermes/requirements.ts
 var REQUIRED_CAPABILITIES = [
   "plugin-rpc-v1",
@@ -51847,13 +51851,9 @@ var SessionViews = class {
   leaveAll(endReason) {
     return Promise.all([...this.#subscriptions.keys()].map((sid) => this.leave(sid, endReason)));
   }
-  /** Stops showing session `sid`: a shared-gateway view detaches (the session keeps running for its other viewers); a private gateway closes it. */
+  /** Stops showing session `sid`: the view detaches, and the session keeps running for its other viewers. */
   async leave(sid, endReason) {
     const subscription2 = this.#subscriptions.get(sid);
-    if (!this.#gw.isCanonical) {
-      await rpc(this.#gw, "session.close", { session_id: sid }).catch(() => void 0);
-      return;
-    }
     if (!subscription2) {
       return;
     }
@@ -51873,9 +51873,7 @@ var SessionViews = class {
       if (ref.live === shown3 || subscription2 && this.#subscriptions.get(ref.live) === subscription2) {
         continue;
       }
-      if (!this.#gw.isCanonical) {
-        void rpc(this.#gw, "session.close", { session_id: ref.live }).catch(() => void 0);
-      } else if (subscription2) {
+      if (subscription2) {
         void this.#detach(ref.live, subscription2);
       }
     }
@@ -52092,11 +52090,7 @@ var SessionLifecycle = class {
         host.transcript.notice("No model provider is configured. Run `hermes setup`, then start again.", "warning");
         return;
       }
-      const r = await rpc(
-        host.gw,
-        "session.create",
-        createParams({ canonical: host.gw.isCanonical, cols: host.cols(), create: host.launch.create, cwd })
-      );
+      const r = await rpc(host.gw, "session.create", { ...host.launch.create, ...optional2("cwd", cwd || void 0) });
       if (!this.#switches.current(token)) {
         this.#views.superseded(r);
         return;
@@ -52146,7 +52140,7 @@ var SessionLifecycle = class {
           return void 0;
         }
       }
-      const r = await rpc(host.gw, "session.resume", { cols: host.cols(), session_id: id });
+      const r = await rpc(host.gw, "session.resume", { session_id: id });
       if (!this.#switches.current(token)) {
         this.#views.superseded(r);
         return void 0;
@@ -52315,11 +52309,11 @@ var SessionTitle = class {
     clearTimeout(this.#timer);
     this.#timer = setTimeout(() => void this.#fetch(), READ_MS);
   }
-  /** Names session `sid` (`/new <title>`): the shared gateway's rename mutation, a private one's `session.title`. */
+  /** Names session `sid` (`/new <title>`) with the gateway's rename mutation. */
   async rename(sid, title) {
     const host = this.#host;
     try {
-      const r = host.gw.isCanonical ? await mutateSession(host.gw, sid, "rename", { title }) : await rpc(host.gw, "session.title", { session_id: sid, title });
+      const r = await mutateSession(host.gw, sid, "rename", { title });
       if (sid === host.session.ref.live && this.set(String(r?.title ?? title))) {
         host.changed();
       }
@@ -53066,7 +53060,7 @@ function waitsFor(target2, ref) {
   }
 }
 var PromptQueue = class {
-  /** Prompts held here until they can be sent: no session yet, a switch in flight, or a private gateway's busy turn. */
+  /** Prompts held here until they can be sent: no session yet, or a switch in flight. */
   #held = [];
   /** The shared gateway's queue for this session: its FIFO, this pane's admissions, the bubbles they owe. */
   server = new ServerQueue();
@@ -53428,19 +53422,18 @@ var PromptRouter = class {
     host.changed();
   }
   /**
-   * Puts `prompt` behind the running turn: into the shared gateway's queue at once, else held here;
-   * `first` holds it ahead of the prompts held already (it was sent before any of them).
+   * Puts `prompt` behind the running turn: into the gateway's queue at once, or held here for the
+   * next session while none is adopted; `first` holds it ahead of the prompts held already (it was
+   * sent before any of them).
    */
   behind(prompt, { first: first2 = false } = {}) {
     const host = this.#host;
-    const s2 = host.gates();
-    const gate = canSend(s2);
-    if (gate.kind === "hold" || !s2.canonical) {
-      const target2 = gate.kind === "hold" ? { kind: "next" } : { kind: "session", ref: { live: gate.sid, stored: host.session.ref.stored } };
+    const gate = canSend(host.gates());
+    if (gate.kind === "hold") {
       if (first2) {
-        host.queue.holdFirst(prompt, target2);
+        host.queue.holdFirst(prompt);
       } else {
-        host.queue.hold(prompt, target2);
+        host.queue.hold(prompt);
       }
       host.queue.drain();
       return host.changed();
@@ -53506,7 +53499,7 @@ var PromptRouter = class {
 };
 
 // src/app/stores.ts
-function chatStores(chat, { act, gw: gw2, launch: launch3, settings: settings2, surface, tern, version: version2 }) {
+function chatStores(chat, { act, gw: gw2, launch: launch3, settings: settings2, surface, version: version2 }) {
   const changed = () => chat.changed();
   const saved = settings2.load();
   const jobCharts = saved.jobCharts !== false;
@@ -53571,7 +53564,7 @@ function chatStores(chat, { act, gw: gw2, launch: launch3, settings: settings2, 
       note: (text16, tone) => transcript.notice(text16, tone),
       sid: () => session2.ref.live
     },
-    { startup: launch3.image }
+    { clipboard: (use) => withClipboardImage(use, launch3.hermes), startup: launch3.image }
   );
   const queue2 = new PromptQueue({
     busy: () => Boolean(activity.busy),
@@ -53591,7 +53584,6 @@ function chatStores(chat, { act, gw: gw2, launch: launch3, settings: settings2, 
     gw: gw2,
     queue: queue2,
     restore: (prompt) => act().restore(prompt),
-    session: session2,
     ticket: () => session2.ticket(),
     transcript
   });
@@ -53626,7 +53618,6 @@ function chatStores(chat, { act, gw: gw2, launch: launch3, settings: settings2, 
       awaitingStartup: () => attachments.awaitingStartup,
       canSwitch: () => canSwitch(act().gates()),
       changed,
-      cols: () => tern.caps.cols,
       drain: () => queue2.drain(),
       gw: gw2,
       launch: launch3,
@@ -53698,7 +53689,7 @@ var App = class {
     this.#tern = tern;
     this.#gw = gw2;
     this.#launch = launch3;
-    const s2 = chatStores(this, { act: () => this.#act, gw: gw2, launch: launch3, settings: settings2, surface: () => this.#surface, tern, version: version2 });
+    const s2 = chatStores(this, { act: () => this.#act, gw: gw2, launch: launch3, settings: settings2, surface: () => this.#surface, version: version2 });
     this.stores = s2;
     this.session = s2.session;
     this.transcript = s2.transcript;
