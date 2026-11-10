@@ -153,7 +153,7 @@ describe('the connect card on the gateway wire', () => {
 
   it('no Thinking line runs under a card the tool waits on', async () => {
     const { app, call } = await waitingOnFigma()
-    const cx: TranscriptContext = { copy: () => undefined, now: Date.now(), welcome: { tip: '', version: '' } }
+    const cx: TranscriptContext = { copy: () => undefined, now: Date.now(), welcome: { version: '' } }
     const turn = () => JSON.stringify(entryNode(must(app.transcript.entries.findLast(e => e.kind === 'turn')), 'main.t', cx))
 
     expect(turn()).not.toContain('"t":"Thinking"')
@@ -361,7 +361,7 @@ describe('the connect card on the gateway wire', () => {
   it('the wait redraws as its minutes count down', async () => {
     const { app, call } = await waitingOnFigma()
     const start = Date.now()
-    const cx = (now: number): TranscriptContext => ({ copy: () => undefined, now, welcome: { tip: '', version: '' } })
+    const cx = (now: number): TranscriptContext => ({ copy: () => undefined, now, welcome: { version: '' } })
     const turn = (now: number) => JSON.stringify(entryNode(must(app.transcript.entries.findLast(e => e.kind === 'turn')), 'main.t', cx(now)))
     gw.handlers.set('connectors.operation.status', () => ({ deadline_at: start / 1000 + 300, op_id: 'op1', seq: 2, settled: false, targets: [figma('initiated')] }))
 
