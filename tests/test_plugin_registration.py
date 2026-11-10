@@ -4,6 +4,8 @@ declares (``hermes plugins validate`` checks the same against a live context).""
 from __future__ import annotations
 
 import argparse
+import json
+import re
 from pathlib import Path
 
 import pytest
@@ -46,6 +48,12 @@ def test_the_tools_hook_and_middleware_are_the_declared_ones(ctx):
     assert [a[0] for a, _ in ctx.of("register_hook")] == ["transform_tool_result"]
     assert "provides_hooks: [transform_tool_result]" in MANIFEST
     assert not ctx.of("register_middleware") and "provides_middleware" not in MANIFEST
+
+
+def test_the_frontend_names_itself_with_the_plugins_version():
+    # The frontend sends its package version as `client.version` on session.create.
+    frontend = json.loads((Path(__file__).resolve().parents[1] / "frontend" / "package.json").read_text())
+    assert re.search(r"^version: (\S+)$", MANIFEST, re.M).group(1) == frontend["version"]
 
 
 def test_the_tern_command_parses_its_own_flags(ctx):
