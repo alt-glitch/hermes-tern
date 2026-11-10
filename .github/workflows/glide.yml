@@ -33,5 +33,5 @@ jobs:
       - name: Glide tests (test_memory_core needs a hermes-agent checkout; run it locally)
         working-directory: glide
         run: |
-          python -m pip install --quiet pytest
+          python -m pip install --quiet pytest pydantic  # pydantic ships with Hermes at runtime
           python -m pytest -q --ignore=tests/test_memory_core.py
