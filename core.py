@@ -78,7 +78,7 @@ def _z0int() -> dict:
     try:
         doctor = json.loads(raw or "")
     except ValueError:
-        return {"installed": True, "ok": False, "failed": ["doctor did not answer"]}
+        return {"installed": True, "ok": False, "failed": [], "unchecked": True}
     failed = [c["id"] for c in doctor.get("checks", []) if c.get("required") and not c.get("ok")]
     return {"installed": True, "ok": bool(doctor.get("ok")), "failed": failed}
 
@@ -190,6 +190,24 @@ def _rows(m: dict) -> str:
             f"quoted into turns: {'on' if m['on'] else 'off'}")
 
 
+def _json_call(home: Path, rest: str, session_id: str) -> str:
+    """`/glide json <verb> [params]`: the glide.* methods for cores without gateway methods.
+
+    Card frontends reach it through the core's command.dispatch; the session is the caller's own.
+    """
+    from . import gateway
+    verb, _, raw = rest.strip().partition(" ")
+    try:
+        params = {**json.loads(raw or "{}"), "session_id": session_id}
+        if verb not in gateway.VERBS:
+            raise ValueError(f"unknown glide verb: {verb or '(none)'}")
+        return json.dumps(gateway.call(home, verb, params))
+    except MemoryNotReady:
+        return json.dumps({"error": "Build your memory first: /glide build"})
+    except (ValueError, TypeError) as error:
+        return json.dumps({"error": str(error).splitlines()[0]})
+
+
 def command(raw_args: str = "", session_id: str | None = None) -> str:
     """The `/glide` slash command, for every Hermes frontend (CLI, TUI, desktop, gateway)."""
     home = _home()
@@ -199,7 +217,7 @@ def command(raw_args: str = "", session_id: str | None = None) -> str:
         return USAGE
     if verb == "build":
         m = sync(home, source.MAX_SESSIONS, session_id or "")
-        return f"Local memory built from {m['scanned']} messages. {_rows(m)}" + (
+        return f"Memory up to date ({m['scanned']} new messages read). {_rows(m)}" + (
             "" if m["on"] else "\nTurn it on with /glide on.")
     if verb in ("on", "off"):
         m = status(home)
@@ -218,12 +236,18 @@ def command(raw_args: str = "", session_id: str | None = None) -> str:
         except MemoryNotReady:
             return "Build your memory first: /glide build"
         return "\n".join(f"- ({h['score']}) {h['text']}" for h in hits) or "No matching correction."
+    if verb == "json":
+        return _json_call(home, rest, session_id or "")
     if verb:
         return USAGE
     found = detect(home)
     z0 = found["z0int"]
-    z0_line = (("ready" if z0.get("ok") else "needs " + ", ".join(z0.get("failed") or ["attention"]))
-               if z0["installed"] else f"optional, not installed ({z0['hint']})")
+    if not z0["installed"]:
+        z0_line = f"optional, not installed ({z0['hint']})"
+    elif z0.get("unchecked"):
+        z0_line = "installed (run `z0int doctor` for details)"
+    else:
+        z0_line = "ready" if z0.get("ok") else "needs " + ", ".join(z0.get("failed") or ["attention"])
     ram = "unknown" if found["ram_gib"] is None else f"{found['ram_gib']} GiB"
     return "\n".join([
         f"This machine: {found['os']}, {found['cpus']} CPU threads, {ram} RAM",
