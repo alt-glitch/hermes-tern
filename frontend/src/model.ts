@@ -127,7 +127,7 @@ export interface ToolCall {
   process?: BackgroundProcess
   /** How it was called: directly, or through Tool Search's `tool_call` bridge (one tool, or a batch). */
   via: Via
-  /** A no-card `manage_connections` call's card: its apps, their states kept current by the app's poll. */
+  /** A `manage_connections` call's card from the gateway's operation (connections/live.ts): its apps, their states kept current. */
   connect?: ConnectCard | undefined
   /** The image it showed (media.ts), once a URL's bytes arrived; null when they could not be fetched. */
   image?: ImageSource | null | undefined

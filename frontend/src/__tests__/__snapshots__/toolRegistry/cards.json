@@ -3360,7 +3360,7 @@
      {
       "k": "icon",
       "p": {
-       "name": "pending",
+       "name": "minus",
        "tone": "muted",
        "key": "i"
       }
@@ -3376,83 +3376,29 @@
         },
         {
          "s": "muted",
-         "t": "  needs authorizing"
+         "t": "  not connected"
         }
        ],
        "truncate": "end",
        "wrap": "none",
        "key": "n"
       }
-     },
-     {
-      "k": "row",
-      "p": {
-       "align": "center",
-       "actions": {
-        "click": "connect-open=f61:linear"
-       },
-       "role": "hermes.connect.open",
-       "title": "https://auth/l",
-       "key": "go"
-      },
-      "c": [
-       {
-        "k": "text",
-        "p": {
-         "text": "Authorize ↗",
-         "wrap": "none",
-         "key": "t"
-        }
-       }
-      ]
      }
     ]
    },
    {
-    "k": "row",
+    "k": "text",
     "p": {
-     "align": "center",
-     "gap": "sm",
-     "role": "hermes.connect.foot",
-     "key": "foot"
-    },
-    "c": [
-     {
-      "k": "text",
-      "p": {
-       "grow": 1,
-       "spans": [
-        {
-         "s": "muted",
-         "t": "Authorize in your browser. Hermes hears when every app is connected."
-        }
-       ],
-       "wrap": "word",
-       "key": "hint"
+     "role": "hermes.connect.note",
+     "spans": [
+      {
+       "s": "muted",
+       "t": "Hermes stopped waiting. Ask it to connect again."
       }
-     },
-     {
-      "k": "row",
-      "p": {
-       "align": "center",
-       "actions": {
-        "click": "connect-continue=f61"
-       },
-       "role": "hermes.connect.continue",
-       "key": "go"
-      },
-      "c": [
-       {
-        "k": "text",
-        "p": {
-         "text": "Continue",
-         "wrap": "none",
-         "key": "t"
-        }
-       }
-      ]
-     }
-    ]
+     ],
+     "wrap": "word",
+     "key": "note"
+    }
    }
   ],
   "name": "manage_connections",
@@ -3479,7 +3425,7 @@
       {
        "k": "icon",
        "p": {
-        "name": "pending",
+        "name": "minus",
         "tone": "muted",
         "key": "i"
        }
@@ -3495,83 +3441,29 @@
          },
          {
           "s": "muted",
-          "t": "  needs authorizing"
+          "t": "  not connected"
          }
         ],
         "truncate": "end",
         "wrap": "none",
         "key": "n"
        }
-      },
-      {
-       "k": "row",
-       "p": {
-        "align": "center",
-        "actions": {
-         "click": "connect-open=f61:linear"
-        },
-        "role": "hermes.connect.open",
-        "title": "https://auth/l",
-        "key": "go"
-       },
-       "c": [
-        {
-         "k": "text",
-         "p": {
-          "text": "Authorize ↗",
-          "wrap": "none",
-          "key": "t"
-         }
-        }
-       ]
       }
      ]
     },
     {
-     "k": "row",
+     "k": "text",
      "p": {
-      "align": "center",
-      "gap": "sm",
-      "role": "hermes.connect.foot",
-      "key": "foot"
-     },
-     "c": [
-      {
-       "k": "text",
-       "p": {
-        "grow": 1,
-        "spans": [
-         {
-          "s": "muted",
-          "t": "Authorize in your browser. Hermes hears when every app is connected."
-         }
-        ],
-        "wrap": "word",
-        "key": "hint"
+      "role": "hermes.connect.note",
+      "spans": [
+       {
+        "s": "muted",
+        "t": "Hermes stopped waiting. Ask it to connect again."
        }
-      },
-      {
-       "k": "row",
-       "p": {
-        "align": "center",
-        "actions": {
-         "click": "connect-continue=f61"
-        },
-        "role": "hermes.connect.continue",
-        "key": "go"
-       },
-       "c": [
-        {
-         "k": "text",
-         "p": {
-          "text": "Continue",
-          "wrap": "none",
-          "key": "t"
-         }
-        }
-       ]
-      }
-     ]
+      ],
+      "wrap": "word",
+      "key": "note"
+     }
     }
    ]
   }

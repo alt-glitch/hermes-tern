@@ -1,14 +1,8 @@
-// The connect cards in the transcript, kept current, one owner for both wires (cards.ts):
-//
-// - a live card (live.ts): the gateway's `connection.request` draws it on the call that opened it
-//   (or a resume's `pending_connection` does), its `connection.update` frames move its rows, and
-//   its buttons answer the gateway. The tool waits on the card and returns by itself, so nobody
-//   tells the agent anything. A read of `connectors.operation.status` each poll covers a frame the
-//   pane missed.
-// - a card file (an older gateway's no-card result): the poll follows the file the plugin's watcher
-//   writes, and the agent is told once every app of the card is connected, or on Continue.
-//
-// The card files are cards.ts's; this module only reads and claims them.
+// The connect cards in the transcript, kept current (live.ts reads the wire, cards.ts is the model).
+// The gateway's `connection.request` draws a card on the call that opened it (or a resume's
+// `pending_connection` does), its `connection.update` frames move its rows, and its buttons answer
+// the gateway. The tool waits on the card and returns by itself, so nobody tells the agent anything.
+// A read of `connectors.operation.status` each poll covers a frame the pane missed.
 
 import type { ConnectionAnswer } from '@hermes/shared/gateway-events'
 
@@ -20,28 +14,8 @@ import type { Transcript } from '../transcript/store.js'
 import { record } from '../wire/json.js'
 import { type Requester, rpc } from '../wire/rpc.js'
 
-import {
-  allConnected,
-  cardRef,
-  CONNECT_TOOL,
-  CONTINUE,
-  type ConnectTarget,
-  connectedMessage,
-  continueMessage,
-  type LiveOp,
-  loadConnect,
-  mayTell,
-  POLL_MS,
-  resultCard,
-  waiting
-} from './cards.js'
+import { cardRef, CONNECT_TOOL, CONTINUE, type ConnectTarget, type LiveOp, POLL_MS, resultCard } from './cards.js'
 import { answers, applyFrame, type LiveCard, liveCard, liveOpen, minutesLeft, opParams, respondParams, retryParams, verbOf } from './live.js'
-
-/**
- * How long a connect call that drew no card (a status read, a call with nothing to authorize) is
- * not read again. Its card may still land (a write the pane read half of): it is read once more after.
- */
-export const NO_CARD_MS = 30_000
 
 /** The gateway's refusal for an operation it no longer holds (tui_gateway/connector_refusals.py UNKNOWN_OPERATION). */
 const UNKNOWN_OPERATION = 4004
@@ -55,8 +29,6 @@ export interface WatcherHost {
   sid(): string | null
   /** Asks for a render. */
   changed(): void
-  /** Sends `text` to the agent as a message the app writes: it waits behind a running turn. */
-  tell(text: string): void
   /** Opens `url` in the browser. */
   openUrl(url: string): void
 }
@@ -64,30 +36,22 @@ export interface WatcherHost {
 /** Follows the open connect cards; one owner for the poll. */
 export class ConnectWatcher {
   readonly #host: WatcherHost
-  /** Where the card files are; unset: the plugin's data folder, read at each poll. */
-  readonly #dir: string | undefined
   /** The poll: every POLL_MS while some card is watched. */
   readonly #poller: Poller = new Poller({ cadence: () => (this.#open ? POLL_MS : 'off'), run: async () => this.#tick() })
-  /** Some card's apps still move (the last read found one watched and not settled). */
+  /** Some card's operation is still open (the last poll found one not settled). */
   #open = false
-  /** Connect cards (by file) this pane saw with an app still waiting. */
-  readonly #seen = new Set<string>()
-  /** Connect calls that drew no card, and when: not read again for NO_CARD_MS. */
-  readonly #noCard = new WeakMap<object, number>()
   /** The minutes each open live card's hint last showed. */
   readonly #minutes = new WeakMap<ToolCall, number>()
   /** Calls whose result already had its say over a `stopped` card. */
   readonly #finals = new WeakSet<ToolCall>()
 
-  /** `dir`: the plugin's data folder the card files are under (tests point it at their own). */
-  constructor(host: WatcherHost, { dir }: { dir?: string } = {}) {
+  constructor(host: WatcherHost) {
     this.#host = host
-    this.#dir = dir
   }
 
   /**
-   * Reads every connect card now (a new call or a reloaded transcript does not wait for the next
-   * poll), then polls while some card is watched: a settled card never moves again.
+   * Polls every open card now (a finished call or a reloaded transcript does not wait for the next
+   * poll), then while some card is open: a settled card never moves again.
    */
   watch() {
     this.#poller.poke()
@@ -141,33 +105,13 @@ export class ConnectWatcher {
     }
   }
 
-  /** A connect card's Continue: a live card's tool returns now; a card file tells the agent which apps the user authorized. */
+  /** A connect card's Continue: the tool returns now, its unresolved apps not connected. */
   continue(ref: string) {
     const call = this.#call(ref)
-    const card = call?.connect
 
-    if (!call || !card || card.told || card.settled) {
-      return
-    }
-
-    if (card.op) {
+    if (call && !call.connect?.settled) {
       this.#answer(call, CONTINUE, answers.continue())
-
-      return
     }
-
-    // As on the desktop, Continue settles the card: an app still waiting did not connect.
-    this.#host.transcript.mutateCall(call, () => {
-      card.told = true
-      card.settled = 'continued'
-    })
-
-    // Another pane's message already told the agent.
-    if (mayTell(card, this.#dir)) {
-      this.#host.tell(continueMessage(card.targets))
-    }
-
-    this.#host.changed()
   }
 
   /**
@@ -188,19 +132,16 @@ export class ConnectWatcher {
     const card = call?.connect
     const target = card?.targets.find(t => t.name === name)
 
-    if (!call || !card || !target?.url || card.settled) {
+    if (!call || !card?.op || !target?.url || card.settled) {
       return
     }
 
     this.#host.openUrl(target.url)
     this.#host.transcript.mutateCall(call, () => (card.opened = [...new Set([...card.opened, name])]))
     this.#host.changed()
-
     // The gateway reads the accounts now rather than at its next tick. It only shortens the wait:
     // the operation may have settled meanwhile.
-    if (card.op) {
-      void rpc(this.#host.gw, 'connectors.operation.wake', opParams(card.op)).catch(() => undefined)
-    }
+    void rpc(this.#host.gw, 'connectors.operation.wake', opParams(card.op)).catch(() => undefined)
   }
 
   /** A live card's Skip on app `name`. */
@@ -233,50 +174,9 @@ export class ConnectWatcher {
 
   #tick() {
     let open = false
-    const now = Date.now()
 
     for (const call of this.#host.transcript.calls(CONNECT_TOOL)) {
-      if (call.connect?.op) {
-        open = this.#tickLive(call) || open
-        continue
-      }
-
-      const missed = this.#noCard.get(call)
-
-      // A running call has no card yet; by its call id alone it would take an earlier call's.
-      if (call.connect?.settled || call.outcome.kind === 'running' || (missed !== undefined && now - missed < NO_CARD_MS)) {
-        continue
-      }
-
-      const next = loadConnect(call, this.#dir)
-
-      if (!next) {
-        this.#noCard.set(call, now)
-        continue
-      }
-
-      this.#noCard.delete(call)
-
-      if (JSON.stringify(next) !== JSON.stringify(call.connect)) {
-        this.#host.transcript.mutateCall(call, c => (c.connect = next))
-        this.#host.changed()
-      }
-
-      const seen = next.key ?? call.id
-
-      if (next.targets.some(waiting) && !next.settled) {
-        this.#seen.add(seen)
-      }
-
-      // Only a card this pane saw waiting: a resumed session's long-settled card stays quiet. Only
-      // one pane tells: the claim is the card's.
-      if (!next.told && this.#seen.has(seen) && allConnected(next) && mayTell(next, this.#dir)) {
-        this.#host.transcript.mutateCall(call, () => (next.told = true))
-        this.#host.tell(connectedMessage(next.targets))
-        this.#host.changed()
-      } else if (next.key && !next.settled) {
-        open = true
-      }
+      open = this.#tickLive(call) || open
     }
 
     this.#open = open
@@ -489,7 +389,7 @@ export class ConnectWatcher {
     return typeof op === 'string' && op ? this.#host.transcript.calls(CONNECT_TOOL).findLast(c => c.connect?.op?.id === op) : undefined
   }
 
-  /** The connect card `ref` names (its operation, its file, or its call id when it has neither). */
+  /** The connect card `ref` names (its operation, or its call id when it has none). */
   #call(ref: string) {
     return this.#host.transcript.calls(CONNECT_TOOL).findLast(c => cardRef(c) === ref)
   }

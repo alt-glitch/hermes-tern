@@ -70,7 +70,7 @@ export interface AdoptHost {
   readBusyMode(): void
   /** Asks the gateway to stream session `sid`'s reasoning. */
   showThoughts(sid: LiveSessionId): void
-  /** Tells the plugin this pane shows `now` (its commands get this pane, its connect results come here), no longer `before`. */
+  /** Tells the plugin this pane shows `now` (its commands get this pane), no longer `before`. */
   markViewer(now: SessionRef, before: SessionIds): void
   /** Records the shown session as this Tern pane's, which `hermes tern` resumes after the pane's program dies. */
   markPane(id: DurableSessionId): void
@@ -116,7 +116,7 @@ export function adoptSteps(host: AdoptHost): readonly Adoptable[] {
     { adopt: ({ ref }) => host.showThoughts(ref.live) },
     {
       adopt: ({ previous, ref }) => {
-        // This pane shows the session now: the plugin's Python half gives its commands this pane, and sends its connect results here.
+        // This pane shows the session now: the plugin's Python half gives its commands this pane.
         host.markViewer(ref, previous)
         host.markPane(durable(ref))
       }

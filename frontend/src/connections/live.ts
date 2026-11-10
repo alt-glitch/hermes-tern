@@ -13,8 +13,8 @@
 // It answers through gateway/session_connections.py: `connection.respond` (a skip, an approval,
 // Continue), `connectors.operation.wake` (read the accounts now), `connectors.connect` with
 // `reconnect` (Try again), and reads `connectors.operation.status`. This module reads the payloads
-// into the card model the file path draws too (cards.ts) and builds those methods' params; the
-// watcher holds the calls and sends them.
+// into the card model (cards.ts) and builds those methods' params; the watcher holds the calls and
+// sends them.
 
 import type {
   ConnectionAnswer,
@@ -56,7 +56,7 @@ export function liveCard(payload: unknown, session: string): LiveCard | undefine
   const callId = typeof r['tool_call_id'] === 'string' && r['tool_call_id'] ? r['tool_call_id'] : undefined
   const op: LiveOp = { deadlineAt, id, seq, session }
 
-  return { callId, card: { gateway: true, op, opened: [], settled: settleReason(r), targets, told: false } }
+  return { callId, card: { op, opened: [], settled: settleReason(r), targets } }
 }
 
 /**

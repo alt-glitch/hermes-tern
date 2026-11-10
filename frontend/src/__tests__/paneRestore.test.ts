@@ -16,7 +16,7 @@ process.env['HERMES_HOME'] = mkdtempSync(join(tmpdir(), 'hermes-tern-pane-'))
 vi.mock('../surface/osc.js', () => ({ reportCwd: () => undefined, setTabTitle: () => undefined }))
 
 const { App } = await import('../app/chat.js')
-const { dataDir } = await import('../connections/cards.js')
+const { dataDir } = await import('../config/dataDir.js')
 
 const flush = () => new Promise(resolve => setTimeout(resolve, 0))
 const read = (pane: string, dir = dataDir()) => record(parseJson(readFileSync(paneFile(pane, dir), 'utf8'))) ?? {}

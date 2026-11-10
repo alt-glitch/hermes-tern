@@ -1,8 +1,8 @@
 // The files and texts this frontend reads that another process wrote: its settings, the watch
-// spec a launching pane hands a watcher, the connection cards and the PR links the plugin's Python
-// half writes, and the chart rules a pane keeps for a process. Each is
-// read once, through a schema, into a named type. None carries a version: an old pane keeps
-// running the old bundle after a `git pull`, so every format stays the one it was.
+// spec a launching pane hands a watcher, the PR links the plugin's Python half writes, and the
+// chart rules a pane keeps for a process. Each is read once, through a schema, into a named type.
+// None carries a version: an old pane keeps running the old bundle after a `git pull`, so every
+// format stays the one it was.
 // A schema falls back where the code before it fell back: a missing or unreadable file and text
 // that is not JSON read as they did, and a field of the wrong type reads as absent.
 
@@ -10,7 +10,6 @@ import { readFileSync } from 'node:fs'
 
 import * as z from 'zod/mini'
 
-import type { SettleReason } from '../connections/cards.js'
 import { liveSessionId, storedSessionId } from '../core/ids.js'
 import type { Settings } from '../settings.js'
 import type { WatchSpec } from '../watch/spec.js'
@@ -80,42 +79,6 @@ export function readWatchSpecText(raw: string | undefined): WatchSpec | undefine
   const spec = watchSpec.safeParse(raw ? parseJson(raw) : undefined)
 
   return spec.success ? spec.data : undefined
-}
-
-// ── Connection cards (plugin-data/hermes-tern/connections/<key>.json, connections.py) ─────────
-
-/** The settle reasons the watcher writes (`settled_by`); `stopped` is the pane's own. */
-const SETTLED_BY = ['all_resolved', 'continued', 'deadline', 'error', 'superseded'] as const satisfies readonly SettleReason[]
-
-/** A card file as connections.py `_Card.data` writes it, the fields the pane reads. */
-const cardFile = z.object({
-  /** Each app's row: kept as written, read by connections/cards.ts as a tool result's rows are. */
-  targets: z.array(z.unknown()),
-  error: loose(z.string()),
-  /** Epoch seconds of the watcher's last write. */
-  updated_at: loose(z.number()),
-  /** Why the card stopped; another value reads as none. */
-  settled_by: loose(z.enum(SETTLED_BY)),
-  watching: loose(z.boolean()),
-  /** The watcher's process. */
-  pid: loose(z.number())
-})
-
-/** A card file's fields. */
-export type CardData = z.infer<typeof cardFile>
-
-/** The card `file` holds; undefined when it cannot be read, is not JSON, or has no list of targets. */
-export function readCardFile(file: string): CardData | undefined {
-  const card = cardFile.safeParse(readJsonFile(file))
-
-  return card.success ? card.data : undefined
-}
-
-const created = z.object({ created_at: z.number() })
-
-/** When card `file` was written (epoch seconds); 0 when it cannot be read or says none. */
-export function cardCreatedAt(file: string): number {
-  return created.safeParse(readJsonFile(file)).data?.created_at ?? 0
 }
 
 // ── PR links (plugin-data/hermes-tern/pull-requests.json, pull_requests.py) ───────────────────

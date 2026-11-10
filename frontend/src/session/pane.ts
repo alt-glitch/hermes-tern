@@ -7,7 +7,7 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 import type { LaunchEnv } from '../config/env.js'
-import { dataDir } from '../connections/cards.js'
+import { dataDir } from '../config/dataDir.js'
 import type { DurableSessionId } from '../core/ids.js'
 
 /** What the pane file says: the plugin's launcher reads these names (panes.py). */
