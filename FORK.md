@@ -1,6 +1,6 @@
-# kvnloo/hermes-tern
+# kvnloo/glide
 
-A fork of [alt-glitch/hermes-tern](https://github.com/alt-glitch/hermes-tern), the community plugin
+Glide is a fork of [alt-glitch/hermes-tern](https://github.com/alt-glitch/hermes-tern), the community plugin
 that draws [Hermes Agent](https://github.com/NousResearch/hermes-agent) natively in
 [Tern](https://stencil.so/tern). The fork carries features ported from the Hermes TSP frontend and
 from OMP, plus fixes that make tool cards say what actually happened. Upstream's
@@ -95,7 +95,8 @@ HERMES_FALLBACK_SOURCE=/tmp/hermes-src "$HERMES_PYTHON" -m pytest -q \
 ## Install the fork
 
 ```sh
-hermes plugins install kvnloo/hermes-tern
+hermes plugins install kvnloo/glide         # this Tern frontend
+hermes plugins install kvnloo/glide#glide   # glide's corrections memory (works without Tern)
 ```
 
 The checked-in `frontend/dist/entry.js` can lag the source on this fork (the bundle workflow needs a
@@ -125,6 +126,13 @@ opened there separately; fork branches are never proposed upstream as they are.
 
 The fork keeps its diff against upstream easy to merge:
 
+0. **Downstream code lives in `glide/`.** Anything only this fork needs (the corrections-memory
+   plugin, glide cards, demo tooling) goes under `glide/`, which upstream never touches. Work meant
+   for upstream stays in upstream's layout, on a branch from `alt-glitch/hermes-tern` main, and is
+   opened there as a PR. CI enforces it: `python glide/tools/check_layout.py` fails when a new
+   fork-added file lands outside `glide/` without a line in `glide/tools/layout-baseline.txt`
+   (mark upstream-bound files `# upstream: <PR>`). The baseline holds the files that predate the
+   rule; it may only shrink as they move into `glide/` or land upstream.
 1. **Add, don't edit.** New behavior goes into new files (`frontend/src/...`, `*_backend.py`,
    `frontend/docs/*.md`). When an upstream file has to change, keep the change small and local.
 2. **Docs live here.** `README.md` stays upstream's text plus one note at the top; fork docs go in

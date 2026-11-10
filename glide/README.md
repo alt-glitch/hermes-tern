@@ -4,8 +4,10 @@ Stop repeating yourself to Hermes. Glide reads your past local sessions, keeps t
 gave ("no, …", "actually, …", "correction: …"), and quotes the ones that match into each new turn.
 
 ```
-hermes plugins install kvnloo/glide
+hermes plugins install kvnloo/glide#glide
 ```
+
+(`kvnloo/glide` is also a Tern frontend; the memory plugin is this `glide/` folder of it.)
 
 Then, in any Hermes chat (CLI, TUI, desktop or a messaging gateway):
 
@@ -37,7 +39,8 @@ Details and the extraction contract: [docs/memory.md](docs/memory.md).
 
 Glide also registers four gateway methods, bound to the caller's attached session: `glide.detect`,
 `glide.sync`, `glide.enable` and `glide.recall`. A frontend such as
-[Tern](https://github.com/alt-glitch/hermes-tern) can call them to show `/glide` as cards with
+[Tern](https://github.com/alt-glitch/hermes-tern), or this repo's own Tern frontend
+(`hermes plugins install kvnloo/glide`), can call them to show `/glide` as cards with
 approve buttons. On a Hermes core without plugin gateway methods they are skipped, and `/glide`
 works as text.
 
