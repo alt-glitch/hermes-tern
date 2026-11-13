@@ -3909,7 +3909,7 @@ function decodeJson(text15) {
 }
 
 // src/hermes/connect.ts
-var command = object({ argv: tuple([string2()], string2()), env: _catch(record(string2(), string2()), {}) });
+var command = tuple([string2()], string2());
 function readHermesCommand(raw2) {
   return raw2 ? command.safeParse(parseJson(raw2)).data : void 0;
 }
@@ -3937,9 +3937,9 @@ var runFile = (file2, args, env2) => new Promise((resolve5) => {
 var lastJson = (text15) => text15.split("\n").reverse().map((line) => line.trim()).filter(Boolean).map((line) => parseJson(line)).find((value) => value !== void 0);
 function attachGateway(hermes, run6 = runFile, env2 = process.env) {
   return async (start, recover) => {
-    const [file2, ...args] = hermes.argv;
+    const [file2, ...args] = hermes;
     const flags = start ? ["--start"] : recover ? ["--recover"] : [];
-    const ran = await run6(file2, [...args, "gateway", "attach", "--json", ...flags], { ...env2, ...hermes.env });
+    const ran = await run6(file2, [...args, "gateway", "attach", "--json", ...flags], env2);
     const reply2 = lastJson(ran.stdout);
     if (ran.code === 0) {
       const parsed2 = grant.safeParse(reply2);
@@ -3973,6 +3973,7 @@ function readLaunchEnv(env2 = process.env, cwd = process.cwd()) {
     restored: Boolean(env2["HERMES_TERN_RESTORED"]?.trim()),
     resume: env2["HERMES_TERN_RESUME"]?.trim() ?? "",
     sessionCwd: env2["HERMES_TERN_SESSION_CWD"]?.trim() ?? "",
+    sessionFile: env2["HERMES_TERN_SESSION_FILE"] ?? "",
     toolProgress: env2["HERMES_TERN_TOOL_PROGRESS"]?.trim() ?? ""
   });
 }
@@ -44519,10 +44520,9 @@ function hermesSplit(env2, vars, args) {
   }
   const command2 = [
     "env",
-    ...Object.entries(hermes.env).map(([k, v]) => `${k}=${v}`),
     ...env2["HERMES_HOME"] ? [`HERMES_HOME=${env2["HERMES_HOME"]}`] : [],
     ...vars,
-    ...hermes.argv,
+    ...hermes,
     ...args
   ];
   return { command: command2, pane };
@@ -45341,6 +45341,15 @@ function markPane(launch3, sid, dir2 = dataDir()) {
   try {
     mkdirSync2(join5(dir2, "panes"), { recursive: true });
     writeFileSync(paneFile(launch3.pane, dir2), JSON.stringify(record3));
+  } catch {
+  }
+}
+function writeSessionFile(launch3, sid) {
+  if (!launch3.sessionFile) {
+    return;
+  }
+  try {
+    writeFileSync(launch3.sessionFile, JSON.stringify({ session_id: sid }), { mode: 384 });
   } catch {
   }
 }
@@ -50270,11 +50279,8 @@ async function hermesClipboardImage(dest, hermes, run6) {
   if (!hermes) {
     throw new Error("no Hermes command to read the clipboard with (start the pane with `hermes tern`)");
   }
-  const [file2, ...args] = hermes.argv;
-  const ran = await run6(file2, [...args, "clipboard", "image", "--out", dest, "--json"], {
-    env: { ...process.env, ...hermes.env },
-    timeout: HERMES_TIMEOUT_MS
-  });
+  const [file2, ...args] = hermes;
+  const ran = await run6(file2, [...args, "clipboard", "image", "--out", dest, "--json"], { timeout: HERMES_TIMEOUT_MS });
   const answer = clipboardAnswer.safeParse(parseJson(ran.stdout.trim())).data;
   if (answer?.ok && ran.code === 0) {
     return answer.path;
@@ -53706,7 +53712,10 @@ function chatStores(chat, { act, gw: gw2, launch: launch3, settings: settings2, 
         warned.status = void 0;
       },
       imageLanded: (call) => act().imageLanded(call),
-      markPane: (id) => markPane(launch3, id),
+      markPane: (id) => {
+        markPane(launch3, id);
+        writeSessionFile(launch3, id);
+      },
       markViewer: (now, before) => viewer.show(now, before),
       readBusyMode: () => void act().readBusyMode(),
       reportCwd: () => act().reportCwd(),
