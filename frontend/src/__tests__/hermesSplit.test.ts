@@ -14,7 +14,7 @@ vi.mock('node:child_process', () => ({
 
 const env = {
   HERMES_HOME: '/h',
-  HERMES_TERN_HERMES: JSON.stringify({ argv: ['/venv/python', '-m', 'hermes_cli.main'], env: { PYTHONPATH: '/src' } }),
+  HERMES_TERN_HERMES: JSON.stringify(['/venv/python', '-I', '-c', 'boot']),
   TERN_PANE: 'b3'
 }
 
@@ -32,11 +32,11 @@ describe('openHermesSplit', () => {
         '--keep-open',
         '--',
         'env',
-        'PYTHONPATH=/src',
         'HERMES_HOME=/h',
         '/venv/python',
-        '-m',
-        'hermes_cli.main',
+        '-I',
+        '-c',
+        'boot',
         'update'
       ]
     ])

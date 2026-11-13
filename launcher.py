@@ -12,8 +12,10 @@ toolsets, skills, yolo, …) goes in ``HERMES_TERN_CREATE`` as the fields of the
 When the terminal does not answer the Tern Surface Protocol handshake, the frontend exits
 :data:`NO_TSP_EXIT`. The launcher then says so and exits: ``hermes tern`` runs only in Tern.
 
-Not supported, for want of a public API: ``-w``/``--worktree`` (Hermes' worktree setup and its exit
-choice), and the "resume with" summary Hermes prints when its TUI exits.
+Around the frontend it does what Hermes' own chat launcher does, through Hermes' published
+functions (:func:`hermes_api`): the ``-w`` worktree before and after, and the "resume with" summary
+after a quit. The frontend writes the session it shows to the file named in
+``HERMES_TERN_SESSION_FILE``, because the pane's own record (``panes.py``) is removed on a quit.
 """
 
 from __future__ import annotations
@@ -25,7 +27,9 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, Optional
 
 from . import panes, pull_requests, sessions
@@ -41,16 +45,12 @@ HEAP_MB = 8192
 CONTINUE_SOURCES = ({"source": ["tui", "local"], "local_created_sources": ["tui"]},
                     {"source": ["cli", "local"], "local_created_sources": ["cli"]})
 # The launch variables of an outer `hermes tern`; this launch sets its own.
-OWN_ENV = ("HERMES_TERN_HERMES", "HERMES_TERN_RESUME", "HERMES_TERN_QUERY", "HERMES_TERN_IMAGE", "HERMES_TERN_CWD",
-           "HERMES_TERN_SESSION_CWD", "HERMES_TERN_CREATE", "HERMES_TERN_TOOL_PROGRESS",
+OWN_ENV = ("HERMES_TERN_HERMES", "HERMES_TERN_SESSION_FILE", "HERMES_TERN_RESUME", "HERMES_TERN_QUERY",
+           "HERMES_TERN_IMAGE", "HERMES_TERN_CWD", "HERMES_TERN_SESSION_CWD", "HERMES_TERN_CREATE", "HERMES_TERN_TOOL_PROGRESS",
            "HERMES_TERN_GITHUB_ENTERPRISE_HOSTS", panes.RESTORED_ENV, panes.LAUNCH_CWD_ENV)
-# `session.create`'s `client_env`: the toolchain and behaviour names a shell-launched client sends
-# (the gateway filters them again against its own rules and secret policy).
-CLIENT_ENV_NAMES = ("PATH", "VIRTUAL_ENV", "GOPATH", "GOROOT", "CARGO_HOME", "RUSTUP_HOME", "JAVA_HOME",
-                    "HERMES_EPHEMERAL_SYSTEM_PROMPT", "HERMES_PREFILL_MESSAGES_FILE", "HERMES_INFERENCE_PROVIDER",
-                    "HERMES_ENABLE_PROJECT_PLUGINS")
-CLIENT_ENV_PREFIXES = ("CONDA_", "NODE_", "NVM_", "PYENV_")
-SECRET_WORDS = ("KEY", "TOKEN", "SECRET", "PASSWORD", "PASSWD", "AUTH", "CREDENTIAL", "COOKIE", "SESSION")
+# Exit codes of a quit (`/quit`, Ctrl+C): the summary is printed and a dirty `-w` tree is asked about.
+QUIT_CODES = (0, 130)
+TOO_OLD = "hermes tern: this Hermes is older than hermes tern needs. Run `hermes update`."
 
 # Launch flags a shell can export instead of passing (as `hermes chat` reads them).
 ENV_FLAGS = {"yolo": "HERMES_YOLO_MODE", "ignore_rules": "HERMES_IGNORE_RULES", "accept_hooks": "HERMES_ACCEPT_HOOKS"}
@@ -79,7 +79,7 @@ FLAGS: list[tuple[tuple[str, ...], dict[str, Any]]] = [
     (("-Q", "--quiet"), dict(action="store_true", help="no tool progress")),
     (("--new",), dict(action="store_true",
                              help="a new session, where the pane would resume its last one")),
-    (("-w", "--worktree"), dict(action="store_true", help="not supported in `hermes tern` yet")),
+    (("-w", "--worktree"), dict(action="store_true", help="run the session in a new git worktree of this repository")),
 ]
 
 
@@ -111,10 +111,10 @@ def _skills(args: argparse.Namespace) -> list[str]:
 
 
 def resolve_session(name_or_id: str) -> Optional[str]:
-    """The id of the session ``name_or_id`` names (an id or a title), at its compression tip; None when none does."""
+    """The id of the session ``name_or_id`` names (an id, a unique id prefix such as the one the quit
+    summary prints, or a title), at its compression tip; None when none does."""
     with contextlib.suppress(Exception), sessions.database() as db:
-        session = db.get_session(name_or_id)
-        found = session["id"] if session else db.resolve_session_by_title(name_or_id)
+        found = db.resolve_session_id(name_or_id) or db.resolve_session_by_title(name_or_id)
         if found:
             with contextlib.suppress(Exception):
                 found = db.get_compression_tip(found) or found
@@ -174,37 +174,21 @@ def pick_session(args: argparse.Namespace) -> Optional[str]:
 # ── What the frontend is handed ──────────────────────────────────────────────────────────────
 
 
-def hermes_command() -> dict[str, Any]:
-    """How to run this Hermes as a command (``hermes gateway attach``, a sidebar's ``hermes tern``):
-    this interpreter on this checkout, so the install and its packages are the ones running now."""
-    import hermes_cli.config
-
-    root = str(Path(hermes_cli.config.__file__).resolve().parent.parent)
-    path = [root, *[p for p in os.environ.get("PYTHONPATH", "").split(os.pathsep) if p and p != root]]
-    return {"argv": [sys.executable, "-m", "hermes_cli.main"], "env": {"PYTHONPATH": os.pathsep.join(path)}}
-
-
-def client_env(environ: Optional[dict[str, str]] = None) -> dict[str, str]:
-    """The shell's toolchain and behaviour values for ``session.create``'s ``client_env``."""
-    environ = dict(os.environ if environ is None else environ)
-    extra: set[str] = set()
-    with contextlib.suppress(Exception):
-        from hermes_cli.config import load_config
-
-        terminal = (load_config() or {}).get("terminal") or {}
-        extra = {n.strip() for n in terminal.get("client_env_passthrough") or [] if isinstance(n, str) and n.strip()}
-
-    def travels(name: str) -> bool:
-        if name in CLIENT_ENV_NAMES:
-            return True
-        if any(word in name.upper() for word in SECRET_WORDS) or name.startswith("HERMES_"):
-            return False
-        return name in extra or name.startswith(CLIENT_ENV_PREFIXES)
-
-    return {k: v for k, v in environ.items() if isinstance(v, str) and travels(k)}
+def hermes_api() -> SimpleNamespace:
+    """Hermes' published launcher functions. An older Hermes lacks them: one line, exit 1."""
+    try:
+        from hermes_cli.chat_launch import hermes_command, print_exit_summary
+        from hermes_cli.gateway_chat import shell_client_env
+        from hermes_cli.session_worktree import create, finish, restore
+    except ImportError:
+        print(TOO_OLD, file=sys.stderr)
+        sys.exit(1)
+    return SimpleNamespace(shell_client_env=shell_client_env, hermes_command=hermes_command,
+                           print_exit_summary=print_exit_summary, create_worktree=create,
+                           restore_worktree=restore, finish_worktree=finish)
 
 
-def create_options(args: argparse.Namespace) -> dict[str, Any]:
+def create_options(args: argparse.Namespace, client_env: dict[str, str]) -> dict[str, Any]:
     """The launch policy as ``session.create`` fields (the shared gateway freezes them with a new session)."""
     options: dict[str, Any] = {}
     for field in ("model", "provider"):
@@ -219,8 +203,8 @@ def create_options(args: argparse.Namespace) -> dict[str, Any]:
     for field in ("yolo", "ignore_rules", "checkpoints", "pass_session_id", "accept_hooks"):
         if _opt(args, field) or _truthy(os.environ.get(ENV_FLAGS.get(field, ""))):
             options[field] = True
-    if env := client_env():
-        options["client_env"] = env
+    if client_env:
+        options["client_env"] = client_env
     return options
 
 
@@ -246,16 +230,18 @@ def node_binary() -> Optional[str]:
     return shutil.which("node")
 
 
-def frontend_env(args: argparse.Namespace, resume: Optional[str], restored: Optional[str], launch_cwd: str) -> dict[str, str]:
+def frontend_env(args: argparse.Namespace, resume: Optional[str], restored: Optional[str], launch_cwd: str,
+                 hermes: SimpleNamespace, session_file: str) -> dict[str, str]:
     from hermes_constants import get_hermes_home
 
     env = {k: v for k, v in os.environ.items() if k not in OWN_ENV}
     cwd = os.getcwd()
     env.update({
         "HERMES_HOME": str(get_hermes_home()),
-        "HERMES_TERN_HERMES": json.dumps(hermes_command()),
+        "HERMES_TERN_HERMES": json.dumps(hermes.hermes_command()),
+        "HERMES_TERN_SESSION_FILE": session_file,
         "HERMES_TERN_CWD": cwd,
-        "HERMES_TERN_CREATE": json.dumps(create_options(args)),
+        "HERMES_TERN_CREATE": json.dumps(create_options(args, hermes.shell_client_env())),
         # The only hosts besides github.com the frontend sends a GitHub token to. Always set, so a
         # value inherited from the shell never widens the list.
         "HERMES_TERN_GITHUB_ENTERPRISE_HOSTS": ",".join(pull_requests.enterprise_hosts()),
@@ -277,35 +263,63 @@ def frontend_env(args: argparse.Namespace, resume: Optional[str], restored: Opti
     return env
 
 
+def _shown_session(session_file: str) -> Optional[str]:
+    """The session the frontend showed last, from the file it writes on every change."""
+    with contextlib.suppress(OSError, ValueError, AttributeError):
+        return str(json.loads(Path(session_file).read_text()).get("session_id") or "").strip() or None
+    return None
+
+
 def run(args: argparse.Namespace) -> None:
     bundle = FRONTEND / "dist" / "entry.js"
     if not bundle.is_file():
         print(f"hermes tern: {bundle} is missing; reinstall the plugin", file=sys.stderr)
         sys.exit(1)
-    if _opt(args, "worktree"):
-        print("hermes tern: --worktree is not supported (Hermes has no public API to make and keep the worktree). "
-              "Make one with `git worktree add`, then run `hermes tern` in it.", file=sys.stderr)
-        sys.exit(2)
+    hermes = hermes_api()
     if image := _opt(args, "image"):
         # Read here: a resume may move to the session's folder.
         args.image = os.path.abspath(os.path.expanduser(image))
     launch_cwd = os.getcwd()
-    resume = pick_session(args)
-    restored = panes.plan(fresh=bool(_opt(args, "new")), explicit=bool(resume))
-    resume = restored or resume
-    # A resumed session opens in its own folder, as `hermes chat --resume` does.
-    if resume and (cwd := _session_cwd(resume)) and os.path.realpath(cwd) != os.path.realpath(launch_cwd):
-        os.chdir(cwd)
     node = node_binary()
     if not node:
         print("hermes tern: Node.js was not found; install it from https://nodejs.org (`hermes doctor` shows how)",
               file=sys.stderr)
         sys.exit(1)
-    env = frontend_env(args, resume, restored, launch_cwd)
+    resume = pick_session(args)
+    restored = panes.plan(fresh=bool(_opt(args, "new")), explicit=bool(resume))
+    resume = restored or resume
+    worktree = None
+    if _opt(args, "worktree"):
+        # As `hermes --tui -w`: a new tree for this launch, also on a resume (which then restores nothing).
+        worktree = hermes.create_worktree()
+        if not worktree:
+            sys.exit(1)
+        os.chdir(worktree["path"])
+    elif resume:
+        # A resumed session whose `-w` tree an earlier quit removed gets it back before its folder is read.
+        hermes.restore_worktree(resume)
+        # A resumed session opens in its own folder, as `hermes chat --resume` does.
+        if (cwd := _session_cwd(resume)) and os.path.realpath(cwd) != os.path.realpath(launch_cwd):
+            os.chdir(cwd)
+    code, shown, session_file = None, resume, None
     try:
-        code = subprocess.call([node, "--expose-gc", str(bundle)], env=env)
-    except KeyboardInterrupt:
-        code = 130
+        fd, session_file = tempfile.mkstemp(prefix="hermes-tern-session-", suffix=".json")
+        os.close(fd)
+        env = frontend_env(args, resume, restored, launch_cwd, hermes, session_file)
+        try:
+            code = subprocess.call([node, "--expose-gc", str(bundle)], env=env)
+        except KeyboardInterrupt:
+            code = 130
+        shown = _shown_session(session_file) or resume
+        if code in QUIT_CODES and shown:
+            hermes.print_exit_summary(shown, command="hermes tern")
+    finally:
+        if session_file:
+            with contextlib.suppress(OSError):
+                os.unlink(session_file)
+        if worktree:
+            # Also when the frontend did not start: the tree made for this launch is not left behind.
+            hermes.finish_worktree(worktree, shown, ask=code in QUIT_CODES)
     if code == NO_TSP_EXIT:
         print("hermes tern: this terminal did not answer the Tern Surface Protocol, so it is not a Tern pane "
               "this program can draw in. Run `hermes tern` in Tern (https://stencil.so/tern), or use `hermes chat`.",

@@ -37,6 +37,23 @@ export function markPane(launch: Pick<LaunchEnv, 'pane' | 'paneCwd'>, sid: Durab
   }
 }
 
+/**
+ * Writes `sid` to the launcher's session file (`{session_id}`, the shape Hermes' own launcher reads):
+ * after the frontend exits, `hermes tern` prints its summary and hands its `-w` tree to that session.
+ * The pane file cannot serve: a quit removes it.
+ */
+export function writeSessionFile(launch: Pick<LaunchEnv, 'sessionFile'>, sid: DurableSessionId) {
+  if (!launch.sessionFile) {
+    return
+  }
+
+  try {
+    writeFileSync(launch.sessionFile, JSON.stringify({ session_id: sid }), { mode: 0o600 })
+  } catch {
+    // Without it the launcher names the session it resumed, or prints no summary.
+  }
+}
+
 /** The user quit: a later `hermes tern` in this pane starts a new session. */
 export function forgetPane(launch: Pick<LaunchEnv, 'pane'>, dir = dataDir()) {
   if (!launch.pane) {

@@ -134,13 +134,14 @@ describe('readLaunchEnv', () => {
         HERMES_TERN_CREATE: '{"model":"m","yolo":true}',
         HERMES_TERN_CWD: '/work',
         HERMES_TERN_EVENT_LOG: '/tmp/events.jsonl',
-        HERMES_TERN_HERMES: '{"argv":["/py","-m","hermes_cli.main"],"env":{"PYTHONPATH":"/src"}}',
+        HERMES_TERN_HERMES: '["/hermes"]',
         HERMES_TERN_IMAGE: ' /tmp/shot.png\n',
         HERMES_TERN_LAUNCH_CWD: '/home/me/project',
         HERMES_TERN_QUERY: '  what is this?  ',
         HERMES_TERN_RESTORED: 'root-1',
         HERMES_TERN_RESUME: ' 20260101_abc ',
         HERMES_TERN_SESSION_CWD: ' /work/tree ',
+        HERMES_TERN_SESSION_FILE: '/tmp/hermes-tern-session-1.json',
         HERMES_TERN_TOOL_PROGRESS: 'verbose',
         HOME: '/home/me',
         TERN_PANE: ' 34505767256143 '
@@ -152,7 +153,7 @@ describe('readLaunchEnv', () => {
       create: { model: 'm', yolo: true },
       cwd: '/work',
       eventLog: '/tmp/events.jsonl',
-      hermes: { argv: ['/py', '-m', 'hermes_cli.main'], env: { PYTHONPATH: '/src' } },
+      hermes: ['/hermes'],
       home: '/home/me',
       image: '/tmp/shot.png',
       pane: '34505767256143',
@@ -161,6 +162,7 @@ describe('readLaunchEnv', () => {
       restored: true,
       resume: '20260101_abc',
       sessionCwd: '/work/tree',
+      sessionFile: '/tmp/hermes-tern-session-1.json',
       toolProgress: 'verbose'
     })
     expect(Object.isFrozen(env)).toBe(true)
@@ -180,9 +182,10 @@ describe('readLaunchEnv', () => {
       restored: false,
       resume: '',
       sessionCwd: '',
+      sessionFile: '',
       toolProgress: ''
     })
-    expect(readLaunchEnv({ HERMES_TERN_CREATE: '[1]', HERMES_TERN_HERMES: '{"argv":[]}' }, '/x')).toMatchObject({ create: {}, hermes: undefined })
+    expect(readLaunchEnv({ HERMES_TERN_CREATE: '[1]', HERMES_TERN_HERMES: '[]' }, '/x')).toMatchObject({ create: {}, hermes: undefined })
     // An empty HERMES_TERN_CWD is no folder; an empty HOME stays as set.
     expect(readLaunchEnv({ HERMES_TERN_CWD: '', HOME: '' }, '/elsewhere')).toMatchObject({ cwd: '/elsewhere', home: '' })
   })

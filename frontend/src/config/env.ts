@@ -12,6 +12,8 @@ import { parseJson } from '../wire/json.js'
 export interface LaunchEnv {
   /** HERMES_TERN_HERMES: how to run this Hermes (the gateway attach, a sidebar); undefined outside `hermes tern`. */
   readonly hermes: HermesCommand | undefined
+  /** HERMES_TERN_SESSION_FILE: where the shown session's id goes, for the launcher's quit summary ('' for none). */
+  readonly sessionFile: string
   /** HERMES_TERN_CREATE: the launch flags as `session.create` fields (model, provider, skills, yolo, …). */
   readonly create: Readonly<Record<string, unknown>>
   /** HERMES_TERN_TOOL_PROGRESS: `-v` / `-Q`, pinned on each new session ('' for the profile's). */
@@ -58,6 +60,7 @@ export function readLaunchEnv(env: NodeJS.ProcessEnv = process.env, cwd: string 
     restored: Boolean(env['HERMES_TERN_RESTORED']?.trim()),
     resume: env['HERMES_TERN_RESUME']?.trim() ?? '',
     sessionCwd: env['HERMES_TERN_SESSION_CWD']?.trim() ?? '',
+    sessionFile: env['HERMES_TERN_SESSION_FILE'] ?? '',
     toolProgress: env['HERMES_TERN_TOOL_PROGRESS']?.trim() ?? ''
   })
 }

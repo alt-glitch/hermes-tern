@@ -25,7 +25,7 @@ export interface Ran {
 }
 
 /** Runs a program; resolves how it exited (a non-zero exit too), rejects when it cannot start or times out. */
-export type Runner = (file: string, args: readonly string[], options: { env?: NodeJS.ProcessEnv; timeout: number }) => Promise<Ran>
+export type Runner = (file: string, args: readonly string[], options: { timeout: number }) => Promise<Ran>
 
 const runFile: Runner = (file, args, options) =>
   new Promise((done, fail) => {
@@ -105,11 +105,8 @@ async function hermesClipboardImage(dest: string, hermes: HermesCommand | undefi
     throw new Error('no Hermes command to read the clipboard with (start the pane with `hermes tern`)')
   }
 
-  const [file, ...args] = hermes.argv
-  const ran = await run(file, [...args, 'clipboard', 'image', '--out', dest, '--json'], {
-    env: { ...process.env, ...hermes.env },
-    timeout: HERMES_TIMEOUT_MS
-  })
+  const [file, ...args] = hermes
+  const ran = await run(file, [...args, 'clipboard', 'image', '--out', dest, '--json'], { timeout: HERMES_TIMEOUT_MS })
   const answer = clipboardAnswer.safeParse(parseJson(ran.stdout.trim())).data
 
   if (answer?.ok && ran.code === 0) {

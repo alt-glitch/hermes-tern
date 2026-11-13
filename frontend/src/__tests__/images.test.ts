@@ -308,7 +308,7 @@ describe('imageSize', () => {
 })
 
 /** The Hermes command the launcher hands the pane. */
-const HERMES: HermesCommand = { argv: ['python', '-m', 'hermes_cli.main'], env: {} }
+const HERMES: HermesCommand = ['hermes']
 
 /** A clipboard read as on Linux, with `runner` in `hermes clipboard image`'s place. */
 const clipboardOf = (runner: Runner): ClipboardReader => use =>
