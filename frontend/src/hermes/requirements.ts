@@ -9,6 +9,7 @@ export const REQUIRED_CAPABILITIES: readonly string[] = [
   'plugin-rpc-v1', // the plugin's own methods and events (viewers.py, charts.py)
   'session-client-v1', // `client` on session.create
   'session-list-picker-v1', // session.list's picker fields
+  'session-list-cursor-v1', // session.list's stored pages (cursor, next_cursor) and query
   'session-transcript-v1' // session.transcript
 ]
 

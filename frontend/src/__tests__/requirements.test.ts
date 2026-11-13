@@ -61,6 +61,16 @@ describe('what the gateway must support', () => {
     ])
   })
 
+  it('opens no session on a gateway whose session list has no cursor', async () => {
+    gw.handlers.set('runtime.describe', () => ({ capabilities: REQUIRED_CAPABILITIES.filter(name => name !== 'session-list-cursor-v1') }))
+    const app = await started()
+
+    expect(gw.methods('session.create')).toHaveLength(0)
+    expect(notices(app)).toEqual([
+      'This Hermes is older than hermes tern needs (it lacks session-list-cursor-v1). Run `hermes update`, then start `hermes tern` again.'
+    ])
+  })
+
   it('asks again on the next gateway.ready when the question failed', async () => {
     gw.handlers.set('runtime.describe', () => {
       throw new Error('socket closed')
