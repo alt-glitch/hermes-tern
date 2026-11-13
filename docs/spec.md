@@ -88,9 +88,11 @@ Sid wants to watch a subagent the way he watches the main chat, and to talk to i
 
 - `/new [title]`: `session.create`. `/branch`, `/fork [title]`: `session.mutate` operation
   `branch` (the view follows the child).
-- `/resume`: one sheet with live sessions first, then stored ones from this folder, then the
-  rest; search, a preview of the conversation, delete with confirm, a "new session" row that
-  takes a first prompt. `/resume <id|title>` resolves directly.
+- `/resume`: one sheet with two tabs, this folder (asked of the gateway by folder) and all
+  folders. Each lists live sessions and stored ones, 200 at a time: more load as the selection
+  nears the end. Search ranks the loaded rows at once and asks the gateway for every stored title
+  and id. A preview of the conversation, delete with confirm. `/resume <id|title>` resolves
+  directly.
 - `/title`.
 - Check: each command works in the lab against the shared gateway.
 

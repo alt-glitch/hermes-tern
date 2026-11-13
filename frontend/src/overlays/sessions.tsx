@@ -1,12 +1,14 @@
 // The session picker (`/resume`, `/sessions`): the conversations the gateway offers
 // (hermes/sessionList.ts), scoped the way `hermes -c` scopes them. The first tab holds this
-// project's sessions (the pane's repo, or its folder); All holds every local one with this
-// project's first. Rows are grouped by last activity, pinned ones on top; a search ranks title,
-// first prompt, folder, branch and id across the tab. The preview (sessions/detail.tsx) shows
-// where the session ran, its whole id, its first prompt and last reply, and the conversation a
-// page at a time, newest first (sessions/preview.ts reads it once the selection rests). Enter resumes; Tab
-// switches the scope; → focuses the preview, where ↑/↓ step through it; ⌥C copies the id; ⌫ on an
-// empty search deletes after a confirm.
+// project's sessions (the pane's repo, or its folder, as the gateway judges it); All holds every
+// local one with this project's first. Each tab reads its next page as the selection nears the end
+// of what is loaded (sessions/listing.ts). Rows are grouped by last activity, pinned ones on top; a
+// search ranks title, first prompt, folder, branch and id across the loaded rows at once, and adds
+// the stored sessions whose title or id holds the text once the gateway answers. The preview
+// (sessions/detail.tsx) shows where the session ran, its whole id, its first prompt and last reply,
+// and the conversation a page at a time, newest first (sessions/preview.ts reads it once the
+// selection rests). Enter resumes; Tab switches the scope; → focuses the preview, where ↑/↓ step
+// through it; ⌥C copies the id; ⌫ on an empty search deletes after a confirm.
 
 import { basename } from 'node:path'
 
@@ -20,13 +22,14 @@ import { errorText } from '../core/errors.js'
 import { Flash } from '../core/flash.js'
 import { storedSessionId } from '../core/ids.js'
 import { mutateSession } from '../hermes/mutate.js'
-import { inWorkspace, listSessions, type ListedSession, sessionLabel, workspaceOf } from '../hermes/sessionList.js'
+import { inWorkspace, type ListedSession, sessionLabel, workspaceOf } from '../hermes/sessionList.js'
 import { gatewayTranscripts, type TranscriptReader } from '../hermes/sessionTranscript.js'
 import { homeTilde } from '../view/format.js'
 
 import type { Overlay } from './overlay.js'
 import { editQuery, hitRuns, moveSelection, rank } from './search.js'
 import { MORE, sessionDetail } from './sessions/detail.js'
+import { Listing, StoredSearch } from './sessions/listing.js'
 import { PreviewLoader } from './sessions/preview.js'
 import { dayOf, itemOf } from './sessions/rows.js'
 
@@ -36,14 +39,17 @@ export type SessionsHost = Pick<ChatPorts, 'changed' | 'close' | 'gw' | 'open' |
 const KEY = 'sessions'
 /** Blocks from the end of what is loaded at which the preview reads its next page. */
 const NEAR_END = 3
+/** Rows from the end of the list at which the picker reads the next page of sessions. */
+const NEAR_END_ROWS = 10
 
 type Tab = 'all' | 'here'
 
 /** Opens the session picker; picking a row resumes that session. */
 export function openSessionPicker(host: SessionsHost, reader: TranscriptReader = gatewayTranscripts(host.gw)) {
   let state: 'loading' | 'ready' | 'error' = 'loading'
-  let sessions: ListedSession[] = []
   let workspace = ''
+  /** Each tab's listing, from the gateway; the search's own listing is in `search`. */
+  let listings: Record<Tab, Listing> | undefined
   let tab: Tab = 'here'
   let query = ''
   let selected: string | undefined
@@ -62,35 +68,63 @@ export function openSessionPicker(host: SessionsHost, reader: TranscriptReader =
   const isCurrent = (s: ListedSession) => [s.id, s.conversation].some(id => id === currentLive || id === currentStored)
   const loader = new PreviewLoader(reader, () => host.changed())
   const copied = new Flash<string>(() => host.changed())
+  const ports = {
+    changed: () => host.changed(),
+    gw: host.gw,
+    // The open session may have no messages yet; every other empty one is litter.
+    keep: (s: ListedSession) => s.messages > 0 || isCurrent(s)
+  }
+  const failed = (error: unknown) => {
+    host.transcript.notice(`Could not read more sessions: ${errorText(error)}`, 'error')
+    host.changed()
+  }
+  const search = new StoredSearch(ports, failed)
 
   const load = async () => {
     state = 'loading'
     host.changed()
 
-    const cwd = host.session.info?.cwd || launchEnv().cwd
-    const [key, listed] = await Promise.all([workspaceOf(cwd), listSessions(host.gw).catch(() => undefined)])
+    workspace = await workspaceOf(host.session.info?.cwd || launchEnv().cwd)
+    listings?.here.close()
+    listings?.all.close()
+    const next = { all: new Listing(ports, {}, true), here: new Listing(ports, { workspace }, true) }
+    listings = next
 
-    if (!listed) {
+    try {
+      await Promise.all([next.here.read(), next.all.read()])
+    } catch {
       state = 'error'
       host.changed()
 
       return
     }
 
-    workspace = key
-    // The open session may have no messages yet; every other empty one is litter.
-    sessions = listed.filter(s => s.messages > 0 || isCurrent(s))
-    tab = sessions.some(s => inWorkspace(s, workspace)) ? 'here' : 'all'
+    tab = next.here.rows.length ? 'here' : 'all'
     selected = rows().find(s => !isCurrent(s))?.id ?? rows()[0]?.id
     state = 'ready'
     host.changed()
   }
 
+  // Only the All tab's grouping and folder badges still judge the folder here: the gateway filters the folder tab.
   const here = (s: ListedSession) => inWorkspace(s, workspace)
-  const rows = () => (tab === 'here' ? sessions.filter(here) : sessions)
+  const rows = () => listings?.[tab].rows ?? []
+  /** The rows the picker holds: both tabs' and the search's. */
+  const held = () => [...(listings?.here.rows ?? []), ...(listings?.all.rows ?? []), ...(search.listing?.rows ?? [])]
+  const find = (id: string | null | undefined) => held().find(s => s.id === id)
+  /** The listing behind the list on show. */
+  const showing = () => (query ? search.listing : listings?.[tab])
+
+  /** Reads the next page of the list on show when the selection is near its end. */
+  const follow = () => {
+    const at = selected === undefined ? -1 : shown.indexOf(selected)
+
+    if (at >= shown.length - NEAR_END_ROWS) {
+      showing()?.read().catch(failed)
+    }
+  }
 
   const resume = (id: string | undefined) => {
-    const s = sessions.find(x => x.id === id)
+    const s = find(id)
 
     if (!s) {
       return
@@ -113,7 +147,10 @@ export function openSessionPicker(host: SessionsHost, reader: TranscriptReader =
     try {
       // A revision-fenced mutation deletes the whole lineage.
       await mutateSession(host.gw, id, 'delete', {})
-      sessions = sessions.filter(s => s.id !== id)
+      for (const listing of [listings?.here, listings?.all, search.listing]) {
+        listing?.drop(id)
+      }
+
       loader.forget(id)
     } catch (error) {
       host.transcript.notice(errorText(error), 'error')
@@ -127,7 +164,9 @@ export function openSessionPicker(host: SessionsHost, reader: TranscriptReader =
       return
     }
 
-    if (sessions.some(s => s.id === selected && isCurrent(s))) {
+    const s = find(selected)
+
+    if (s && isCurrent(s)) {
       host.transcript.notice('The open session cannot be deleted; start a new one first.', 'warning')
     } else {
       deleting = selected
@@ -204,6 +243,7 @@ export function openSessionPicker(host: SessionsHost, reader: TranscriptReader =
   }
 
   const view = (now: number) => {
+    search.set(query, tab === 'here' ? workspace : undefined)
     // Browsing All: pinned first, then this project's, then the rest, each newest first.
     const rank0 = (x: ListedSession) => (x.pinned ? 0 : tab === 'all' && here(x) ? 1 : 2)
     const list = query ? rows() : [...rows()].sort((a, b) => rank0(a) - rank0(b))
@@ -211,9 +251,13 @@ export function openSessionPicker(host: SessionsHost, reader: TranscriptReader =
     const ranked = rank(list, query, s => `${sessionLabel(s)}\n${s.preview} ${s.cwd} ${s.branch} ${s.id}`, { scattered: false })
     const hits: Record<string, [number, number][]> = {}
     const order: (string | PickerGroup)[] = []
+    // The gateway's matches the loaded rows did not rank (not loaded, or matched on an id or an older segment's title), after them.
+    const ranks = new Set(ranked.flatMap(r => [r.item.id, r.item.conversation]))
+    const found = query ? (search.listing?.rows ?? []).filter(s => !ranks.has(s.id) && !ranks.has(s.conversation)) : []
 
     if (query) {
-      order.push({ count: ranked.length, group: 'matches', label: 'Matches' }, ...ranked.map(r => r.item.id))
+      const ids = [...ranked.map(r => r.item.id), ...found.map(s => s.id)]
+      order.push({ count: ids.length, group: 'matches', label: 'Matches' }, ...ids)
     } else {
       const groups = new Map<string, string[]>()
       const add = (label: string, id: string) => groups.set(label, [...(groups.get(label) ?? []), id])
@@ -225,6 +269,10 @@ export function openSessionPicker(host: SessionsHost, reader: TranscriptReader =
       for (const [label, ids] of groups) {
         order.push({ count: ids.length, group: label, label }, ...ids)
       }
+    }
+
+    if (showing()?.loading) {
+      order.push({ group: 'loading', label: 'Loading more…' })
     }
 
     for (const { item, positions } of ranked) {
@@ -247,7 +295,15 @@ export function openSessionPicker(host: SessionsHost, reader: TranscriptReader =
       loader.select(selected)
     }
 
-    return { hits, order }
+    return { hits, items: [...rows(), ...found], order }
+  }
+
+  /** A tab with its count of loaded rows, `200+` while the store may hold more. */
+  const tabOf = (id: Tab, label: string) => {
+    const listing = listings?.[id]
+    const count = listing?.rows.length ?? 0
+
+    return !listing || listing.exhausted ? { count, id, label } : { id, label: [{ t: label }, { s: 'muted' as const, t: `  ${count}+` }] }
   }
 
   const overlay: Overlay = {
@@ -256,9 +312,8 @@ export function openSessionPicker(host: SessionsHost, reader: TranscriptReader =
     node: id => {
       nodeId = id
       const now = Date.now()
-      const { hits, order } = view(now)
-      const s = sessions.find(x => x.id === selected)
-      const hereCount = sessions.filter(here).length
+      const { hits, items, order } = view(now)
+      const s = find(selected)
       const project = workspace ? basename(workspace) : 'This folder'
       const pane = s
         ? sessionDetail({
@@ -291,13 +346,13 @@ export function openSessionPicker(host: SessionsHost, reader: TranscriptReader =
             { format: 'time', id: 'when', priority: 2 }
           ]}
           key={KEY}
-          {...optional('confirm', deleting ? { act: 'confirm', label: 'Delete', text: `Delete “${sessionLabel(sessions.find(x => x.id === deleting) ?? { preview: '', title: '' })}”?` } : undefined)}
-          current={sessions.filter(isCurrent).map(x => x.id)}
+          {...optional('confirm', deleting ? { act: 'confirm', label: 'Delete', text: `Delete “${sessionLabel(find(deleting) ?? { preview: '', title: '' })}”?` } : undefined)}
+          current={items.filter(isCurrent).map(x => x.id)}
           empty={tab === 'here' ? `No sessions in ${project} yet. Tab shows every folder.` : 'No saved sessions yet'}
           focus={focus}
           hits={hits}
           icon="history"
-          items={rows().map(x => itemOf(x, now, tab === 'all' && !here(x)))}
+          items={items.map(x => itemOf(x, now, tab === 'all' && !here(x)))}
           layout="cards"
           noun="sessions"
           onAction={{
@@ -336,6 +391,7 @@ export function openSessionPicker(host: SessionsHost, reader: TranscriptReader =
           onSelect={ev => {
             selected = ev.item
             deleting = null
+            follow()
             host.changed()
           }}
           order={order}
@@ -348,18 +404,18 @@ export function openSessionPicker(host: SessionsHost, reader: TranscriptReader =
           state={state}
           subtitle={[{ s: 'muted', t: workspace ? homeTilde(workspace, launchEnv().home) : '' }]}
           tab={tab}
-          tabs={[
-            { count: hereCount, id: 'here', label: project },
-            { count: sessions.length, id: 'all', label: 'All folders' }
-          ]}
+          tabs={[tabOf('here', project), tabOf('all', 'All folders')]}
           title="Sessions"
-          total={rows().length}
+          total={items.length}
         >
           {pane?.nodes ?? null}
         </picker>
       )
     },
     onClose: () => {
+      listings?.here.close()
+      listings?.all.close()
+      search.dispose()
       loader.dispose()
       copied.dispose()
     },
@@ -398,6 +454,7 @@ export function openSessionPicker(host: SessionsHost, reader: TranscriptReader =
 
         if (moved !== undefined) {
           selected = moved
+          follow()
         } else if (edited !== undefined) {
           query = edited
         }

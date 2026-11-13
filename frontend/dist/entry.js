@@ -14809,7 +14809,7 @@ function effortText(effort2, wire) {
   const shown3 = effort2 === "none" ? "off" : effort2 || DEFAULT_EFFORT;
   return wire && effort2 && wire !== effort2 && effort2 !== "none" ? `${shown3}\u2192${wire}` : shown3;
 }
-async function applyEffort(host, value, scope2) {
+async function applyEffort(host, value, scope) {
   const session2 = host.session;
   const sid = session2.ref.live;
   if (!sid) {
@@ -14819,12 +14819,12 @@ async function applyEffort(host, value, scope2) {
   session2.info = session2.info && withEffort(session2.info, value, void 0);
   host.changed();
   try {
-    if (scope2 === "session") {
+    if (scope === "session") {
       await mutateSession(host.gw, sid, "reasoning", { effort: value });
     } else {
-      await rpc(host.gw, "config.set", { key: "reasoning", scope: scope2, session_id: sid, value });
+      await rpc(host.gw, "config.set", { key: "reasoning", scope, session_id: sid, value });
     }
-    if (scope2 === "global") {
+    if (scope === "global") {
       host.transcript.notice(`Reasoning effort ${value === "none" ? "off" : value} is now the default for new sessions.`);
     }
   } catch (error) {
@@ -15075,7 +15075,7 @@ function openModelPicker(host) {
   let providers = [];
   let current = "";
   let query = "";
-  let scope2 = ALL;
+  let scope = ALL;
   let selected;
   const startEffort = host.session.info?.reasoning_effort || "";
   let effort2 = startEffort || "medium";
@@ -15139,7 +15139,7 @@ function openModelPicker(host) {
     host.changed();
   };
   const view = () => {
-    const inScope = scope2 === ALL ? rows : rows.filter((r) => `provider:${r.provider.slug}` === scope2);
+    const inScope = scope === ALL ? rows : rows.filter((r) => `provider:${r.provider.slug}` === scope);
     const ranked = rank(inScope, query, (r) => `${modelSearchText(r.model)} ${r.providerName} ${r.provider.slug}`);
     const hits = {};
     const order2 = [];
@@ -15151,7 +15151,7 @@ function openModelPicker(host) {
       if (!mine.length) {
         continue;
       }
-      if (scope2 === ALL) {
+      if (scope === ALL) {
         order2.push({ count: mine.length, group: provider.slug, label: name });
       }
       for (const { item: item3, positions } of mine) {
@@ -15223,7 +15223,7 @@ function openModelPicker(host) {
             },
             retry: () => void load2(),
             scope: (ev) => {
-              scope2 = ev.value ?? ALL;
+              scope = ev.value ?? ALL;
               host.changed();
             },
             strip: (ev) => {
@@ -15242,7 +15242,7 @@ function openModelPicker(host) {
           placeholder: "Search models\u2026",
           preview: "side",
           query,
-          scope: scope2,
+          scope,
           scopes,
           ...optional2("selected", selected),
           size: "lg",
@@ -15295,7 +15295,7 @@ function openModelPicker(host) {
       }
       if (k.name === "tab") {
         const ids = [ALL, ...providers.map((p3) => `provider:${p3.provider.slug}`)];
-        scope2 = ids[(ids.indexOf(scope2) + (k.shift ? ids.length - 1 : 1)) % ids.length] ?? ALL;
+        scope = ids[(ids.indexOf(scope) + (k.shift ? ids.length - 1 : 1)) % ids.length] ?? ALL;
         return true;
       }
       const moved2 = moveSelection(k, shown3, selected);
@@ -43033,7 +43033,10 @@ var listRow = object({
   last_active_at: loose(nullable(number2())),
   pinned: loose(nullable(boolean2()))
 });
-var listResult = object({ sessions: _catch(array(unknown()), []) });
+var listResult = object({
+  next_cursor: loose(nullable(string2())),
+  sessions: _catch(array(unknown()), [])
+});
 function listed(r) {
   const startedAt = Math.round((r.started_at ?? 0) * 1e3);
   return {
@@ -43054,21 +43057,21 @@ function listed(r) {
     workspace: r.workspace ?? ""
   };
 }
-async function scope(gw2, which) {
-  const r = await rpcParsed(gw2, "session.list", { limit: LIMIT, picker: true, scope: which }, listResult);
+async function liveSessions(gw2, workspace) {
+  const r = await rpcParsed(gw2, "session.list", { limit: LIMIT, picker: true, scope: "live", ...optional2("workspace", workspace) }, listResult);
   return rowsOf(listRow, r.sessions).map(listed);
 }
-async function listSessions(gw2) {
-  const [live, stored] = await Promise.all([scope(gw2, "live"), scope(gw2, "stored")]);
-  const seen = /* @__PURE__ */ new Set();
-  const out = [];
-  for (const s2 of [...live, ...stored]) {
-    if (!seen.has(s2.conversation) && !seen.has(s2.id)) {
-      seen.add(s2.conversation).add(s2.id);
-      out.push(s2);
-    }
-  }
-  return out.sort((a2, b) => b.lastActive - a2.lastActive);
+async function storedPage(gw2, filter, cursor) {
+  const params = {
+    limit: LIMIT,
+    picker: true,
+    scope: "stored",
+    ...optional2("workspace", filter.workspace),
+    ...optional2("query", filter.query),
+    ...optional2("cursor", cursor)
+  };
+  const r = await rpcParsed(gw2, "session.list", params, listResult);
+  return { next: r.next_cursor ?? null, rows: rowsOf(listRow, r.sessions).map(listed) };
 }
 async function workspaceOf(cwd) {
   try {
@@ -43682,6 +43685,118 @@ function rowNode2(row2) {
   }
 }
 
+// src/overlays/sessions/listing.ts
+var SEARCH_PAUSE = 250;
+var QUERY_MAX = 200;
+var Listing = class {
+  /** `live`: the first read also takes the sessions the gateway serves now, in the same folder. */
+  constructor(ports, filter, live) {
+    this.ports = ports;
+    this.filter = filter;
+    this.live = live;
+  }
+  ports;
+  filter;
+  live;
+  /** The rows read so far, once each, newest activity first. */
+  rows = [];
+  /** A page is being read. */
+  loading = false;
+  /** The next page's cursor; undefined before the first page, null once the store has no more. */
+  #next;
+  /** The ids and conversation ids of every row read, kept rows or not. */
+  #seen = /* @__PURE__ */ new Set();
+  #closed = false;
+  /** The store holds no rows this listing has not read. */
+  get exhausted() {
+    return this.#next === null;
+  }
+  /**
+   * Reads the next page (the first one on the first call). Does nothing while a page is being read,
+   * once the store has no more, or after `close`. Rejects with the gateway's refusal; the rows read
+   * so far stay, and the next call tries the same page again.
+   */
+  async read() {
+    const cursor = this.#next;
+    if (this.loading || cursor === null || this.#closed) {
+      return;
+    }
+    this.loading = true;
+    try {
+      const [live, page] = await Promise.all([
+        this.live && cursor === void 0 ? liveSessions(this.ports.gw, this.filter.workspace) : [],
+        storedPage(this.ports.gw, this.filter, cursor)
+      ]);
+      if (this.#closed) {
+        return;
+      }
+      this.#add([...live, ...page.rows]);
+      this.#next = page.next;
+      this.ports.changed();
+    } finally {
+      this.loading = false;
+    }
+  }
+  /** Forgets row `id` (deleted); a later page that repeats it does not bring it back. */
+  drop(id) {
+    this.rows = this.rows.filter((s2) => s2.id !== id);
+  }
+  /** Drops every reply still to come. */
+  close() {
+    this.#closed = true;
+  }
+  #add(rows) {
+    for (const s2 of rows) {
+      if (!this.#seen.has(s2.conversation) && !this.#seen.has(s2.id)) {
+        this.#seen.add(s2.conversation).add(s2.id);
+        if (this.ports.keep(s2)) {
+          this.rows.push(s2);
+        }
+      }
+    }
+    this.rows.sort((a2, b) => b.lastActive - a2.lastActive);
+  }
+};
+var StoredSearch = class {
+  /** `failed`: a page the gateway refused. */
+  constructor(ports, failed) {
+    this.ports = ports;
+    this.failed = failed;
+  }
+  ports;
+  failed;
+  #listing;
+  #timer;
+  #asked = "";
+  /** The listing for the current text, once it is asked for. */
+  get listing() {
+    return this.#listing;
+  }
+  /** Searches every stored title and id for `text`, in `workspace` when one is named; '' stops. Repeating the last call does nothing. */
+  set(text15, workspace) {
+    const query = text15.trim();
+    const asked2 = `${workspace ?? ""}
+${query}`;
+    if (asked2 === this.#asked) {
+      return;
+    }
+    this.#asked = asked2;
+    this.dispose();
+    if (query && query.length <= QUERY_MAX) {
+      this.#timer = setTimeout(() => {
+        this.#listing = new Listing(this.ports, { query, workspace }, false);
+        this.#listing.read().catch(this.failed);
+      }, SEARCH_PAUSE);
+    }
+  }
+  /** Stops the search: a pending ask is not sent, and a reply still to come is dropped. */
+  dispose() {
+    clearTimeout(this.#timer);
+    this.#listing?.close();
+    this.#listing = void 0;
+  }
+};
+
 // src/overlays/sessions/preview.ts
 var EMPTY_PAGES = 5;
 var PreviewLoader = class {
@@ -43791,10 +43906,11 @@ var PreviewLoader = class {
 // src/overlays/sessions.tsx
 var KEY6 = "sessions";
 var NEAR_END = 3;
+var NEAR_END_ROWS = 10;
 function openSessionPicker(host, reader = gatewayTranscripts(host.gw)) {
   let state = "loading";
-  let sessions = [];
   let workspace = "";
+  let listings;
   let tab2 = "here";
   let query = "";
   let selected;
@@ -43809,27 +43925,50 @@ function openSessionPicker(host, reader = gatewayTranscripts(host.gw)) {
   const isCurrent = (s2) => [s2.id, s2.conversation].some((id) => id === currentLive || id === currentStored);
   const loader = new PreviewLoader(reader, () => host.changed());
   const copied = new Flash(() => host.changed());
+  const ports = {
+    changed: () => host.changed(),
+    gw: host.gw,
+    // The open session may have no messages yet; every other empty one is litter.
+    keep: (s2) => s2.messages > 0 || isCurrent(s2)
+  };
+  const failed = (error) => {
+    host.transcript.notice(`Could not read more sessions: ${errorText(error)}`, "error");
+    host.changed();
+  };
+  const search3 = new StoredSearch(ports, failed);
   const load2 = async () => {
     state = "loading";
     host.changed();
-    const cwd = host.session.info?.cwd || launchEnv().cwd;
-    const [key2, listed2] = await Promise.all([workspaceOf(cwd), listSessions(host.gw).catch(() => void 0)]);
-    if (!listed2) {
+    workspace = await workspaceOf(host.session.info?.cwd || launchEnv().cwd);
+    listings?.here.close();
+    listings?.all.close();
+    const next2 = { all: new Listing(ports, {}, true), here: new Listing(ports, { workspace }, true) };
+    listings = next2;
+    try {
+      await Promise.all([next2.here.read(), next2.all.read()]);
+    } catch {
       state = "error";
       host.changed();
       return;
     }
-    workspace = key2;
-    sessions = listed2.filter((s2) => s2.messages > 0 || isCurrent(s2));
-    tab2 = sessions.some((s2) => inWorkspace(s2, workspace)) ? "here" : "all";
+    tab2 = next2.here.rows.length ? "here" : "all";
     selected = rows().find((s2) => !isCurrent(s2))?.id ?? rows()[0]?.id;
     state = "ready";
     host.changed();
   };
   const here = (s2) => inWorkspace(s2, workspace);
-  const rows = () => tab2 === "here" ? sessions.filter(here) : sessions;
+  const rows = () => listings?.[tab2].rows ?? [];
+  const held = () => [...listings?.here.rows ?? [], ...listings?.all.rows ?? [], ...search3.listing?.rows ?? []];
+  const find2 = (id) => held().find((s2) => s2.id === id);
+  const showing = () => query ? search3.listing : listings?.[tab2];
+  const follow = () => {
+    const at = selected === void 0 ? -1 : shown3.indexOf(selected);
+    if (at >= shown3.length - NEAR_END_ROWS) {
+      showing()?.read().catch(failed);
+    }
+  };
   const resume = (id) => {
-    const s2 = sessions.find((x) => x.id === id);
+    const s2 = find2(id);
     if (!s2) {
       return;
     }
@@ -43845,7 +43984,9 @@ function openSessionPicker(host, reader = gatewayTranscripts(host.gw)) {
     deleting = null;
     try {
       await mutateSession(host.gw, id, "delete", {});
-      sessions = sessions.filter((s2) => s2.id !== id);
+      for (const listing of [listings?.here, listings?.all, search3.listing]) {
+        listing?.drop(id);
+      }
       loader.forget(id);
     } catch (error) {
       host.transcript.notice(errorText(error), "error");
@@ -43856,7 +43997,8 @@ function openSessionPicker(host, reader = gatewayTranscripts(host.gw)) {
     if (!selected) {
       return;
     }
-    if (sessions.some((s2) => s2.id === selected && isCurrent(s2))) {
+    const s2 = find2(selected);
+    if (s2 && isCurrent(s2)) {
       host.transcript.notice("The open session cannot be deleted; start a new one first.", "warning");
     } else {
       deleting = selected;
@@ -43917,14 +44059,18 @@ function openSessionPicker(host, reader = gatewayTranscripts(host.gw)) {
     return true;
   };
   const view = (now) => {
+    search3.set(query, tab2 === "here" ? workspace : void 0);
     const rank0 = (x) => x.pinned ? 0 : tab2 === "all" && here(x) ? 1 : 2;
     const list9 = query ? rows() : [...rows()].sort((a2, b) => rank0(a2) - rank0(b));
     const ranked = rank(list9, query, (s2) => `${sessionLabel(s2)}
 ${s2.preview} ${s2.cwd} ${s2.branch} ${s2.id}`, { scattered: false });
     const hits = {};
     const order2 = [];
+    const ranks = new Set(ranked.flatMap((r) => [r.item.id, r.item.conversation]));
+    const found = query ? (search3.listing?.rows ?? []).filter((s2) => !ranks.has(s2.id) && !ranks.has(s2.conversation)) : [];
     if (query) {
-      order2.push({ count: ranked.length, group: "matches", label: "Matches" }, ...ranked.map((r) => r.item.id));
+      const ids = [...ranked.map((r) => r.item.id), ...found.map((s2) => s2.id)];
+      order2.push({ count: ids.length, group: "matches", label: "Matches" }, ...ids);
     } else {
       const groups = /* @__PURE__ */ new Map();
       const add = (label, id) => groups.set(label, [...groups.get(label) ?? [], id]);
@@ -43934,6 +44080,9 @@ ${s2.preview} ${s2.cwd} ${s2.branch} ${s2.id}`, { scattered: false });
       for (const [label, ids] of groups) {
         order2.push({ count: ids.length, group: label, label }, ...ids);
       }
+    }
+    if (showing()?.loading) {
+      order2.push({ group: "loading", label: "Loading more\u2026" });
     }
     for (const { item: item3, positions } of ranked) {
       if (positions.length) {
@@ -43950,7 +44099,12 @@ ${s2.preview} ${s2.cwd} ${s2.branch} ${s2.id}`, { scattered: false });
       focus = "list";
       loader.select(selected);
     }
-    return { hits, order: order2 };
+    return { hits, items: [...rows(), ...found], order: order2 };
+  };
+  const tabOf = (id, label) => {
+    const listing = listings?.[id];
+    const count2 = listing?.rows.length ?? 0;
+    return !listing || listing.exhausted ? { count: count2, id, label } : { id, label: [{ t: label }, { s: "muted", t: `  ${count2}+` }] };
   };
   const overlay2 = {
     key: KEY6,
@@ -43958,9 +44112,8 @@ ${s2.preview} ${s2.cwd} ${s2.branch} ${s2.id}`, { scattered: false });
     node: (id) => {
       nodeId = id;
       const now = Date.now();
-      const { hits, order: order2 } = view(now);
-      const s2 = sessions.find((x) => x.id === selected);
-      const hereCount = sessions.filter(here).length;
+      const { hits, items, order: order2 } = view(now);
+      const s2 = find2(selected);
       const project = workspace ? basename3(workspace) : "This folder";
       const pane = s2 ? sessionDetail({
         copied: copied.value === s2.id,
@@ -43987,13 +44140,13 @@ ${s2.preview} ${s2.cwd} ${s2.branch} ${s2.id}`, { scattered: false });
             { format: "dim", id: "size", priority: 1 },
             { format: "time", id: "when", priority: 2 }
           ],
-          ...optional2("confirm", deleting ? { act: "confirm", label: "Delete", text: `Delete \u201C${sessionLabel(sessions.find((x) => x.id === deleting) ?? { preview: "", title: "" })}\u201D?` } : void 0),
-          current: sessions.filter(isCurrent).map((x) => x.id),
+          ...optional2("confirm", deleting ? { act: "confirm", label: "Delete", text: `Delete \u201C${sessionLabel(find2(deleting) ?? { preview: "", title: "" })}\u201D?` } : void 0),
+          current: items.filter(isCurrent).map((x) => x.id),
           empty: tab2 === "here" ? `No sessions in ${project} yet. Tab shows every folder.` : "No saved sessions yet",
           focus,
           hits,
           icon: "history",
-          items: rows().map((x) => itemOf2(x, now, tab2 === "all" && !here(x))),
+          items: items.map((x) => itemOf2(x, now, tab2 === "all" && !here(x))),
           layout: "cards",
           noun: "sessions",
           onAction: {
@@ -44032,6 +44185,7 @@ ${s2.preview} ${s2.cwd} ${s2.branch} ${s2.id}`, { scattered: false });
           onSelect: (ev) => {
             selected = ev.item;
             deleting = null;
+            follow();
             host.changed();
           },
           order: order2,
@@ -44044,18 +44198,18 @@ ${s2.preview} ${s2.cwd} ${s2.branch} ${s2.id}`, { scattered: false });
           state,
           subtitle: [{ s: "muted", t: workspace ? homeTilde(workspace, launchEnv().home) : "" }],
           tab: tab2,
-          tabs: [
-            { count: hereCount, id: "here", label: project },
-            { count: sessions.length, id: "all", label: "All folders" }
-          ],
+          tabs: [tabOf("here", project), tabOf("all", "All folders")],
           title: "Sessions",
-          total: rows().length,
+          total: items.length,
           children: pane?.nodes ?? null
         },
         KEY6
       );
     },
     onClose: () => {
+      listings?.here.close();
+      listings?.all.close();
+      search3.dispose();
       loader.dispose();
       copied.dispose();
     },
@@ -44090,6 +44244,7 @@ ${s2.preview} ${s2.cwd} ${s2.branch} ${s2.id}`, { scattered: false });
         const edited = moved2 === void 0 ? editQuery(k, query) : void 0;
         if (moved2 !== void 0) {
           selected = moved2;
+          follow();
         } else if (edited !== void 0) {
           query = edited;
         }
@@ -46280,7 +46435,7 @@ function scoreSlashMenuItem(item3, query) {
 
 // src/hermes/completion.ts
 var TAB_PATH_RE = /(?<=^|\s)((?:["']?(?:[A-Za-z]:[\\/]|\.{1,2}\/|~\/|\/|@|[^"'`\s]+\/))[^\s]*)$/;
-function completionRequestForInput(input2, scope2 = {}) {
+function completionRequestForInput(input2, scope = {}) {
   const isSlashCommand = looksLikeSlashCommand(input2);
   const pathWord = isSlashCommand ? null : input2.match(TAB_PATH_RE)?.[1] ?? null;
   if (isSlashCommand && /^\/model(?:\s|$)/.test(input2)) {
@@ -46296,7 +46451,7 @@ function completionRequestForInput(input2, scope2 = {}) {
   if (!pathWord) {
     return null;
   }
-  const { cwd, sid } = scope2;
+  const { cwd, sid } = scope;
   return {
     method: "complete.path",
     params: { word: pathWord, ...cwd ? { cwd } : {}, ...sid ? { session_id: sid } : {} },
@@ -51726,6 +51881,8 @@ var REQUIRED_CAPABILITIES = [
   // `client` on session.create
   "session-list-picker-v1",
   // session.list's picker fields
+  "session-list-cursor-v1",
+  // session.list's stored pages (cursor, next_cursor) and query
   "session-transcript-v1"
   // session.transcript
 ];
@@ -53764,8 +53921,8 @@ var App = class {
     this.stores.theme.set(mode);
     this.changed();
   }
-  setEffort(value, scope2) {
-    return applyEffort(this, value, scope2);
+  setEffort(value, scope) {
+    return applyEffort(this, value, scope);
   }
 };
 
