@@ -168,6 +168,8 @@ export class App implements ChatPorts {
       Promise.race([s.life.leaveAll('tui_shutdown'), new Promise(resolve => s.timers.timeout(() => resolve(undefined), QUIT_DETACH_MS))])
     ])
     this.dispose()
+    // The record goes before the pane hands the terminal back: a `done` would outlive the session.
+    s.programStatus.clear()
     await this.#tern.close()
     this.#gw.kill('exit')
 
@@ -183,11 +185,25 @@ export class App implements ChatPorts {
     disposeStores(this.stores)
   }
 
-  /** One frame of the whole view, once run() opened the surface. */
+  /** One frame of the whole view, once run() opened the surface, and the run status it shows. */
   #frame() {
     if (this.#view) {
       drawFrame(this.#view)
+      this.#reportStatus()
     }
+  }
+
+  /** Tells Tern whether the session works, waits on the user, finished or failed (OSC 7501). */
+  #reportStatus() {
+    const s = this.stores
+    const last = this.transcript.entries.findLast(e => e.kind === 'turn')
+
+    s.programStatus.sync({
+      lastTurn: last?.end,
+      sid: this.session.ref.live,
+      waiting: s.sheets.waiting(),
+      working: Boolean(s.activity.busy || s.activity.compacting)
+    })
   }
 
   open(overlay: Overlay) {

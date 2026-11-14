@@ -38,6 +38,7 @@ import { adoptSteps } from '../session/adopt.js'
 import { Automation } from '../session/automation.js'
 import { SessionLifecycle } from '../session/lifecycle.js'
 import { markPane, writeSessionFile } from '../session/pane.js'
+import { ProgramStatus } from '../session/programStatus.js'
 import { SessionState } from '../session/state.js'
 import { showThoughts } from '../session/thoughts.js'
 import { SessionTitle } from '../session/title.js'
@@ -263,8 +264,10 @@ export function chatStores(chat: ChatPorts, { act, gw, launch, settings, surface
   const theme = new Theme({ palette: palette => surface().palette(palette), settings }, saved.theme ?? 'tern')
   const completion = new Completion(chat, gw, () => session.ref.live)
   const welcome: WelcomeContext = { version: version && version !== 'unknown' ? `v${version}` : '' }
+  /** The run status Tern shows on the pane and notifies about (OSC 7501), read after every frame. */
+  const programStatus = new ProgramStatus()
 
-  return { ...shared, attachments, completion, cron, life, router, stack, theme, viewer, warned, welcome }
+  return { ...shared, attachments, completion, cron, life, programStatus, router, stack, theme, viewer, warned, welcome }
 }
 
 /** Stops what the stores run on their own: every timer, the polls and the sidebar's reads. */
