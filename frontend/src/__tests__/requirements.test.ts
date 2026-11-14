@@ -12,7 +12,7 @@ import { FakeGateway, fakeTern } from './fakes.js'
 
 process.env['HERMES_HOME'] = mkdtempSync(join(tmpdir(), 'hermes-tern-requirements-'))
 // The tab's title is not this test's; it would print to the runner's terminal.
-vi.mock('../surface/osc.js', () => ({ reportCwd: () => undefined, setTabTitle: () => undefined }))
+vi.mock('../surface/osc.js', () => ({ reportCwd: () => undefined, reportProgramStatus: () => undefined, setTabTitle: () => undefined }))
 
 const { App } = await import('../app/chat.js')
 

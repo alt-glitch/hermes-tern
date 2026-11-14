@@ -7,6 +7,7 @@
 import { type OverlayKey, overlayKey } from '../core/ids.js'
 import { sharedPromptId } from '../hermes/sharedPrompts.js'
 import type { Overlay, OverlayHost } from '../overlays/overlay.js'
+import type { Waiting } from '../session/programStatus.js'
 
 import type { PromptRequest } from './parse.js'
 
@@ -14,6 +15,21 @@ const PREFIX = 'prompt:'
 
 /** The overlay key of the sheet that answers request `id`. */
 export const promptKey = (id: string): OverlayKey => overlayKey(`${PREFIX}${id}`)
+
+/** What `prompt` waits on, as Tern's inbox and notification word it: an approval, a question, or a value to type. */
+export function waitingFor(prompt: PromptRequest): Waiting {
+  switch (prompt.kind) {
+    case 'approval':
+      return { kind: 'permission', msg: `Approve: ${prompt.command || prompt.description}` }
+    case 'clarify': {
+      const open = prompt.questions.find(q => !(q.qid in prompt.answers)) ?? prompt.questions[0]
+
+      return { kind: 'question', msg: open?.question ?? '' }
+    }
+    case 'masked':
+      return { kind: 'auth', msg: prompt.prompt || (prompt.method === 'sudo' ? 'Password for sudo' : prompt.manager || prompt.site || 'A value to type') }
+  }
+}
 
 /** What the prompt sheets reach of the app: its overlay stack. */
 export type SheetsHost = Pick<OverlayHost, 'close' | 'open'> & {
@@ -26,6 +42,8 @@ export class PromptSheets {
   readonly #host: SheetsHost
   /** Open approval sheets' keys → their approval-queue `request_id` (what approval.cancelled names). */
   readonly #approvals = new Map<string, string>()
+  /** Open sheets' keys → what each waits on. */
+  readonly #asks = new Map<string, Waiting>()
 
   constructor(host: SheetsHost) {
     this.#host = host
@@ -34,6 +52,7 @@ export class PromptSheets {
   /** Opens `overlay`, the sheet for `prompt`; an approval's queue id is kept while the sheet is open. */
   open(overlay: Overlay, prompt: PromptRequest) {
     this.#host.open(overlay)
+    this.#asks.set(overlay.key, waitingFor(prompt))
 
     if (prompt.kind === 'approval' && prompt.requestId !== undefined) {
       this.#approvals.set(overlay.key, prompt.requestId)
@@ -43,6 +62,14 @@ export class PromptSheets {
   /** `overlay` left the stack (the app's close): its approval id goes with it. */
   closed(overlay: Overlay) {
     this.#approvals.delete(overlay.key)
+    this.#asks.delete(overlay.key)
+  }
+
+  /** What the newest open question sheet waits on (the pane's run status reports it); undefined with none open. */
+  waiting(): Waiting | undefined {
+    const top = this.#host.overlays.findLast(o => this.#asks.has(o.key))
+
+    return top && this.#asks.get(top.key)
   }
 
   /** Whether the sheet for request `id` is open. */

@@ -22,3 +22,12 @@ export function setTabTitle(title: string, out: Out = process.stdout) {
 export function reportCwd(cwd: string, out: Out = process.stdout) {
   out.write(`\x1b]7;file://${hostname()}${encodeURI(cwd)}\x07`)
 }
+
+/**
+ * OSC 7501: the run status record (`state=working:app=hermes`, session/programStatus.ts builds
+ * the body). Tern shows it on the pane's icon, in its inbox and banners, and as a system
+ * notification while it is in the background.
+ */
+export function reportProgramStatus(body: string, out: Out = process.stdout) {
+  out.write(`\x1b]7501;${body}\x1b\\`)
+}
