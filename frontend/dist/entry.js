@@ -43562,9 +43562,10 @@ function foldOf(turn) {
     return void 0;
   }
   const answer = turn.blocks.findLastIndex((b) => b.kind === "text" && b.text.trim());
+  const replies = steeredReplies(turn.blocks);
   const hidden2 = /* @__PURE__ */ new Set();
   for (const [i, b] of turn.blocks.entries()) {
-    if (i === answer || b.kind === "steer" || b.kind === "compaction" || b.kind === "event") {
+    if (i === answer || replies.has(i) || b.kind === "steer" || b.kind === "compaction" || b.kind === "event") {
       continue;
     }
     if (b.kind === "tool" && (isAsk(b.call) || isBackgroundCall(b.call) || waiting4(b.call) || isConnectCall(b.call) || showsImage(b.call) || b.call.subagents?.some((a2) => a2.status === "running" || a2.status === "queued"))) {
@@ -43580,6 +43581,20 @@ function foldOf(turn) {
   }
   const ms2 = (turnEndedAt(turn) ?? turn.startedAt) - turn.startedAt;
   return { hidden: hidden2, label: workedFor(ms2) };
+}
+function steeredReplies(blocks2) {
+  const out = /* @__PURE__ */ new Set();
+  for (const [i, b] of blocks2.entries()) {
+    if (b.kind !== "steer") {
+      continue;
+    }
+    const j = blocks2.findLastIndex((c, k) => k < i && c.kind !== "steer" && !(c.kind === "text" && !c.text.trim()));
+    const reply2 = blocks2[j];
+    if (reply2?.kind === "text") {
+      out.add(j);
+    }
+  }
+  return out;
 }
 var workedFor = (ms2) => ms2 > 0 ? `Worked for ${durationCompact(ms2)}` : "Worked";
 function parts2(turn) {
