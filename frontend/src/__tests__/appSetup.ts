@@ -67,7 +67,11 @@ export function setup(replies: Record<string, Reply> = {}, { features = [] }: { 
       const note = noteNode ? words(noteNode).join(' ') : undefined
 
       return {
-        actions: r.children.flatMap(c => (c.props['role'] === 'omp.queue.steer' ? ['steer'] : c.props['role'] === 'omp.queue.edit' ? ['edit'] : [])),
+        actions: r.children.flatMap(c => {
+          const action = queueActions[String(c.props['role'])]
+
+          return action ? [action] : []
+        }),
         ...(note === undefined ? {} : { note }),
         text: r.children.find(c => c.props['text'] !== undefined && c.props['role'] !== 'omp.queue.note')?.props['text']
       }
@@ -79,6 +83,9 @@ export function setup(replies: Record<string, Reply> = {}, { features = [] }: { 
 
   return { app, attach, dockText, emit, press, queuedRows, sent, tern, type }
 }
+
+/** A queued row's action buttons by role, as queuedRows names them. */
+const queueActions: Record<string, string> = { 'omp.queue.discard': 'discard', 'omp.queue.edit': 'edit', 'omp.queue.steer': 'steer' }
 
 /** The words under `n`: its text, its spans' text and its children's, in order. */
 function words(n: Node): string[] {
