@@ -6412,6 +6412,7 @@ var PENDING_STATUSES = ["queued", "started", "unknown", "terminal"];
 var isPendingStatus = oneOf(PENDING_STATUSES);
 var pendingRow = object({
   admission_id: pipe(string2(), transform(admissionId)),
+  execution_generation: loose(number2()),
   /** The submission id the submitter chose (this pane's `submission_id`). */
   input_id: loose(pipe(string2(), transform(inputId))),
   status: pipe(optional(unknown()), transform((status) => isPendingStatus(status) ? status : "other")),
@@ -47925,6 +47926,7 @@ var AppActions = class {
       onLoop: () => openAutomation(chat, "loop"),
       onModel: () => openModelPicker(chat),
       onPrs: () => openPrMenu(chat),
+      onQueueDiscard: (i) => queue2.discard(i),
       onQueueEdit: (i) => queue2.dequeue(i),
       onQueueSteer: (i) => queue2.steer(i),
       onRemoveAttachment: (i) => attachments.remove(i),
@@ -48310,6 +48312,18 @@ function queuedNode(queued, on) {
       },
       "steer"
     ) : null,
+    on.discard && q2.kind === "foreign" && q2.note === "unknown" ? /* @__PURE__ */ jsx(
+      "row",
+      {
+        align: "center",
+        gap: "xs",
+        onClick: () => on.discard?.(i),
+        role: "omp.queue.discard",
+        title: "The gateway stopped while this turn ran, so its result is unknown. Discard it so the queued prompts behind it run",
+        children: /* @__PURE__ */ jsx("text", { text: "Discard" }, "t")
+      },
+      "discard"
+    ) : null,
     editable(q2) ? /* @__PURE__ */ jsxs(
       "row",
       {
@@ -48384,7 +48398,7 @@ function dockNodes(cx, on) {
     );
   }
   if (cx.queue.rows.length) {
-    nodes.push(queuedNode(cx.queue.rows, { edit: on.onQueueEdit, steer: cx.queue.canSteer ? on.onQueueSteer : void 0 }));
+    nodes.push(queuedNode(cx.queue.rows, { discard: on.onQueueDiscard, edit: on.onQueueEdit, steer: cx.queue.canSteer ? on.onQueueSteer : void 0 }));
   }
   if (p3.todos?.open) {
     nodes.push(todoPanelNode(p3.todos.list));
@@ -53845,6 +53859,30 @@ var PromptQueue = class {
         this.drain();
       }
       host.changed();
+    });
+  }
+  /**
+   * A row's Discard: tells the gateway that the turn at `index`, whose outcome is unknown, will not
+   * finish (prompt.resolve_unknown), so the prompts queued behind it run. The gateway's next pending
+   * list drops the row; a refusal leaves it and says why.
+   */
+  discard(index2) {
+    const host = this.#host;
+    const ticket = host.ticket();
+    const { sid } = ticket;
+    const q2 = this.server.queued()[index2 - this.#held.length];
+    if (!sid || q2?.kind !== "theirs" || q2.row.status !== "unknown") {
+      return;
+    }
+    const { admission_id, execution_generation } = q2.row;
+    if (execution_generation === void 0) {
+      return host.transcript.notice("Could not discard the turn: the gateway did not say which run it was.", "error");
+    }
+    rpc(host.gw, "prompt.resolve_unknown", { admission_id, execution_generation, session_id: sid }).catch((error) => {
+      if (ticket.isCurrent()) {
+        host.transcript.notice(`Could not discard the turn: ${errorText(error)}`, "error");
+        host.changed();
+      }
     });
   }
   /** Sends the oldest held prompt once the session is adopted and idle (no turn, switch or startup image pending). */
