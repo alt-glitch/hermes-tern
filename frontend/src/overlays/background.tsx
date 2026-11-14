@@ -38,9 +38,11 @@ import {
   type Watchers
 } from '../processes/store.js'
 import { chartNode } from '../processes/widgets/view.js'
+import { settingsFile } from '../settings.js'
 import { isBackgroundCall } from '../transcript/calls.js'
 import { commandLine, describeCommand, oneLine } from '../view/describe.js'
 import { clockSeconds, duration, relative } from '../view/format.js'
+import { shortPath } from '../view/tools/steps.js'
 import { type Fact, facts } from '../view/ui/facts.js'
 
 import type { Overlay } from './overlay.js'
@@ -430,9 +432,9 @@ function preview(p: BackgroundProcess, call: ToolCall | undefined, now: number):
   ]
 }
 
-/** Why `p` has no chart: the chart's own note, else charts are off (settings.json). */
+/** Why `p` has no chart: the chart's own note, else charts are off, in this profile's settings file. */
 function chartNote(p: BackgroundProcess): string {
-  return p.chart ? (p.chart.note ?? 'No chart yet.') : 'Charts are off (`jobCharts: false` in ~/.hermes/hermes-tern/settings.json).'
+  return p.chart ? (p.chart.note ?? 'No chart yet.') : `Charts are off (\`jobCharts: false\` in ${shortPath(settingsFile())}).`
 }
 
 /** The output in a box of `lines` that follows its end. */
