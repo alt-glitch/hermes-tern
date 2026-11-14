@@ -8260,11 +8260,13 @@ function taskCard(call, d, now) {
     meta: meta3 ? [meta3] : void 0,
     name: "task",
     status: working ? "running" : void 0,
-    target: count2 ? plural(count2, "agent") : void 0,
+    ...taskHead(d, count2),
     targetKind: "text",
-    title: "Task",
     took: took2
   };
+}
+function taskHead(d, count2) {
+  return d.background ? { target: count2 ? plural(count2, "background agent") : void 0, title: "Launched" } : { target: count2 ? plural(count2, "agent") : void 0, title: "Task" };
 }
 function settledRows(goals, results) {
   const titles = goals.length ? goals : results.map(() => "Delegated task");
@@ -11774,6 +11776,7 @@ var Charts = class {
     entry.runtime.ingest([entry.tap, ...entry.files], settled2);
     if (settled2) {
       abortRequest(entry);
+      entry.endNote = this.#note(entry);
       entry.authoring = { kind: "frozen" };
     } else {
       this.#maybeAuthor(entry, now);
@@ -11781,7 +11784,9 @@ var Charts = class {
     this.#recompute(entry);
   }
   #recompute(entry) {
-    const view = entry.runtime.view({ authoring: entry.authoring.kind === "requesting", label: entry.process.command });
+    const drawn = entry.runtime.view({ authoring: entry.authoring.kind === "requesting", label: entry.process.command });
+    const note = drawn.state === "fallback" ? this.#note(entry) : void 0;
+    const view = note ? { ...drawn, note } : drawn;
     const key2 = JSON.stringify(view);
     if (key2 === entry.viewKey) {
       return false;
@@ -11789,6 +11794,33 @@ var Charts = class {
     entry.view = view;
     entry.viewKey = key2;
     return true;
+  }
+  /** Why `entry` has no chart now, in the user's words; undefined while one is being written. */
+  #note(entry) {
+    const a2 = entry.authoring;
+    const failed = entry.failure ? `The chart model failed: ${entry.failure.replace(/\.$/, "")}.` : void 0;
+    switch (a2.kind) {
+      case "requesting":
+        return void 0;
+      case "frozen":
+        return entry.endNote ?? "The process ended before a chart was written.";
+      case "unavailable":
+        return "No chart: no auxiliary model is set up for charts (auxiliary.tern_charts in config.yaml).";
+      case "declined": {
+        const why = a2.why?.trim().replace(/\.$/, "");
+        return why && !/^nothing to chart$/i.test(why) ? `Nothing to chart: ${why}.` : "Nothing to chart: the chart model found no quantity in this output.";
+      }
+      case "idle":
+        if (!this.#author) {
+          return "No chart: no chart model (the launcher named no Hermes Python to run it).";
+        }
+        if (a2.attempts >= this.#o.maxAttempts) {
+          return `${failed ?? "The chart model gave no usable rules."} No more tries for this process.`;
+        }
+        return failed ?? `A chart is written once the process has run ${Math.round(this.#o.authorAfterMs / 1e3)}s with output.`;
+      default:
+        return assertNever(a2);
+    }
   }
   /** Starts a spec request once the process is old and talkative enough, or re-authors a spec that stopped fitting. */
   #maybeAuthor(entry, now) {
@@ -11856,8 +11888,9 @@ var Charts = class {
           request.rejected = { answer: answer.answer, errors: answer.errors };
           continue;
         }
-        if (specSkip(answer) !== void 0) {
-          next2 = { atLines: entry.runtime.totalLines, attempts: counted2.attempts, kind: "declined" };
+        const skip = specSkip(answer);
+        if (skip !== void 0) {
+          next2 = { atLines: entry.runtime.totalLines, attempts: counted2.attempts, kind: "declined", why: skip };
           this.#memory?.save(entry.process.id, { skip: next2.atLines });
           break;
         }
@@ -11868,7 +11901,9 @@ var Charts = class {
           request.rejected = { answer: JSON.stringify(answer), errors: checked.errors };
         }
       }
-    } catch {
+      entry.failure = spec || next2.kind !== "idle" ? void 0 : "its rules did not fit the output";
+    } catch (error) {
+      entry.failure = error instanceof Error ? error.message : String(error);
     } finally {
       this.#inFlight--;
       if (entry.authoring.kind === "requesting" && entry.authoring.controller === controller) {
@@ -12022,6 +12057,10 @@ var Processes = class {
   #stopping = /* @__PURE__ */ new Set();
   /** Each process's live chart, kept on `p.chart`. */
   #charts;
+  /** Ids seen running in this pane: only their ends are news (one that had ended before is not). */
+  #seenRunning = /* @__PURE__ */ new Set();
+  /** Ids whose end processEnded told. */
+  #told = /* @__PURE__ */ new Set();
   constructor(host, charts = {}) {
     this.#host = host;
     this.#charts = new Charts(() => this.#chart([...this.#byId.values()]) && this.#host.changed(), charts);
@@ -12159,6 +12198,7 @@ var Processes = class {
         changed = true;
       }
     }
+    this.#watchEnds();
     this.#charts.retain(new Set(this.#byId.keys()));
     changed = this.#chart([...this.#byId.values()]) || changed;
     changed = this.#link(touched) || touched.size > 0 || changed;
@@ -12169,6 +12209,17 @@ var Processes = class {
     }
     if (changed) {
       this.#host.changed();
+    }
+  }
+  /** Notes each process running now, and tells the host of each one seen running that has ended since. */
+  #watchEnds() {
+    for (const p3 of this.#byId.values()) {
+      if (isRunning2(p3)) {
+        this.#seenRunning.add(p3.id);
+      } else if (endOf(p3) && this.#seenRunning.has(p3.id) && !this.#told.has(p3.id)) {
+        this.#told.add(p3.id);
+        this.#host.processEnded?.(p3);
+      }
     }
   }
   /**
@@ -13410,6 +13461,7 @@ function processLine(call, id, now) {
   const p3 = call.process;
   const live = !p3 || isRunning2(p3);
   const tone = p3 ? processTone(p3.state.status) : "muted";
+  const note = p3?.chart?.state === "fallback" ? p3.chart.note : void 0;
   return /* @__PURE__ */ jsxs(
     "row",
     {
@@ -13417,7 +13469,8 @@ function processLine(call, id, now) {
       align: "center",
       gap: "xs",
       role: "omp.tool.process",
-      title: "Open in the Background sheet  \u2325J",
+      title: `${note ? `${note}
+` : ""}Open in the Background sheet (the shells pill opens it too)  \u2325J`,
       children: [
         p3 && live ? /* @__PURE__ */ jsx("spinner", { style: "dots", tone: "accent" }, "state-icon") : /* @__PURE__ */ jsx("icon", { name: p3 ? PROCESS_LOOK[p3.state.status].icon : "pending", tone }, "state-icon"),
         /* @__PURE__ */ jsx("text", { spans: [{ s: tone, t: p3 ? processVerdict(p3) : "starting" }], wrap: "none" }, "state"),
@@ -14242,6 +14295,79 @@ var SHEET_CLICKS = {
   toggle: () => ({ type: "toggleJob" })
 };
 
+// src/settings.ts
+import { mkdirSync as mkdirSync2, writeFileSync } from "node:fs";
+import { homedir as homedir6 } from "node:os";
+import { dirname, join as join3 } from "node:path";
+
+// src/wire/files.ts
+import { readFileSync as readFileSync2 } from "node:fs";
+function readJsonFile(file2) {
+  try {
+    return parseJson(readFileSync2(file2, "utf8"));
+  } catch {
+    return void 0;
+  }
+}
+function isObject2(value) {
+  return typeof value === "object" && value !== null;
+}
+var settingsFile = _catch(
+  object({
+    theme: loose(_enum(["tern", "nous", "skin"])),
+    thoughts: loose(boolean2()),
+    jobCharts: loose(boolean2())
+  }),
+  {}
+);
+function readSettings(file2) {
+  return settingsOf(readStoredSettings(file2));
+}
+function settingsOf(stored) {
+  return settingsFile.parse(stored);
+}
+function readStoredSettings(file2) {
+  const stored = readJsonFile(file2);
+  return isObject2(stored) ? stored : {};
+}
+var watchSpec = object({
+  sid: pipe(string2(), transform(liveSessionId)),
+  subagent: string2(),
+  name: _catch(string2(), ""),
+  goal: _catch(string2(), ""),
+  index: _catch(number2(), 0),
+  startedAt: _catch(number2(), 0)
+});
+function readWatchSpecText(raw2) {
+  const spec = watchSpec.safeParse(raw2 ? parseJson(raw2) : void 0);
+  return spec.success ? spec.data : void 0;
+}
+var skipped = object({ skip: number2() });
+function chartSkip(value) {
+  return skipped.safeParse(value).data;
+}
+
+// src/settings.ts
+function settingsFile2(env2 = process.env) {
+  return join3(env2["HERMES_HOME"] || join3(homedir6(), ".hermes"), "hermes-tern", "settings.json");
+}
+function loadSettings(file2 = settingsFile2()) {
+  return readSettings(file2);
+}
+function saveSettings(patch6, file2 = settingsFile2()) {
+  const next2 = { ...readStoredSettings(file2), ...patch6 };
+  mkdirSync2(dirname(file2), { recursive: true });
+  writeFileSync(file2, `${JSON.stringify(next2, null, 2)}
+`);
+  return settingsOf(next2);
+}
+function fileSettings(file2) {
+  return {
+    load: () => loadSettings(file2 ?? settingsFile2()),
+    save: (patch6) => saveSettings(patch6, file2 ?? settingsFile2())
+  };
+}
+
 // src/overlays/background.tsx
 var KEY2 = "background";
 var TICK_MS2 = 1e3;
@@ -14552,10 +14678,14 @@ function preview(p3, call, now) {
       },
       "facts"
     ),
-    // The chart once its rules are being written or drive it; a plain count of lines says nothing the output does not.
-    ...p3.chart && p3.chart.state !== "fallback" ? [/* @__PURE__ */ jsx("section", { head: "Chart", children: chartNode(p3.chart) }, "chart")] : [],
+    // The chart once its rules are being written or drive it; a plain count of lines says nothing
+    // the output does not, so without one the section says why there is none.
+    /* @__PURE__ */ jsx("section", { head: "Chart", children: p3.chart && p3.chart.state !== "fallback" ? chartNode(p3.chart) : /* @__PURE__ */ jsx("text", { role: "hermes.chart.note", spans: [{ s: "muted", t: chartNote(p3) }], wrap: "word" }, "why") }, "chart"),
     /* @__PURE__ */ jsx("section", { head: "Output", children: outputNodes(p3) }, "output")
   ];
+}
+function chartNote(p3) {
+  return p3.chart ? p3.chart.note ?? "No chart yet." : `Charts are off (\`jobCharts: false\` in ${shortPath(settingsFile2())}).`;
 }
 function outputNodes(p3, lines = 14) {
   return p3.output ? [/* @__PURE__ */ jsx("ansi", { follow: true, max: { h: `${lines}lines` }, text: p3.output.replace(/\n$/, "") }, "out")] : [/* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: isRunning2(p3) ? "No output yet" : "It printed nothing" }] }, "none")];
@@ -20106,7 +20236,7 @@ function htmlKind(value) {
 }
 
 // node_modules/mdast-util-to-markdown/lib/join.js
-var join3 = [joinDefaults];
+var join4 = [joinDefaults];
 function joinDefaults(left, right, parent, state) {
   if (right.type === "code" && formatCodeAsIndented(right, state) && (left.type === "list" || left.type === right.type && formatCodeAsIndented(left, state))) {
     return false;
@@ -23083,7 +23213,7 @@ function toMarkdown(tree, options) {
     handle: void 0,
     indentLines,
     indexStack: [],
-    join: [...join3],
+    join: [...join4],
     options: {},
     safe: safeBound,
     stack: [],
@@ -43434,7 +43564,7 @@ function foldOf(turn) {
   const answer = turn.blocks.findLastIndex((b) => b.kind === "text" && b.text.trim());
   const hidden2 = /* @__PURE__ */ new Set();
   for (const [i, b] of turn.blocks.entries()) {
-    if (i === answer || b.kind === "steer" || b.kind === "compaction") {
+    if (i === answer || b.kind === "steer" || b.kind === "compaction" || b.kind === "event") {
       continue;
     }
     if (b.kind === "tool" && (isAsk(b.call) || isBackgroundCall(b.call) || waiting4(b.call) || isConnectCall(b.call) || showsImage(b.call) || b.call.subagents?.some((a2) => a2.status === "running" || a2.status === "queued"))) {
@@ -44552,55 +44682,6 @@ var CONTROL_COMMANDS = [
 // src/watch/spec.ts
 import { execFile as execFile5 } from "node:child_process";
 import { promisify as promisify3 } from "node:util";
-
-// src/wire/files.ts
-import { readFileSync as readFileSync2 } from "node:fs";
-function readJsonFile(file2) {
-  try {
-    return parseJson(readFileSync2(file2, "utf8"));
-  } catch {
-    return void 0;
-  }
-}
-function isObject2(value) {
-  return typeof value === "object" && value !== null;
-}
-var settingsFile = _catch(
-  object({
-    theme: loose(_enum(["tern", "nous", "skin"])),
-    thoughts: loose(boolean2()),
-    jobCharts: loose(boolean2())
-  }),
-  {}
-);
-function readSettings(file2) {
-  return settingsOf(readStoredSettings(file2));
-}
-function settingsOf(stored) {
-  return settingsFile.parse(stored);
-}
-function readStoredSettings(file2) {
-  const stored = readJsonFile(file2);
-  return isObject2(stored) ? stored : {};
-}
-var watchSpec = object({
-  sid: pipe(string2(), transform(liveSessionId)),
-  subagent: string2(),
-  name: _catch(string2(), ""),
-  goal: _catch(string2(), ""),
-  index: _catch(number2(), 0),
-  startedAt: _catch(number2(), 0)
-});
-function readWatchSpecText(raw2) {
-  const spec = watchSpec.safeParse(raw2 ? parseJson(raw2) : void 0);
-  return spec.success ? spec.data : void 0;
-}
-var skipped = object({ skip: number2() });
-function chartSkip(value) {
-  return skipped.safeParse(value).data;
-}
-
-// src/watch/spec.ts
 var run4 = promisify3(execFile5);
 var WATCH_ENV = "HERMES_TERN_WATCH";
 function readWatchSpec(env2 = process.env) {
@@ -45421,24 +45502,24 @@ async function openHelp(host) {
 }
 
 // src/session/pane.ts
-import { mkdirSync as mkdirSync2, rmSync, writeFileSync } from "node:fs";
-import { join as join5 } from "node:path";
+import { mkdirSync as mkdirSync3, rmSync, writeFileSync as writeFileSync2 } from "node:fs";
+import { join as join6 } from "node:path";
 
 // src/config/dataDir.ts
-import { homedir as homedir6 } from "node:os";
-import { join as join4 } from "node:path";
-var dataDir = (env2 = process.env) => join4(env2["HERMES_HOME"] || join4(homedir6(), ".hermes"), "plugin-data", "hermes-tern");
+import { homedir as homedir7 } from "node:os";
+import { join as join5 } from "node:path";
+var dataDir = (env2 = process.env) => join5(env2["HERMES_HOME"] || join5(homedir7(), ".hermes"), "plugin-data", "hermes-tern");
 
 // src/session/pane.ts
-var paneFile = (pane, dir2 = dataDir()) => join5(dir2, "panes", `${pane}.json`);
+var paneFile = (pane, dir2 = dataDir()) => join6(dir2, "panes", `${pane}.json`);
 function markPane(launch3, sid, dir2 = dataDir()) {
   if (!launch3.pane) {
     return;
   }
   const record3 = { cwd: launch3.paneCwd, pid: process.pid, session_id: sid, updated_at: Date.now() / 1e3 };
   try {
-    mkdirSync2(join5(dir2, "panes"), { recursive: true });
-    writeFileSync(paneFile(launch3.pane, dir2), JSON.stringify(record3));
+    mkdirSync3(join6(dir2, "panes"), { recursive: true });
+    writeFileSync2(paneFile(launch3.pane, dir2), JSON.stringify(record3));
   } catch {
   }
 }
@@ -45447,7 +45528,7 @@ function writeSessionFile(launch3, sid) {
     return;
   }
   try {
-    writeFileSync(launch3.sessionFile, JSON.stringify({ session_id: sid }), { mode: 384 });
+    writeFileSync2(launch3.sessionFile, JSON.stringify({ session_id: sid }), { mode: 384 });
   } catch {
   }
 }
@@ -45459,30 +45540,6 @@ function forgetPane(launch3, dir2 = dataDir()) {
     rmSync(paneFile(launch3.pane, dir2), { force: true });
   } catch {
   }
-}
-
-// src/settings.ts
-import { mkdirSync as mkdirSync3, writeFileSync as writeFileSync2 } from "node:fs";
-import { homedir as homedir7 } from "node:os";
-import { dirname, join as join6 } from "node:path";
-function settingsFile2(env2 = process.env) {
-  return join6(env2["HERMES_HOME"] || join6(homedir7(), ".hermes"), "hermes-tern", "settings.json");
-}
-function loadSettings(file2 = settingsFile2()) {
-  return readSettings(file2);
-}
-function saveSettings(patch6, file2 = settingsFile2()) {
-  const next2 = { ...readStoredSettings(file2), ...patch6 };
-  mkdirSync3(dirname(file2), { recursive: true });
-  writeFileSync2(file2, `${JSON.stringify(next2, null, 2)}
-`);
-  return settingsOf(next2);
-}
-function fileSettings(file2) {
-  return {
-    load: () => loadSettings(file2 ?? settingsFile2()),
-    save: (patch6) => saveSettings(patch6, file2 ?? settingsFile2())
-  };
 }
 
 // src/surface/host.ts
@@ -46522,6 +46579,12 @@ var STYLES = css`
 
   [data-role='hermes.sessions.tool'] {
     font: 12.5px/1.45 var(--mono);
+  }
+
+  /* The Background sheet gives its detail the room: the list about 40%, the detail (command,
+     chart, output) about 60%. A session has few processes, so a wide list is mostly empty. */
+  .sf-picker[data-id='layer.background'] .pk-pv {
+    width: 60% !important;
   }
 `;
 
@@ -47611,12 +47674,17 @@ function shownPills(src, now) {
     todos: shownTodos(src)
   });
 }
-function dockActivity(a2) {
+function dockActivity(a2, agents2 = []) {
   const { busy, compacting } = a2;
   if (busy) {
-    return { kind: "turn", label: busy.label, since: busy.since, startedAt: busy.startedAt };
+    const step = busy.step && { since: busy.step.since, startedAt: busy.step.at };
+    return { kind: "turn", label: busy.label, since: busy.since, startedAt: busy.startedAt, ...step ? { step } : {} };
   }
-  return compacting ? { kind: "compacting", since: compacting.since, startedAt: compacting.startedAt } : IDLE;
+  if (compacting) {
+    return { kind: "compacting", since: compacting.since, startedAt: compacting.startedAt };
+  }
+  const oldest = agents2.reduce((o, x) => o && o.startedAt <= x.startedAt ? o : x, void 0);
+  return oldest ? { count: agents2.length, kind: "agents", since: oldest, startedAt: oldest.startedAt } : IDLE;
 }
 function dockModel(src, now) {
   const { info, usage } = src.session;
@@ -47625,7 +47693,7 @@ function dockModel(src, now) {
   const max = usage?.context_max ?? 0;
   const list9 = shownTodos(src);
   return {
-    activity: dockActivity(src.activity),
+    activity: dockActivity(src.activity, src.agents.running().filter((a2) => !a2.depth)),
     composer: {
       attachments: src.attachments.chips(),
       draft: src.composer,
@@ -47722,7 +47790,8 @@ var AppActions = class {
         this.submit(ev.text);
         changed();
       },
-      onShells: () => openBackground(chat),
+      // The pill opens the sheet on the process its card opens (the longest running), so both are one thing.
+      onShells: () => openBackground(chat, chat.processes.recent()[0]?.id),
       onSubmit: () => {
         this.submitDraft();
         changed();
@@ -48081,6 +48150,7 @@ function queuedNode(queued, on) {
     /* @__PURE__ */ jsx("text", { grow: 1, text: q2.text.replace(/\s*\r?\n\s*/g, " \u21B5 "), truncate: "end", wrap: "none" }, "text"),
     i === 0 && queued.length > 1 ? /* @__PURE__ */ jsx("badge", { role: "omp.queue.count", text: `${queued.length}` }, "count") : null,
     q2.kind === "foreign" && q2.note === "unknown" ? /* @__PURE__ */ jsx("badge", { text: "unknown", tone: "warning" }, "note") : null,
+    q2.why ? /* @__PURE__ */ jsx("text", { role: "omp.queue.note", spans: [{ s: "muted", t: q2.why }], wrap: "none" }, "why") : null,
     on.steer && editable(q2) && q2.steer ? /* @__PURE__ */ jsxs(
       "row",
       {
@@ -48118,11 +48188,11 @@ function queuedTitle(q2) {
   switch (q2.kind) {
     case "local":
     case "mine":
-      return "Queued";
+      return q2.why === void 0 ? "Queued: sent as the next prompt when this turn ends; Steer sends it into this turn now" : "Queued: a steer carries text only, so a prompt with images waits for this turn to end (Esc Esc stops the turn)";
     case "sending":
       return "Queuing\u2026";
     case "foreign":
-      return q2.note === "elsewhere" ? "Queued by another window (or before a reconnect)" : "Queued behind a turn whose outcome is unknown";
+      return q2.why ? "Hermes goes on with this by itself, as a turn of its own once the running one ends; it cannot steer" : q2.note === "elsewhere" ? "Queued by another window (or before a reconnect)" : "Queued behind a turn whose outcome is unknown";
     default:
       return assertNever(q2, "queued row");
   }
@@ -48137,13 +48207,27 @@ function shimmerText(o) {
   return /* @__PURE__ */ jsx("shimmer", { mode: "classic", palette: SHIMMER, ...o.role ? { role: o.role } : {}, spans: [{ s: "muted", t: o.text }] }, o.key);
 }
 function workingRow(w) {
+  const turn = /* @__PURE__ */ jsx("elapsed", { age: age(w.since, w.startedAt, w.now), format: "short" }, "elapsed");
   return /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "omp.working", ...w.title ? { title: w.title } : {}, children: [
     /* @__PURE__ */ jsx("spinner", { style: "starburst", tone: "accent" }, "spinner"),
     shimmerText({ key: "label", role: "omp.working.label", text: w.label }),
     /* @__PURE__ */ jsx("text", { role: "omp.working.sep", text: "\xB7" }, "sep"),
-    /* @__PURE__ */ jsx("elapsed", { age: age(w.since, w.startedAt, w.now), format: "short" }, "elapsed"),
+    w.step ? /* @__PURE__ */ jsx("elapsed", { age: age(w.step.since, w.step.startedAt, w.now), format: "short" }, "step") : turn,
+    w.step ? /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", role: "omp.working.turn", title: "This turn has run this long", children: [
+      /* @__PURE__ */ jsx("text", { role: "omp.working.sep", text: "\xB7" }, "sep"),
+      /* @__PURE__ */ jsx("text", { spans: [{ s: "dim", t: "turn" }] }, "t"),
+      turn
+    ] }, "turn") : null,
     w.trailing
   ] }, "working");
+}
+function waitingAgentsRow(a2) {
+  return /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", onClick: a2.onOpen, role: "hermes.waiting.agents", title: "Hermes goes on by itself when they finish \xB7 click to see them  \u2325A", children: [
+    /* @__PURE__ */ jsx("spinner", { style: "dots", tone: "muted" }, "spinner"),
+    /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: `Waiting for ${plural(a2.count, "background agent")}` }], wrap: "none" }, "label"),
+    /* @__PURE__ */ jsx("text", { role: "omp.working.sep", text: "\xB7" }, "sep"),
+    /* @__PURE__ */ jsx("elapsed", { age: age(a2.since, a2.startedAt, a2.now), format: "short" }, "elapsed")
+  ] }, "agents");
 }
 
 // src/view/dock.tsx
@@ -48195,6 +48279,8 @@ function activityNode(a2, cx, on) {
       return workingNode(a2, cx, on);
     case "compacting":
       return compactingNode(a2, cx.now);
+    case "agents":
+      return waitingAgentsRow({ ...a2, now: cx.now, onOpen: on.onAgents });
     default:
       return assertNever(a2, "dock activity");
   }
@@ -48313,7 +48399,7 @@ function shellsPill(s2, onOpen, focused) {
   const charts = live ? s2.charts ?? [] : [];
   const fresh = latest(charts)?.view;
   const figure = fresh && glance(fresh);
-  const title = ["Background processes  \u2325J", ...charts.map((c) => `${c.process.id}  ${summary(c.view)}`)].join("\n");
+  const title = ["Background tasks (the cards marked background)  \u2325J", ...charts.map((c) => `${c.process.id}  ${summary(c.view)}`)].join("\n");
   const card = hovercard(charts);
   return pill({
     children: [
@@ -48355,6 +48441,7 @@ function workingNode(busy, cx, on) {
     now: cx.now,
     since: busy.since,
     startedAt: busy.startedAt,
+    ...busy.step ? { step: busy.step } : {},
     trailing: [
       /* @__PURE__ */ jsx("row", { grow: 1 }, "fill"),
       cx.pills.todos ? todosPillNode(cx.pills.todos, on.onTodos, false) : null,
@@ -48573,7 +48660,7 @@ function steerText(content5) {
   return (end >= 0 ? body.slice(0, end) : body).trim();
 }
 function steerState(turn, index2) {
-  if (turn.blocks.slice(index2 + 1).some((b) => b.kind !== "steer" && b.kind !== "compaction")) {
+  if (turn.blocks.slice(index2 + 1).some((b) => b.kind !== "steer" && b.kind !== "compaction" && b.kind !== "event")) {
     return "landed";
   }
   return turn.end.status === "live" ? "pending" : "next";
@@ -49185,7 +49272,7 @@ function turnNode(turn, id, cx) {
       ...part.kind === "fold" ? [foldNode(part, `${id}.${part.key}`, pieceNodes(turn, part.blocks, `${id}.${part.key}`, cx))] : pieceNodes(turn, part.blocks, id, cx)
     );
   }
-  const last = pieces(turn.blocks).at(-1);
+  const last = pieces(turn.blocks).findLast((p3) => p3.kind !== "block" || p3.block.kind !== "event");
   const compacting = last?.kind === "block" && last.block.kind === "compaction" && last.block.compaction.state.status === "running";
   const asking2 = last?.kind === "block" && last.block.kind === "tool" && (isAsk(last.block.call) && last.block.call.outcome.kind === "running" || liveOpen(last.block.call.connect));
   if (live && !compacting && !asking2 && (!last || last.kind === "block" && last.block.kind !== "text" || last.kind === "work" && latestFailed(last.items))) {
@@ -49228,9 +49315,10 @@ function pieceNodes(turn, blocks2, parent, cx) {
   const live = turn.end.status === "live";
   const ps = pieces(blocks2, turn.blocks);
   const lastText = blocks2.findLast((b) => b.kind === "text");
+  const tail = ps.findLastIndex((p3) => p3.kind !== "block" || p3.block.kind !== "event");
   return ps.map((p3, i) => {
     if (p3.kind === "work") {
-      return workNode(p3.items, parent, live && i === ps.length - 1 && !latestFailed(p3.items), cx.now);
+      return workNode(p3.items, parent, live && i === tail && !latestFailed(p3.items), cx.now);
     }
     const b = p3.block;
     switch (b.kind) {
@@ -49242,6 +49330,8 @@ function pieceNodes(turn, blocks2, parent, cx) {
         return steerNode(b, steerState(turn, turn.blocks.indexOf(b)));
       case "compaction":
         return compactionNode(b.compaction, b.id, `${parent}.${b.id}`, cx.now);
+      case "event":
+        return eventNode(b);
       case "thinking":
         return null;
     }
@@ -49330,6 +49420,13 @@ function compactionNode(c, key2, id, now) {
     role: "hermes.compaction"
   });
 }
+function eventNode(b) {
+  const icon = b.tone === "success" ? "done" : b.tone === "error" ? "failed" : b.tone === "warning" ? "aborted" : "info";
+  return /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", role: "hermes.event", children: [
+    /* @__PURE__ */ jsx("icon", { name: icon, tone: b.tone === "info" ? "muted" : b.tone }, "icon"),
+    /* @__PURE__ */ jsx("text", { spans: [{ s: "dim", t: b.text }], wrap: "word" }, "text")
+  ] }, b.id);
+}
 function noticeNode(e) {
   const tone = e.tone === "info" ? "muted" : e.tone;
   return /* @__PURE__ */ jsx("text", { role: `omp.notice.${e.tone}`, spans: [{ s: tone, t: e.text }], wrap: "word" }, e.id);
@@ -49396,6 +49493,10 @@ var Agents = class {
   #unseen = /* @__PURE__ */ new WeakMap();
   /** Rows whose end the host heard of. */
   #ended = /* @__PURE__ */ new WeakSet();
+  /** Rows seen running in this pane: only their ends are news (a resumed history's are not). */
+  #seenRunning = /* @__PURE__ */ new WeakSet();
+  /** Rows whose end agentFinished told. */
+  #finished = /* @__PURE__ */ new WeakSet();
   /** The agent the hub shows: its transcript is read while it can grow. */
   #followed;
   /** What each followed agent's transcript read gave, by subagent id. */
@@ -49447,6 +49548,7 @@ var Agents = class {
         bare = true;
       }
     }
+    this.#watchEnds();
     if (bare) {
       this.#probe = true;
       this.#poller.poke();
@@ -49464,6 +49566,7 @@ var Agents = class {
     const listed2 = this.#needsList();
     if (call) {
       this.#host.transcript.mutateCall(call, (c) => this.#streamed.add(foldEvent(c, { at, event, type })));
+      this.#watchEnds();
     }
     if (!listed2 && this.#needsList()) {
       this.#poller.poke();
@@ -49529,6 +49632,7 @@ var Agents = class {
       changed = true;
     }
     if (changed) {
+      this.#watchEnds();
       this.#host.changed();
     }
   }
@@ -49583,6 +49687,7 @@ var Agents = class {
     }
     if (changed.size) {
       changed.forEach((x) => this.#touch(x));
+      this.#watchEnds();
       this.#host.changed();
     }
   }
@@ -49668,6 +49773,23 @@ var Agents = class {
     if (!isRunning(a2) && !this.#ended.has(a2)) {
       this.#ended.add(a2);
       this.#host.agentEnded?.();
+    }
+  }
+  /**
+   * Notes each agent running now, and tells the host of each one seen running that has ended since:
+   * the end of an agent this pane never saw run (a resumed history's) is old news. A row that left
+   * the list with no word on how it ended waits for the delegation's completion (settle) to say.
+   */
+  #watchEnds() {
+    for (const a2 of this.all()) {
+      if (isRunning(a2)) {
+        this.#seenRunning.add(a2);
+      } else if (this.#seenRunning.has(a2) && !this.#finished.has(a2) && a2.exitReason !== OUTCOME_UNKNOWN) {
+        this.#finished.add(a2);
+        if (!a2.depth) {
+          this.#host.agentFinished?.(a2);
+        }
+      }
     }
   }
   /** Each agent with the delegate_task call whose card shows it. */
@@ -52783,6 +52905,7 @@ function blockAt(b) {
       return b.call.startedAt;
     case "steer":
     case "compaction":
+    case "event":
       return b.at;
     case "text":
       return void 0;
@@ -52966,6 +53089,18 @@ var Transcript = class {
       return;
     }
     this.user({ at, attachments, text: text15 });
+  }
+  /**
+   * Background work that ended now (a subagent, a background process): a line in the live turn,
+   * where it happened, else between the turns.
+   */
+  event(text15, tone = "info", at = Date.now()) {
+    const turn = this.live;
+    if (!turn) {
+      return this.notice(text15, tone);
+    }
+    turn.blocks.push({ at, id: this.id("e"), kind: "event", text: text15, tone });
+    turn.rev++;
   }
   notice(text15, tone = "info") {
     this.push({ id: this.id("n"), kind: "notice", text: text15, tone });
@@ -53292,9 +53427,10 @@ var Activity = class {
    * The stream's labels wait while the context is compacted; `status`: a label of the user's or
    * a status line's own (the interrupt's 'Stopping…', a retry), which shows then too.
    */
-  relabel(label, { status = false } = {}) {
-    if (this.#busy && label && (status || this.#compaction.kind === "none")) {
-      this.#busy = { ...this.#busy, label };
+  relabel(label, { now = Date.now(), status = false } = {}) {
+    const busy = this.#busy;
+    if (busy && label && (status || this.#compaction.kind === "none") && label !== busy.label) {
+      this.#busy = { ...busy, label, step: { at: now, since: {} } };
     }
   }
   /**
@@ -53329,6 +53465,7 @@ var Activity = class {
 };
 
 // src/turn/queue.ts
+var IMAGES_WAIT = "has images: waits for this turn";
 var PromptQueue = class {
   /** Prompts held here until they can be sent: no session yet, or a switch in flight. */
   #held = [];
@@ -53368,18 +53505,22 @@ var PromptQueue = class {
   }
   /** The dock's queued rows, in count()'s order, with what each one's Edit and Steer can do. */
   rows() {
-    const steer3 = this.#host.busy();
+    const busy = this.#host.busy();
+    const own14 = (images) => ({ steer: busy && !images, why: busy && images ? IMAGES_WAIT : void 0 });
     return [
-      ...this.#held.map(({ prompt: p3 }) => ({ kind: "local", steer: steer3, text: userText(shownText(p3), p3.images) })),
+      ...this.#held.map(({ prompt: p3 }) => ({ kind: "local", ...own14(p3.images.length), text: userText(shownText(p3), p3.images) })),
       ...this.server.queued().map((q2) => {
         switch (q2.kind) {
-          case "theirs":
-            return { kind: "foreign", note: q2.row.status === "unknown" ? "unknown" : "elsewhere", text: internalNotice(q2.text) ?? q2.text };
+          case "theirs": {
+            const notice = internalNotice(q2.text);
+            const why = notice ? busy ? "starts when this turn ends" : "starts next" : void 0;
+            return { kind: "foreign", note: q2.row.status === "unknown" ? "unknown" : "elsewhere", text: notice ?? q2.text, why };
+          }
           // Withdrawing it needs the gateway's id for it: until prompt.submit answers it is on its way.
           case "sending":
             return { kind: "sending", text: q2.text };
           case "mine":
-            return { kind: "mine", steer: steer3 && !q2.own.item.prompt.images.length, text: q2.text };
+            return { kind: "mine", ...own14(q2.own.item.prompt.images.length), text: q2.text };
         }
       })
     ];
@@ -53650,7 +53791,14 @@ var PromptRouter = class {
     const host = this.#host;
     const ticket = host.ticket();
     const { sid } = ticket;
-    if (!sid || mode === "queue" || prompt.images.length) {
+    if (!sid || mode === "queue") {
+      return this.behind(prompt);
+    }
+    if (prompt.images.length) {
+      host.transcript.notice(
+        `Images cannot join a running turn (a ${mode === "steer" ? "steer" : "redirect"} carries text only), so this prompt waits for the turn to end. Esc Esc stops the turn to send it now.`,
+        "info"
+      );
       return this.behind(prompt);
     }
     const ready = await this.expanded(sid, prompt);
@@ -53748,6 +53896,30 @@ var PromptRouter = class {
   }
 };
 
+// src/view/backgroundLines.ts
+var AGENT_END = {
+  cancelled: { tone: "warning", verb: "was stopped" },
+  done: { tone: "success", verb: "finished" },
+  failed: { tone: "error", verb: "failed" },
+  queued: { tone: "info", verb: "is queued" },
+  running: { tone: "info", verb: "is running" }
+};
+function agentFinishedLine(a2) {
+  const goal = clip(flat(a2.goal.split("\n")[0] ?? ""), { max: 60 });
+  const name = goal ? `Agent "${goal}"` : a2.name ?? `Agent ${a2.index + 1}`;
+  const { tone, verb } = AGENT_END[a2.status];
+  const took2 = a2.duration === void 0 ? "" : ` \xB7 ${durationWhole(a2.duration)}`;
+  return { text: `${name} ${verb}${took2}`, tone };
+}
+function processExitedLine(p3) {
+  const title = clip(describeCommand(p3.command), { max: 60 });
+  const state = p3.state;
+  const exitedAt = "exitedAt" in state ? state.exitedAt : void 0;
+  const took2 = exitedAt === void 0 ? "" : ` \xB7 ${durationWhole(exitedAt - p3.startedAt)}`;
+  const [how, tone] = state.status === "done" ? [`exited (${state.exitCode ?? 0})`, "success"] : state.status === "failed" ? [state.reason === "failed_start" ? "failed to start" : `exited (${state.exitCode ?? "?"})`, "error"] : state.status === "killed" ? ["was stopped", "warning"] : state.status === "lost" ? ["was lost (its gateway restarted)", "warning"] : [state.status, "info"];
+  return { text: `Background task "${title}" ${how}${took2}`, tone };
+}
+
 // src/app/stores.ts
 function chatStores(chat, { act, gw: gw2, launch: launch3, settings: settings2, surface, version: version2 }) {
   const changed = () => chat.changed();
@@ -53758,6 +53930,15 @@ function chatStores(chat, { act, gw: gw2, launch: launch3, settings: settings2, 
   const transcript = new Transcript();
   const activity = new Activity();
   const live = {
+    // Background work this pane saw run ended: a line in the transcript, where the turn is now.
+    agentFinished: (a2) => {
+      const line = agentFinishedLine(a2);
+      transcript.event(line.text, line.tone);
+    },
+    processEnded: (p3) => {
+      const line = processExitedLine(p3);
+      transcript.event(line.text, line.tone);
+    },
     changed,
     gw: gw2,
     // A command's dispatch envelope from outside a typed command (a goal or loop sheet's button).
