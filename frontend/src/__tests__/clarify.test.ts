@@ -243,7 +243,7 @@ describe('a clarify call in its turn', () => {
   it('says the agent waits on the user, not that it thinks, while the sheet is open', () => {
     const running = call(colour, { outcome: { kind: 'running' } })
     const turn: TurnEntry = { blocks: [block(running)], end: { status: 'live' }, id: entryId('t'), kind: 'turn', rev: 0, startedAt: 0 }
-    const cx: TranscriptContext = { copy: () => undefined, now: 9, welcome: { tip: '', version: '' } }
+    const cx: TranscriptContext = { copy: () => undefined, now: 9, welcome: { version: '' } }
 
     expect(JSON.stringify(tree(entryNode(turn, 'main.t', cx)))).not.toContain('Thinking')
     expect(busyLabel(running)).toBe('Waiting for your answer…')

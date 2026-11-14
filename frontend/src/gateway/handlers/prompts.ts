@@ -2,7 +2,7 @@
 // settling (answered here or by another viewer), and a request the gateway withdrew.
 
 import type { ServerRequest } from '@hermes/shared/json-rpc-channel'
-import type { CanonicalClarifyPrompt as ClarifyCard } from '@tui/gatewayTypes.js'
+import type { CanonicalClarifyPrompt as ClarifyCard } from '@hermes/shared/gateway-types'
 
 import { sharedPromptId, sharedPromptRequest } from '../../hermes/sharedPrompts.js'
 import { promptTimeoutNotice } from '../../overlays/prompts.js'
