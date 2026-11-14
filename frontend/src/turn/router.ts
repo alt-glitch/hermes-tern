@@ -187,7 +187,7 @@ export class PromptRouter {
     }
 
     if (r.ok) {
-      host.transcript.steer(shownText(prompt))
+      host.transcript.steer(shownText(prompt), Date.now(), { redirect: mode !== 'steer' })
     } else {
       if (r.error) {
         host.transcript.notice(`${mode === 'steer' ? 'Steer' : 'Redirect'} failed: ${r.error}. Queued instead.`, 'warning')

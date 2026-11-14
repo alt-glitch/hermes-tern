@@ -84,7 +84,7 @@ export const turnHandlers = {
   },
 
   'message.delta': (ev, cx) => {
-    cx.transcript.text(ev.payload?.text ?? '')
+    cx.transcript.text(ev.payload?.text ?? '', Date.now(), ev.payload ?? {})
     cx.activity.relabel('Writing…')
 
     return 'render'
