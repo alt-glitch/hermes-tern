@@ -4647,16 +4647,31 @@ function moved(key2, at, count2) {
 // src/prompts/sheets.ts
 var PREFIX = "prompt:";
 var promptKey = (id) => overlayKey(`${PREFIX}${id}`);
+function waitingFor(prompt) {
+  switch (prompt.kind) {
+    case "approval":
+      return { kind: "permission", msg: `Approve: ${prompt.command || prompt.description}` };
+    case "clarify": {
+      const open = prompt.questions.find((q2) => !(q2.qid in prompt.answers)) ?? prompt.questions[0];
+      return { kind: "question", msg: open?.question ?? "" };
+    }
+    case "masked":
+      return { kind: "auth", msg: prompt.prompt || (prompt.method === "sudo" ? "Password for sudo" : prompt.manager || prompt.site || "A value to type") };
+  }
+}
 var PromptSheets = class {
   #host;
   /** Open approval sheets' keys → their approval-queue `request_id` (what approval.cancelled names). */
   #approvals = /* @__PURE__ */ new Map();
+  /** Open sheets' keys → what each waits on. */
+  #asks = /* @__PURE__ */ new Map();
   constructor(host) {
     this.#host = host;
   }
   /** Opens `overlay`, the sheet for `prompt`; an approval's queue id is kept while the sheet is open. */
   open(overlay2, prompt) {
     this.#host.open(overlay2);
+    this.#asks.set(overlay2.key, waitingFor(prompt));
     if (prompt.kind === "approval" && prompt.requestId !== void 0) {
       this.#approvals.set(overlay2.key, prompt.requestId);
     }
@@ -4664,6 +4679,12 @@ var PromptSheets = class {
   /** `overlay` left the stack (the app's close): its approval id goes with it. */
   closed(overlay2) {
     this.#approvals.delete(overlay2.key);
+    this.#asks.delete(overlay2.key);
+  }
+  /** What the newest open question sheet waits on (the pane's run status reports it); undefined with none open. */
+  waiting() {
+    const top = this.#host.overlays.findLast((o) => this.#asks.has(o.key));
+    return top && this.#asks.get(top.key);
   }
   /** Whether the sheet for request `id` is open. */
   shows(id) {
@@ -47571,6 +47592,9 @@ function setTabTitle(title, out = process.stdout) {
 function reportCwd(cwd, out = process.stdout) {
   out.write(`\x1B]7;file://${hostname()}${encodeURI(cwd)}\x07`);
 }
+function reportProgramStatus(body, out = process.stdout) {
+  out.write(`\x1B]7501;${body}\x1B\\`);
+}
 
 // src/turn/serverQueue.ts
 function busyModeOf(raw2) {
@@ -52808,6 +52832,70 @@ var SessionLifecycle = class {
   }
 };
 
+// src/session/programStatus.ts
+var MSG_MAX_BYTES = 2048;
+var APP = "hermes";
+function runStatus(s2, ranHere) {
+  if (s2.waiting) {
+    return { state: "blocked", ...s2.waiting };
+  }
+  if (s2.working) {
+    return { state: "working" };
+  }
+  if (!ranHere || !s2.lastTurn) {
+    return { state: "idle" };
+  }
+  if (s2.lastTurn.status === "error") {
+    return { msg: s2.lastTurn.error || "The turn failed", state: "error" };
+  }
+  return { state: s2.lastTurn.status === "done" ? "done" : "idle" };
+}
+function encodeMsg(text15) {
+  let line = text15.replace(/[\x00-\x1f\x7f]+/g, " ").replace(/\s+/g, " ").trim();
+  while (Buffer.byteLength(line) > MSG_MAX_BYTES) {
+    line = line.slice(0, Math.floor(line.length * 0.9));
+  }
+  return line ? Buffer.from(line).toString("base64") : "";
+}
+function reportBody(status) {
+  const kind = status.state === "blocked" ? `:kind=${status.kind}` : "";
+  const msg = status.state === "blocked" || status.state === "error" ? encodeMsg(status.msg) : "";
+  return `state=${status.state}${kind}:app=${APP}${msg ? `:msg=${msg}` : ""}`;
+}
+var ProgramStatus = class {
+  #write;
+  /** The body Tern holds now; undefined before the first report and after clear(). */
+  #reported;
+  /** The session this pane last saw working: only its turns' ends count as done or failed. */
+  #ranIn = null;
+  #closed = false;
+  constructor(write = reportProgramStatus) {
+    this.#write = write;
+  }
+  /** Reads the status from `s` and reports it if it changed. */
+  sync(s2) {
+    if (this.#closed) {
+      return;
+    }
+    if (s2.working && s2.sid) {
+      this.#ranIn = s2.sid;
+    }
+    const body = reportBody(runStatus(s2, s2.sid !== null && s2.sid === this.#ranIn));
+    if (body !== this.#reported) {
+      this.#reported = body;
+      this.#write(body);
+    }
+  }
+  /** The pane ends: the record goes, so no `done` outlives the session that set it. */
+  clear() {
+    this.#closed = true;
+    if (this.#reported !== void 0) {
+      this.#reported = void 0;
+      this.#write("state=clear");
+    }
+  }
+};
+
 // src/session/state.ts
 function sessionTicket(shown3, signal) {
   const sid = shown3();
@@ -54357,7 +54445,8 @@ function chatStores(chat, { act, gw: gw2, launch: launch3, settings: settings2, 
   const theme = new Theme({ palette: (palette) => surface().palette(palette), settings: settings2 }, saved.theme ?? "tern");
   const completion2 = new Completion(chat, gw2, () => session2.ref.live);
   const welcome = { version: version2 && version2 !== "unknown" ? `v${version2}` : "" };
-  return { ...shared, attachments, completion: completion2, cron, life, router, stack, theme, viewer, warned, welcome };
+  const programStatus = new ProgramStatus();
+  return { ...shared, attachments, completion: completion2, cron, life, programStatus, router, stack, theme, viewer, warned, welcome };
 }
 function disposeStores(s2) {
   s2.timers.dispose();
@@ -54476,6 +54565,7 @@ var App = class {
       Promise.race([s2.life.leaveAll("tui_shutdown"), new Promise((resolve5) => s2.timers.timeout(() => resolve5(void 0), QUIT_DETACH_MS))])
     ]);
     this.dispose();
+    s2.programStatus.clear();
     await this.#tern.close();
     this.#gw.kill("exit");
     return code7;
@@ -54488,11 +54578,23 @@ var App = class {
     this.#act.dispose();
     disposeStores(this.stores);
   }
-  /** One frame of the whole view, once run() opened the surface. */
+  /** One frame of the whole view, once run() opened the surface, and the run status it shows. */
   #frame() {
     if (this.#view) {
       drawFrame(this.#view);
+      this.#reportStatus();
     }
+  }
+  /** Tells Tern whether the session works, waits on the user, finished or failed (OSC 7501). */
+  #reportStatus() {
+    const s2 = this.stores;
+    const last = this.transcript.entries.findLast((e) => e.kind === "turn");
+    s2.programStatus.sync({
+      lastTurn: last?.end,
+      sid: this.session.ref.live,
+      waiting: s2.sheets.waiting(),
+      working: Boolean(s2.activity.busy || s2.activity.compacting)
+    });
   }
   open(overlay2) {
     this.stores.stack.open(overlay2);
