@@ -72,7 +72,7 @@ async function browser(host: RefusedHost, arg: string) {
       ...(url ? { url } : {})
     })
   } catch (e) {
-    // The shared gateway refuses connect/disconnect (they would switch every chat's browser) and says what to do instead.
+    // The gateway's refusal says what to do instead.
     return note(errorText(e), 'warning')
   }
 
