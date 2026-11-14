@@ -7,6 +7,7 @@
 import type {
   InflightTurn,
   MessageCompletePayload,
+  MessageDeltaPayload,
   ToolCompletePayload,
   ToolStartPayload,
   TranscriptMessage,
@@ -15,7 +16,7 @@ import type {
 
 import { type EntryId, entryId, type ToolCallId, toolCallId } from '../core/ids.js'
 import type { StoredCompaction } from '../hermes/compactions.js'
-import type { Counters, Entry, NoticeEntry, Todo, ToolCall, TurnEntry, UserAttachment } from '../model.js'
+import type { Block, Counters, Entry, NoticeEntry, Todo, ToolCall, TurnEntry, UserAttachment } from '../model.js'
 import { nextVia, settleBridge, unwrap } from '../tools/bridge.js'
 import { detailOf } from '../tools/detail.js'
 import { record } from '../wire/json.js'
@@ -44,6 +45,11 @@ export class Transcript {
    * comes after it lands there, and opens no live turn of its own.
    */
   #ended: TurnEntry | undefined
+  /**
+   * The text block the last stamped message.delta wrote to, and that delta's `turn_id` and
+   * `segment`. A delta with the same pair and an `offset` above 0 is more of the same model reply.
+   */
+  #reply: { block: Extract<Block, { kind: 'text' }>; segment: string } | undefined
   /** The compactions part: a compaction's start, end and take-back, the context readings that size it, its stored summary. */
   readonly compactions = new Compactions({ entries: () => this.#entries, id: prefix => this.id(prefix), live: () => this.#live })
 
@@ -119,12 +125,19 @@ export class Transcript {
   /**
    * A steer the gateway took for the running turn: it shows inside that turn, where it was sent,
    * since the agent reads it before its next step. With no turn running it is a plain prompt.
+   * A `redirect` (session.redirect) is drawn the same way.
    */
-  steer(text: string, at = Date.now()) {
+  steer(text: string, at = Date.now(), { redirect = false } = {}) {
     const turn = this.live
 
     if (!turn) {
       return this.user({ at, text })
+    }
+
+    // A redirect stops the model call. The text after it is a new reply, although Hermes keeps
+    // counting the same segment and offset.
+    if (redirect) {
+      this.#reply = undefined
     }
 
     turn.blocks.push({ at, id: this.id('s'), kind: 'steer', text })
@@ -270,22 +283,46 @@ export class Transcript {
     turn.rev++
   }
 
-  text(text: string, at = Date.now()) {
+  /** A message.delta: `stamp` is where Hermes says the chunk goes in its reply. */
+  text(text: string, at = Date.now(), stamp: Pick<MessageDeltaPayload, 'offset' | 'segment' | 'turn_id'> = {}) {
     if (!text) {
       return
     }
 
     const turn = this.#open(at)
     endThinking(turn, at)
+    const segment = stamp.turn_id && typeof stamp.segment === 'number' ? `${stamp.turn_id}/${stamp.segment}` : undefined
     const last = turn.blocks.at(-1)
+    let block = last?.kind === 'text' ? last : this.#steeredReply(turn, segment, stamp.offset)
 
-    if (last?.kind === 'text') {
-      last.text += text
+    if (block) {
+      block.text += text
     } else {
-      turn.blocks.push({ id: this.id('x'), kind: 'text', text })
+      block = { id: this.id('x'), kind: 'text', text }
+      turn.blocks.push(block)
     }
 
+    this.#reply = segment ? { block, segment } : undefined
     turn.rev++
+  }
+
+  /**
+   * The reply a steer was sent during, when the delta in `segment` at `offset` is more of it.
+   * Hermes does not stop the model call for a steer, so the rest of the reply comes in the same
+   * segment, at an offset above 0. It joins the text before the steer, so the reply reads whole
+   * and the steer stays after it. A new model call comes after a tool, a seal (a new segment) or
+   * in a new run of the agent (a new `turn_id`).
+   */
+  #steeredReply(turn: TurnEntry, segment: string | undefined, offset: number | null | undefined) {
+    const reply = this.#reply
+
+    if (!reply || !segment || reply.segment !== segment || !offset) {
+      return undefined
+    }
+
+    const i = turn.blocks.indexOf(reply.block)
+
+    return i >= 0 && turn.blocks.slice(i + 1).every(b => b.kind === 'steer') ? reply.block : undefined
   }
 
   /** Interim commentary: seals the streamed text so the next delta starts a new block. */
