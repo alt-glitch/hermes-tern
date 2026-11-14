@@ -1,59 +1,108 @@
-// The clarify tool: omp's ask card, each question with its choices and the answers picked.
+// The clarify tool: omp's ask card. Settled, it folds to its head: the question and what the user
+// answered (several questions: their count and each answer). Open, it shows each whole question
+// and every choice offered, the picked ones checked. While the sheet asks, the card says it waits.
 
-import type { JSX } from '@stencil-hq/tern'
+import type { JSX, SpanData } from '@stencil-hq/tern'
 
 import type { ToolCall } from '../../../model.js'
-import type { AskDetail } from '../../../tools/ask.js'
+import { type AskDetail, type AskQuestion, type AskResponse, splitQuestion } from '../../../tools/ask.js'
+import { flat } from '../../format.js'
 import { namedStep } from '../steps.js'
 import type { Card, ToolView } from '../types.js'
 
 /** The clarify tool's view. */
 export const askView: ToolView<'clarify'> = { action: 'other', card: askCard, step: namedStep }
 
-/** The questions asked, their choices (the picked ones checked) and any typed answer. */
+/** The question itself, on one line, for the head: as the sheet titles it. */
+const asking = (q: AskQuestion | undefined) => flat(splitQuestion(q?.question ?? '').ask)
+
 function askCard(call: ToolCall, d: AskDetail): Card {
   const qs = d.questions
+  const several = qs.length > 1
+  // Several questions each read in the body; the head counts them instead of repeating one.
+  const asked = several ? `${qs.length} questions` : asking(qs[0]) || call.context
+  const head = { name: 'ask', targetKind: 'text', title: 'Ask' } as const
+
+  // While the sheet asks, the card only says so: the sheet shows the question and its choices.
+  if (call.outcome.kind === 'running') {
+    return { ...head, body: [<text key="waiting" role="hermes.ask.waiting" spans={[{ s: 'muted', t: 'Waiting for your answer' }]} />], target: asked }
+  }
+
   const body: JSX.Element[] = []
 
+  // Open, the card lists each question with what the user answered and every choice offered.
   for (const [i, q] of qs.entries()) {
-    const choices = q.choices
-    const answers = d.responses[i]?.answers ?? []
-
-    // One question already reads in the head; several each get their own.
-    if (qs.length > 1) {
-      body.push(<md key={`q${i}`}>{q.question ?? ''}</md>)
+    if (several || (q.question ?? '').trim().includes('\n')) {
+      body.push(<md key={`q${i}`} role="hermes.ask.question">{q.question ?? ''}</md>)
     }
 
-    for (const [j, c] of choices.entries()) {
-      body.push(answerRow(`q${i}.o${j}`, c, answers.includes(c)))
+    const r = d.responses[i]
+    const picked = new Set(r?.answers ?? [])
+
+    for (const [j, c] of q.choices.entries()) {
+      body.push(choiceRow(`q${i}.o${j}`, c, picked.has(c)))
     }
 
-    for (const [j, typed] of answers.filter(a => !choices.includes(a)).entries()) {
-      body.push(answerRow(`q${i}.a${j}`, typed, true))
+    // A typed answer, or why there is none, after the choices.
+    for (const [j, typed] of (r?.answers ?? []).filter(a => !q.choices.includes(a)).entries()) {
+      body.push(choiceRow(`q${i}.a${j}`, typed, true))
     }
 
-    // History drops clarify's result: with none, the answer is unknown, not missing.
-    if (!answers.length && call.outcome.kind !== 'running' && d.answered) {
-      const skipped = d.responses[i]?.skipped === true
-      body.push(<text key={`q${i}.none`} role="omp.tool.notice" spans={[{ s: 'muted', t: skipped ? 'Skipped' : 'No answer' }]} />)
+    if (d.answered && r?.status !== 'answered') {
+      body.push(
+        <row align="start" gap="sm" key={`q${i}.none`} role="hermes.ask.verdict">
+          <icon key="icon" name={d.outcome === 'timed_out' ? 'clock' : 'minus'} tone="muted" />
+          <text key="t" spans={[{ s: 'muted', t: noAnswer(r, d) }]} wrap="word" />
+        </row>
+      )
     }
   }
 
-  return {
-    body,
-    name: 'ask',
-    // Several questions each read in the body; the head counts them instead of repeating one.
-    target: qs.length > 1 ? `${qs.length} questions` : (qs[0]?.question ?? call.context),
-    targetKind: 'text',
-    title: 'Ask'
-  }
+  // Folded, the head says what was asked and what the user answered.
+  return { ...head, body, folded: d.answered, target: [{ t: asked }, ...verdictSpans(d)] }
 }
 
-function answerRow(key: string, text: string, picked: boolean): JSX.Element {
+/**
+ * The answers in a settled card's head, after its question: each question's answer, or why it has
+ * none. A call with no result (history drops clarify's) has none: the answer is unknown, not missing.
+ */
+function verdictSpans(d: AskDetail): SpanData[] {
+  if (!d.answered) {
+    return []
+  }
+
+  const parts = d.questions.map((_, i): SpanData => {
+    const r = d.responses[i]
+
+    return r?.status === 'answered' ? { s: 'success', t: r.answers.join(', ') } : { s: 'muted', t: noAnswer(r, d) }
+  })
+
+  return [{ s: 'dim', t: '  →  ' }, ...parts.flatMap((p, i) => (i ? [{ s: 'dim', t: ' · ' }, p] : [p]))]
+}
+
+/** Why a question has no answer, in the user's terms. */
+function noAnswer(r: AskResponse | undefined, d: AskDetail): string {
+  if (r?.status === 'skipped' || d.outcome === 'cancelled') {
+    return 'Skipped'
+  }
+
+  if (d.outcome === 'timed_out') {
+    return 'No answer: the question timed out'
+  }
+
+  if (d.outcome === 'undelivered') {
+    return 'No answer: no window showed the question'
+  }
+
+  return 'No answer'
+}
+
+/** One offered choice: checked when picked, a quiet dot when not. */
+function choiceRow(key: string, text: string, picked: boolean): JSX.Element {
   return (
-    <row key={key} role={picked ? 'omp.tool.answer' : 'omp.tool.answer.off'}>
-      <text key="c" spans={[picked ? { s: 'success', t: '✓' } : { s: 'dim', t: '·' }]} />
-      <text key="t" spans={[{ t: text }]} />
+    <row align="start" gap="sm" key={key} role={picked ? 'hermes.ask.choice.on' : 'hermes.ask.choice'}>
+      {picked ? <icon key="mark" name="check" tone="success" /> : <text key="mark" spans={[{ s: 'dim', t: '·' }]} />}
+      <text key="t" spans={[picked ? { t: text } : { s: 'muted', t: text }]} wrap="word" />
     </row>
   )
 }
