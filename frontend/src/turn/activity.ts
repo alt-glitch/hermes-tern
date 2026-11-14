@@ -1,7 +1,9 @@
 // What the session is doing, as the working line shows it: the busy state (a turn runs, or a
 // prompt's `{!cmd}`s do) and a compaction. Activity is their one owner. Each write replaces the
 // busy object and never edits it, and a relabel keeps its `since`, so the line's age runs on. The
-// label is last-write-wins: 'Stopping…' stays only until the stream's next label.
+// label is last-write-wins: 'Stopping…' stays only until the stream's next label. A new label is a
+// new step with an age of its own (`step`): the turn's age alone made a label set a second ago
+// ("Preparing terminal…" for the second call of a batch) read as stuck for the whole turn.
 //
 // The work that puts a row up (a send, its `{!cmd}`s) holds a ticket for it, and its late answer
 // ends the row only while the ticket is current. The gateway's turn takes the row over when it
@@ -15,6 +17,14 @@ export interface Busy {
   /** Owner of the working row's timer age; kept by a relabel, new per turn. */
   readonly since: object
   readonly label: string
+  /** The step the label names, from when the label last changed; none while it is the turn's first. */
+  readonly step?: Step | undefined
+}
+
+/** One step of the working row: when its label was set, and the object its timer is fixed on. */
+export interface Step {
+  readonly since: object
+  readonly at: number
 }
 
 /** A compaction (Hermes' own, or /compress): its row's age, and whether /compress asked for it. */
@@ -67,9 +77,11 @@ export class Activity {
    * The stream's labels wait while the context is compacted; `status`: a label of the user's or
    * a status line's own (the interrupt's 'Stopping…', a retry), which shows then too.
    */
-  relabel(label: string, { status = false }: { status?: boolean } = {}) {
-    if (this.#busy && label && (status || this.#compaction.kind === 'none')) {
-      this.#busy = { ...this.#busy, label }
+  relabel(label: string, { now = Date.now(), status = false }: { now?: number; status?: boolean } = {}) {
+    const busy = this.#busy
+
+    if (busy && label && (status || this.#compaction.kind === 'none') && label !== busy.label) {
+      this.#busy = { ...busy, label, step: { at: now, since: {} } }
     }
   }
 

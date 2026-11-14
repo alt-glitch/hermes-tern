@@ -80,15 +80,26 @@ export function shownPills(src: PillReads, now: number): Pill[] {
   })
 }
 
-/** What holds the session: the turn first; a compaction shows only with no turn. */
-export function dockActivity(a: DockSources['activity']): DockActivity {
+/**
+ * What holds the session: the turn first; a compaction shows only with no turn; with neither, the
+ * background agents still running (Hermes goes on by itself once they end), timed from the oldest.
+ */
+export function dockActivity(a: DockSources['activity'], agents: readonly { readonly startedAt: number }[] = []): DockActivity {
   const { busy, compacting } = a
 
   if (busy) {
-    return { kind: 'turn', label: busy.label, since: busy.since, startedAt: busy.startedAt }
+    const step = busy.step && { since: busy.step.since, startedAt: busy.step.at }
+
+    return { kind: 'turn', label: busy.label, since: busy.since, startedAt: busy.startedAt, ...(step ? { step } : {}) }
   }
 
-  return compacting ? { kind: 'compacting', since: compacting.since, startedAt: compacting.startedAt } : IDLE
+  if (compacting) {
+    return { kind: 'compacting', since: compacting.since, startedAt: compacting.startedAt }
+  }
+
+  const oldest = agents.reduce<{ readonly startedAt: number } | undefined>((o, x) => (o && o.startedAt <= x.startedAt ? o : x), undefined)
+
+  return oldest ? { count: agents.length, kind: 'agents', since: oldest, startedAt: oldest.startedAt } : IDLE
 }
 
 /** The dock at `now`, from what the stores hold. */
@@ -100,7 +111,7 @@ export function dockModel(src: DockSources, now: number): DockContext {
   const list = shownTodos(src)
 
   return {
-    activity: dockActivity(src.activity),
+    activity: dockActivity(src.activity, src.agents.running().filter(a => !a.depth)),
     composer: {
       attachments: src.attachments.chips(),
       draft: src.composer,

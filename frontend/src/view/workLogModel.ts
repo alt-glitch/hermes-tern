@@ -114,8 +114,9 @@ export function foldOf(turn: TurnEntry): Fold | undefined {
   const hidden = new Set<string>()
 
   for (const [i, b] of turn.blocks.entries()) {
-    // The answer stays, and so do the user's own words and the compactions: neither folds away.
-    if (i === answer || b.kind === 'steer' || b.kind === 'compaction') {
+    // The answer stays, and so do the user's own words, the compactions and the lines saying when
+    // background work ended: none folds away.
+    if (i === answer || b.kind === 'steer' || b.kind === 'compaction' || b.kind === 'event') {
       continue
     }
 

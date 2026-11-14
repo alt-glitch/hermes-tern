@@ -203,6 +203,7 @@ function blockAt(b: Block): number | undefined {
       return b.call.startedAt
     case 'steer':
     case 'compaction':
+    case 'event':
       return b.at
     case 'text':
       return undefined

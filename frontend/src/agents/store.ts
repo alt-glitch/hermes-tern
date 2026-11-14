@@ -33,6 +33,7 @@ import {
   foldEvent,
   isRunning,
   type ListRow,
+  OUTCOME_UNKNOWN,
   nestedChild,
   type Owners,
   ownersOf,
@@ -49,6 +50,8 @@ export interface AgentsHost {
   changed(): void
   /** A subagent ended (the PRs it linked may be new). */
   agentEnded?(): void
+  /** An agent the session spawned, seen running in this pane, has ended now: once per agent (its line in the transcript). */
+  agentFinished?(a: Subagent): void
 }
 
 const POLL_MS = 1000
@@ -76,6 +79,10 @@ export class Agents {
   readonly #unseen = new WeakMap<Subagent, number>()
   /** Rows whose end the host heard of. */
   readonly #ended = new WeakSet<Subagent>()
+  /** Rows seen running in this pane: only their ends are news (a resumed history's are not). */
+  readonly #seenRunning = new WeakSet<Subagent>()
+  /** Rows whose end agentFinished told. */
+  readonly #finished = new WeakSet<Subagent>()
   /** The agent the hub shows: its transcript is read while it can grow. */
   #followed: Subagent | undefined
   /** What each followed agent's transcript read gave, by subagent id. */
@@ -137,6 +144,8 @@ export class Agents {
       }
     }
 
+    this.#watchEnds()
+
     if (bare) {
       // A probe during a round in flight runs right after it.
       this.#probe = true
@@ -157,6 +166,7 @@ export class Agents {
 
     if (call) {
       this.#host.transcript.mutateCall(call, c => this.#streamed.add(foldEvent(c, { at, event, type })))
+      this.#watchEnds()
     }
 
     // A nested child started: the list poll starts for it.
@@ -246,6 +256,7 @@ export class Agents {
     }
 
     if (changed) {
+      this.#watchEnds()
       this.#host.changed()
     }
   }
@@ -321,6 +332,7 @@ export class Agents {
 
     if (changed.size) {
       changed.forEach(x => this.#touch(x))
+      this.#watchEnds()
       this.#host.changed()
     }
   }
@@ -439,6 +451,26 @@ export class Agents {
     if (!isRunning(a) && !this.#ended.has(a)) {
       this.#ended.add(a)
       this.#host.agentEnded?.()
+    }
+  }
+
+  /**
+   * Notes each agent running now, and tells the host of each one seen running that has ended since:
+   * the end of an agent this pane never saw run (a resumed history's) is old news. A row that left
+   * the list with no word on how it ended waits for the delegation's completion (settle) to say.
+   */
+  #watchEnds() {
+    for (const a of this.all()) {
+      if (isRunning(a)) {
+        this.#seenRunning.add(a)
+      } else if (this.#seenRunning.has(a) && !this.#finished.has(a) && a.exitReason !== OUTCOME_UNKNOWN) {
+        this.#finished.add(a)
+
+        // The session's own agents only: a nested child's end is its parent's business.
+        if (!a.depth) {
+          this.#host.agentFinished?.(a)
+        }
+      }
     }
   }
 

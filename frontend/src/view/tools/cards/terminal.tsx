@@ -100,6 +100,8 @@ function processLine(call: ToolCall, id: string, now: number): JSX.Element {
   const p = call.process
   const live = !p || processRuns(p)
   const tone = p ? processTone(p.state.status) : 'muted'
+  // Why the card draws no chart, where its glance would be.
+  const note = p?.chart?.state === 'fallback' ? p.chart.note : undefined
 
   return (
     <row
@@ -108,7 +110,7 @@ function processLine(call: ToolCall, id: string, now: number): JSX.Element {
       gap="xs"
       key="process"
       role="omp.tool.process"
-      title="Open in the Background sheet  ⌥J"
+      title={`${note ? `${note}\n` : ''}Open in the Background sheet (the shells pill opens it too)  ⌥J`}
     >
       {p && live ? (
         <spinner key="state-icon" style="dots" tone="accent" />

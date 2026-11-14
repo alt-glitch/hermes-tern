@@ -22,6 +22,7 @@ export function queuedNode(queued: readonly QueuedRow[], on: QueuedActions): JSX
           <text grow={1} key="text" text={q.text.replace(/\s*\r?\n\s*/g, ' ↵ ')} truncate="end" wrap="none" />
           {i === 0 && queued.length > 1 ? <badge key="count" role="omp.queue.count" text={`${queued.length}`} /> : null}
           {q.kind === 'foreign' && q.note === 'unknown' ? <badge key="note" text="unknown" tone="warning" /> : null}
+          {q.why ? <text key="why" role="omp.queue.note" spans={[{ s: 'muted', t: q.why }]} wrap="none" /> : null}
           {on.steer && editable(q) && q.steer ? (
             <row
               align="center"
@@ -61,13 +62,19 @@ function queuedTitle(q: QueuedRow): string {
     case 'local':
 
     case 'mine':
-      return 'Queued'
+      return q.why === undefined
+        ? 'Queued: sent as the next prompt when this turn ends; Steer sends it into this turn now'
+        : 'Queued: a steer carries text only, so a prompt with images waits for this turn to end (Esc Esc stops the turn)'
 
     case 'sending':
       return 'Queuing…'
 
     case 'foreign':
-      return q.note === 'elsewhere' ? 'Queued by another window (or before a reconnect)' : 'Queued behind a turn whose outcome is unknown'
+      return q.why
+        ? 'Hermes goes on with this by itself, as a turn of its own once the running one ends; it cannot steer'
+        : q.note === 'elsewhere'
+          ? 'Queued by another window (or before a reconnect)'
+          : 'Queued behind a turn whose outcome is unknown'
 
     default:
       return assertNever(q, 'queued row')
