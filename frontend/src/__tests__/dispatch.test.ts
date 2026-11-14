@@ -285,11 +285,12 @@ describe('afterToolComplete', () => {
 })
 
 describe('afterMessageComplete', () => {
-  it('folds the message, ends the turn and any compaction, drains, then reads the PRs and the sidebar again', () => {
+  it('folds the message, ends the turn, checks its figures, ends any compaction, drains, then reads the PRs and the sidebar again', () => {
     const log: string[] = []
     const note = (what: string) => () => void log.push(what)
     const cx: MessageFanout = {
       activity: { endBusy: note('endBusy'), endCompaction: note('endCompaction') },
+      checkFigures: note('checkFigures'),
       drain: note('drain'),
       prs: { poke: note('prs.poke') },
       sidebar: { poke: note('sidebar.poke') },
@@ -299,6 +300,6 @@ describe('afterMessageComplete', () => {
 
     afterMessageComplete({}, cx)
 
-    expect(log).toEqual(['complete', 'endBusy', 'endCompaction', 'uncompact running', 'summarize', 'drain', 'prs.poke', 'sidebar.poke'])
+    expect(log).toEqual(['complete', 'endBusy', 'checkFigures', 'endCompaction', 'uncompact running', 'summarize', 'drain', 'prs.poke', 'sidebar.poke'])
   })
 })

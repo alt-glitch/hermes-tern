@@ -3,11 +3,14 @@
 // `omp.assistant` columns holding streamed `md`, work groups (workLog.tsx) and
 // `tool` cards, and an `omp.turn.usage` footer.
 
-import type { JSX } from '@stencil-hq/tern'
+import { homedir } from 'node:os'
+
+import { type JSX, node } from '@stencil-hq/tern'
 
 import { liveOpen } from '../connections/live.js'
 import { optional } from '../core/assert.js'
 import type { Block, Compaction, Entry, NoticeEntry, TurnEntry, UserAttachment, UserEntry } from '../model.js'
+import { replyParts } from '../replyParts.js'
 import { isAsk } from '../transcript/calls.js'
 import { steerState } from '../transcript/messages.js'
 import { answerText, turnEndedAt } from '../transcript/turns.js'
@@ -247,11 +250,7 @@ function pieceNodes(turn: TurnEntry, blocks: readonly Block[], parent: string, c
 
     switch (b.kind) {
       case 'text':
-        return (
-          <md key={b.id} {...optional('stream', (live && b === lastText) || undefined)}>
-            {b.text}
-          </md>
-        )
+        return textNodes(b.id, b.text, live && b === lastText)
 
       case 'tool':
         return toolNode(b.call, cx.now)
@@ -269,6 +268,34 @@ function pieceNodes(turn: TurnEntry, blocks: readonly Block[], parent: string, c
         return null
     }
   })
+}
+
+/** A text block: its Markdown, with each media line (`MEDIA:/path`) as Tern's viewer for that file. */
+function textNodes(id: string, text: string, streaming: boolean): JSX.Element {
+  const parts = replyParts(text, streaming)
+
+  if (parts.length === 1 && parts[0]?.kind === 'md') {
+    return (
+      <md key={id} {...optional('stream', streaming || undefined)}>
+        {text}
+      </md>
+    )
+  }
+
+  // Its own key: Tern 0.9.12 drops the subtree when a streamed `md` turns into a `col` under one key.
+  return (
+    <col gap="sm" key={`${id}.parts`} role="hermes.reply.parts">
+      {parts.map((p, i) =>
+        p.kind === 'md' ? (
+          <md key={`md${i}`} {...optional('stream', (streaming && i === parts.length - 1) || undefined)}>
+            {p.text}
+          </md>
+        ) : (
+          node('media', { key: `media${i}`, path: p.path.replace(/^~(?=\/)/, homedir()) })
+        )
+      )}
+    </col>
+  )
 }
 
 /** The reason line's icon: agents, a background command, a watcher, or Hermes going on. */

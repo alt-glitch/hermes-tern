@@ -24,6 +24,7 @@ import type { PrKey } from '../core/ids.js'
 import type { Attachments } from '../draft/attachments.js'
 import type { Composer } from '../draft/composer.js'
 import type { KeyCx, Presses } from '../draft/keys.js'
+import { FigureAsk, gatewayFigureCheck } from '../figures.js'
 import { allCompactions, latestCompactions } from '../hermes/compactions.js'
 import { shellError, shellExec, shellLines } from '../hermes/shell.js'
 import type { Media } from '../media.js'
@@ -96,6 +97,8 @@ export class AppActions {
   readonly #copied = new Flash<string>(() => this.#cx.changed())
   /** The folder last reported to Tern by OSC 7. */
   #reportedCwd: string | undefined
+  /** Asks the agent once per prompt to resend a finished reply's figures that would not render. */
+  readonly figures: FigureAsk
   /** What the dock's buttons and fields do. */
   readonly dock: DockActions
   /** What the key rules (draft/keys.ts) reach. */
@@ -109,6 +112,8 @@ export class AppActions {
 
   constructor(cx: ActionsCx) {
     this.#cx = cx
+    // A message the app writes: it leaves the draft's images, and waits behind a running turn.
+    this.figures = new FigureAsk(gatewayFigureCheck(cx.gw), () => cx.state.ref.live, text => cx.router.route({ images: [], kind: 'typed', pasted: [], text }, 'queue'))
     const { attachments, chat, composer, gw, life, queue, transcript } = cx
     const changed = () => cx.changed()
 
@@ -227,6 +232,7 @@ export class AppActions {
   submitDraft() {
     const pasted = [...this.#cx.composer.pasted]
 
+    this.figures.reset()
     this.submit(this.#cx.composer.take(), this.#cx.state.busyMode, pasted)
   }
 

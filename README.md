@@ -58,10 +58,10 @@ A pane remembers its conversation. If `hermes tern` dies in a pane (a crash, a k
 | --- | --- |
 | `hermes tern` | The chat in this plugin's Tern frontend. It runs in a Tern pane only |
 | `link_pull_request`, `unlink_pull_request`, `list_pull_requests` | Tools: the PRs a conversation works on, shown above the composer |
-| Plugin RPC methods (`ctx.register_rpc`) | The pane's own calls to the plugin: which session it shows, a conversation's linked PRs, a chart's rules |
+| Plugin RPC methods (`ctx.register_rpc`) | The pane's own calls to the plugin: which session it shows, a conversation's linked PRs, a chart's rules, a check of a reply's figures |
 | Per-session environment (`ctx.register_session_env`) | The agent's shell commands run with the chat's `TERN_PANE`, so `tern open` works beside the chat |
 | `tern_charts` auxiliary task | Writes the rules behind a background process's live chart (`auxiliary.tern_charts` picks its model) |
-| System prompt section | Tells the agent to link the PRs it opens |
+| System prompt sections | Tell the agent to link the PRs it opens, and (only in a session `hermes tern` started) what Tern draws in a reply |
 
 ## The chat
 
@@ -107,6 +107,20 @@ A turn shows what the agent does while it works: its reasoning, short notes, and
 | `/changes` | The working tree's diff |
 | `/prs [N]` | Pull requests, or PR #N |
 | `/theme` | Paint the chat in Tern's colors, Nous colors or the Hermes skin |
+
+### Figures
+
+Tern draws more than Markdown in a reply: ```` ```mermaid ```` diagrams (through merman, the Rust
+port of Mermaid, so 35 kinds from flowcharts to Wardley maps), ```` ```svg ```` figures in the
+theme's colors, TeX math, 3D fences (` ```stl `, ` ```obj `), callouts and links to files at a line.
+The plugin tells the agent so in sessions `hermes tern` started, and a line `MEDIA:/path` in a reply
+shows that file (an image, PDF, video, audio or 3D model) in Tern's viewer.
+
+After a turn, the plugin checks the reply's diagrams with merman and its svg figures against Tern's
+rules (`figure_check.py`, which fetches merman through Hermes' `uv` on first use). When one would
+not render, it asks the agent once to send it again, with the error and the line.
+
+<img alt="A reply with a broken diagram, math, an svg figure and an image, then the fixed diagram" src="docs/images/figures.png" width="600">
 
 ## Background processes
 
@@ -189,9 +203,9 @@ This section lists what the plugin does beyond drawing the chat, so you can deci
 
 | | |
 | --- | --- |
-| **Network** | GitHub's API, with the token that Hermes gives it: `GITHUB_TOKEN` to `api.github.com` only, and `GITHUB_ENTERPRISE_TOKEN` only to the hosts in `enterprise_hosts`. Redirects to another host are not followed. It is used for the pull request view and for the actions you click; merge and close ask first. The job charts send the command and samples of a background process's output to your own auxiliary model (`auxiliary.tern_charts`), once per process, after Hermes redacts them. Nothing else. **No telemetry.** |
+| **Network** | GitHub's API, with the token that Hermes gives it: `GITHUB_TOKEN` to `api.github.com` only, and `GITHUB_ENTERPRISE_TOKEN` only to the hosts in `enterprise_hosts`. Redirects to another host are not followed. It is used for the pull request view and for the actions you click; merge and close ask first. The job charts send the command and samples of a background process's output to your own auxiliary model (`auxiliary.tern_charts`), once per process, after Hermes redacts them. The first figure check downloads the `merman` package (version 0.8.0) from your Python package index through Hermes' `uv`; later checks use uv's cache. Nothing else. **No telemetry.** |
 | **Commands** | The agent's shell commands get the chat's Tern pane variables (`TERN_PANE` and the window's) in their environment, through Hermes' per-session environment, in sessions that a Tern pane shows. The command itself is not changed: the approval sheet shows exactly what runs. `!cmd` and `{!cmd}` in the composer run through Hermes' own `shell.exec`, so its dangerous-command refusal applies. They run only when you type them: a pasted `{!cmd}` never runs. The composer's `/` commands are Hermes' own. |
-| **Processes** | `hermes tern` runs the frontend with Node, and the frontend runs `hermes gateway attach` each time it connects. A pasted image is read with `osascript` on macOS and with `hermes clipboard image` elsewhere. Opening the sidebar, or a file beside the chat, runs Tern's own `tern` CLI. With `-w`, Hermes' own worktree functions run `git` in the repository. |
+| **Processes** | `hermes tern` runs the frontend with Node, and the frontend runs `hermes gateway attach` each time it connects. A pasted image is read with `osascript` on macOS and with `hermes clipboard image` elsewhere. Opening the sidebar, or a file beside the chat, runs Tern's own `tern` CLI. With `-w`, Hermes' own worktree functions run `git` in the repository. After a reply that has a mermaid or svg figure, the gateway runs `figure_check.py` in a `uv` subprocess, one at a time, with the figure's text on its standard input. |
 | **Reads outside its data** | Hermes' session database, read-only, from the plugin's Python half through Hermes' own `hermes_state` API: a conversation's compression lineage, its subagents' parents and the session a pane resumes. The frontend opens no Hermes file: sessions, transcripts and subagents come from the gateway. The output of the session's background processes, and the log files that their commands write to (for charts). The files you open from the chat. |
 | **Stored data** | `$HERMES_HOME/plugin-data/hermes-tern/`: linked pull requests, the conversation each Tern pane last showed (to resume it after a crash) and chart rules. Which pane shows which session (with its Tern variables) is kept in the gateway's memory only. `$HERMES_HOME/hermes-tern/settings.json`: the theme and chart settings. While a chat runs, a temporary file holds the id of the session the pane shows; `hermes tern` reads it when the chat ends and deletes it. |
 
@@ -205,7 +219,7 @@ flowchart LR
   F <-->|JSON-RPC| G[Hermes gateway<br/>shared by the profile]
   subgraph Hermes
     G --> A[agent + tools]
-    P[hermes-tern plugin<br/>tern_env.py · viewers.py ·<br/>charts.py · pull_requests.py] -.session env, RPC, tools.-> G
+    P[hermes-tern plugin<br/>tern_env.py · viewers.py ·<br/>charts.py · pull_requests.py ·<br/>render_hints.py · figure_check.py] -.session env, RPC, tools.-> G
   end
   A -->|shell commands, with<br/>the pane's TERN_PANE| T
 ```
@@ -215,6 +229,7 @@ flowchart LR
 - **What the frontend reads.** Everything about sessions comes from the gateway: the session picker from `session.list` (a page of 200 at a time, the current folder and the search text filtered by the gateway), its preview and the compaction markers from `session.transcript`, subagent rows from the `subagent.*` events, and a subagent's transcript from `session.transcript` with `subagent_id`. The connect card is the gateway's own (`connection.request`). The frontend opens none of Hermes' files. At each connect it reads `runtime.describe` and needs the capabilities `plugin-rpc-v1`, `session-client-v1`, `session-list-picker-v1`, `session-list-cursor-v1` and `session-transcript-v1`.
 - **`tern_env.py`** is needed because the agent's tools run in that shared gateway, not in the chat's pane. It registers the pane's `TERN_PANE` and window variables with Hermes' `ctx.register_session_env`: Hermes asks for them each time it starts a shell command for a session (in the foreground, in the background, and from a Python cell), and a subagent gets its parent conversation's pane. **`viewers.py`** knows which pane shows which session: each pane tells it over plugin RPC (`viewer.set` when it shows a session, also after a reconnect, and `viewer.clear` when it stops). The command is not changed, so the model, the approval sheet and the shell see the same text. So plain `tern open`, `tern split` and the rest of Tern's CLI act beside the chat. [`docs/tern-blocks.md`](docs/tern-blocks.md) is a short guide to scripting blocks that way: split, run, capture, wait and close.
 - **`pull_requests.py`** holds the link tools and serves `plugin.hermes-tern.pull_requests.linked`, which the pane reads its list from. When a link tool changes the list (also from a subagent), it sends the pane the event `pull_requests.changed`. **`sessions.py`** is the one module that reads Hermes' session database, through `hermes_state`.
+- **`render_hints.py`** registers the prompt section that says what Tern draws. Only a session the frontend created gets it: the frontend names itself on `session.create`, and Hermes gives that name to prompt sections. **`figure_check.py`** serves `plugin.hermes-tern.figures.check`. The first pane to ask about a reply gets the check; the result comes back to the session as the plugin event `figures.checked`.
 - **`charts.py`** serves the plugin RPC method `plugin.hermes-tern.charts.author`. The frontend calls it on its gateway connection when it wants a background process's chart rules. The Python half redacts the samples, asks the auxiliary model (task `tern_charts`, through `ctx.llm`) for one JSON answer, and sends the answer back to the session as a plugin event. The frontend validates the rules and runs them (`frontend/src/processes/widgets/`, ported from omp's job widgets). It uses Node's linear-time regex engine, so no rule can stall the chat.
 
 > [!NOTE]
