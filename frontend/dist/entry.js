@@ -45101,11 +45101,17 @@ async function save(host) {
   host.notice(r?.file ? `Conversation saved to: ${r.file}` : "Could not save the conversation.", r?.file ? "info" : "error");
 }
 async function reloadEnv(host) {
-  const r = await rpc(host.gw, "reload.env", host.sid ? { session_id: host.sid } : {});
+  if (!host.sid) {
+    return host.notice("No active session.", "warning");
+  }
+  const r = await rpc(host.gw, "reload.env", { session_id: host.sid });
   host.notice(`Reloaded .env (${plural(Number(r?.updated ?? 0), "var")} updated).`);
 }
 async function reloadSkills(host) {
-  const r = await rpc(host.gw, "skills.reload", host.sid ? { session_id: host.sid } : {});
+  if (!host.sid) {
+    return host.notice("No active session.", "warning");
+  }
+  const r = await rpc(host.gw, "skills.reload", { session_id: host.sid });
   host.panel("Reload Skills", r?.output?.trim() || "Skills reloaded.");
 }
 async function reloadMcp(host) {
