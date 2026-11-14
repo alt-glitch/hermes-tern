@@ -126,6 +126,8 @@ export interface DockActions {
   onQueueEdit(index: number): void
   /** Inject the queued prompt at `index` into the running turn; offered only while the queue's `canSteer`. */
   onQueueSteer(index: number): void
+  /** Discard the turn at `index` whose outcome is unknown, so the prompts queued behind it run. */
+  readonly onQueueDiscard?: ((index: number) => void) | undefined
   /** Drop the composer's image chip at `index`. */
   onRemoveAttachment(index: number): void
   onAgents(): void
@@ -191,7 +193,7 @@ export function dockNodes(cx: DockContext, on: DockActions): JSX.Element[] {
   }
 
   if (cx.queue.rows.length) {
-    nodes.push(queuedNode(cx.queue.rows, { edit: on.onQueueEdit, steer: cx.queue.canSteer ? on.onQueueSteer : undefined }))
+    nodes.push(queuedNode(cx.queue.rows, { discard: on.onQueueDiscard, edit: on.onQueueEdit, steer: cx.queue.canSteer ? on.onQueueSteer : undefined }))
   }
 
   if (p.todos?.open) {

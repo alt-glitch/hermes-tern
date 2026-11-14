@@ -1,13 +1,18 @@
 // The dock's queued prompts: one row per prompt waiting behind the turn, oldest first, with the
-// Edit and Steer this pane can do on it (turn/queue.ts builds the rows).
+// Edit and Steer this pane can do on it, and Discard on a turn whose outcome is unknown
+// (turn/queue.ts builds the rows).
 
 import type { JSX } from '@stencil-hq/tern'
 
 import { assertNever } from '../core/assert.js'
 import type { QueuedRow } from '../turn/queue.js'
 
-/** What a queued row's buttons do, by its index: Edit pulls it into the composer; Steer (absent when no turn runs) sends it into the turn. */
+/**
+ * What a queued row's buttons do, by its index: Edit pulls it into the composer; Steer (absent when
+ * no turn runs) sends it into the turn; Discard drops a turn whose outcome is unknown.
+ */
 export interface QueuedActions {
+  discard?: ((index: number) => void) | undefined
   edit(index: number): void
   steer?: ((index: number) => void) | undefined
 }
@@ -35,6 +40,18 @@ export function queuedNode(queued: readonly QueuedRow[], on: QueuedActions): JSX
               <icon key="i" name="corner-up-right" />
               {i === 0 ? <kbd key="k" keys={['alt', 'enter']} /> : null}
               <text key="t" text="Steer" />
+            </row>
+          ) : null}
+          {on.discard && q.kind === 'foreign' && q.note === 'unknown' ? (
+            <row
+              align="center"
+              gap="xs"
+              key="discard"
+              onClick={() => on.discard?.(i)}
+              role="omp.queue.discard"
+              title="The gateway stopped while this turn ran, so its result is unknown. Discard it so the queued prompts behind it run"
+            >
+              <text key="t" text="Discard" />
             </row>
           ) : null}
           {editable(q) ? (

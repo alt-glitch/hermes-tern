@@ -133,6 +133,7 @@ export class AppActions {
       onLoop: () => openAutomation(chat, 'loop'),
       onModel: () => openModelPicker(chat),
       onPrs: () => openPrMenu(chat),
+      onQueueDiscard: i => queue.discard(i),
       onQueueEdit: i => queue.dequeue(i),
       onQueueSteer: i => queue.steer(i),
       onRemoveAttachment: i => attachments.remove(i),

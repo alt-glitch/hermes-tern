@@ -34,7 +34,7 @@ interface Held {
  * pane's row in the shared gateway's queue. Both have Edit, and Steer while `steer` says so.
  * `sending`: this pane's row still on its way to the gateway; `foreign`: another window's row
  * (`elsewhere`: queued there or before a reconnect; `unknown`: its turn's outcome is unknown).
- * The last two are shown, not acted on. `why`: why a row that cannot steer waits, shown on it (a
+ * The last two are shown, not acted on, except that an `unknown` row offers Discard. `why`: why a row that cannot steer waits, shown on it (a
  * prompt with images, Hermes' own follow-up turn); a row that can steer says nothing.
  */
 export type QueuedRow =
@@ -294,6 +294,35 @@ export class PromptQueue {
       }
 
       host.changed()
+    })
+  }
+
+  /**
+   * A row's Discard: tells the gateway that the turn at `index`, whose outcome is unknown, will not
+   * finish (prompt.resolve_unknown), so the prompts queued behind it run. The gateway's next pending
+   * list drops the row; a refusal leaves it and says why.
+   */
+  discard(index: number) {
+    const host = this.#host
+    const ticket = host.ticket()
+    const { sid } = ticket
+    const q = this.server.queued()[index - this.#held.length]
+
+    if (!sid || q?.kind !== 'theirs' || q.row.status !== 'unknown') {
+      return
+    }
+
+    const { admission_id, execution_generation } = q.row
+
+    if (execution_generation === undefined) {
+      return host.transcript.notice('Could not discard the turn: the gateway did not say which run it was.', 'error')
+    }
+
+    rpc(host.gw, 'prompt.resolve_unknown', { admission_id, execution_generation, session_id: sid }).catch((error: unknown) => {
+      if (ticket.isCurrent()) {
+        host.transcript.notice(`Could not discard the turn: ${errorText(error)}`, 'error')
+        host.changed()
+      }
     })
   }
 

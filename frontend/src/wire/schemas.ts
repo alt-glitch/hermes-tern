@@ -64,12 +64,15 @@ type InfoRow = NonNullable<SessionInfo['pending_submissions']>[number]
 /** One row of the authority's FIFO (`info.pending_submissions`), as the queue reads it. */
 export interface PendingRow extends Pick<InfoRow, 'user'> {
   admission_id: AdmissionId
+  /** The run that started it; prompt.resolve_unknown names it to discard an `unknown` row. */
+  execution_generation?: number | undefined
   input_id?: InputId | undefined
   status: PendingStatus
 }
 
 const pendingRow: z.ZodMiniType<PendingRow> = z.object({
   admission_id: z.pipe(z.string(), z.transform(admissionId)),
+  execution_generation: loose(z.number()),
   /** The submission id the submitter chose (this pane's `submission_id`). */
   input_id: loose(z.pipe(z.string(), z.transform(inputId))),
   status: z.pipe(z.optional(z.unknown()), z.transform((status): PendingStatus => (isPendingStatus(status) ? status : 'other'))),
