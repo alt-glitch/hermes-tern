@@ -6902,7 +6902,7 @@ var turnHandlers = {
     return "render";
   },
   "message.delta": (ev, cx) => {
-    cx.transcript.text(ev.payload?.text ?? "");
+    cx.transcript.text(ev.payload?.text ?? "", Date.now(), ev.payload ?? {});
     cx.activity.relabel("Writing\u2026");
     return "render";
   },
@@ -53214,6 +53214,11 @@ var Transcript = class {
    * comes after it lands there, and opens no live turn of its own.
    */
   #ended;
+  /**
+   * The text block the last stamped message.delta wrote to, and that delta's `turn_id` and
+   * `segment`. A delta with the same pair and an `offset` above 0 is more of the same model reply.
+   */
+  #reply;
   /** The compactions part: a compaction's start, end and take-back, the context readings that size it, its stored summary. */
   compactions = new Compactions({ entries: () => this.#entries, id: (prefix2) => this.id(prefix2), live: () => this.#live });
   /** The entries, oldest first; only the transcript's own methods change the list. */
@@ -53275,11 +53280,15 @@ var Transcript = class {
   /**
    * A steer the gateway took for the running turn: it shows inside that turn, where it was sent,
    * since the agent reads it before its next step. With no turn running it is a plain prompt.
+   * A `redirect` (session.redirect) is drawn the same way.
    */
-  steer(text15, at = Date.now()) {
+  steer(text15, at = Date.now(), { redirect = false } = {}) {
     const turn = this.live;
     if (!turn) {
       return this.user({ at, text: text15 });
+    }
+    if (redirect) {
+      this.#reply = void 0;
     }
     turn.blocks.push({ at, id: this.id("s"), kind: "steer", text: text15 });
     turn.rev++;
@@ -53396,19 +53405,39 @@ var Transcript = class {
     turn.blocks.push({ endedAt: at, id: this.id("k"), kind: "thinking", label, startedAt: at, text: text15.trim() });
     turn.rev++;
   }
-  text(text15, at = Date.now()) {
+  /** A message.delta: `stamp` is where Hermes says the chunk goes in its reply. */
+  text(text15, at = Date.now(), stamp = {}) {
     if (!text15) {
       return;
     }
     const turn = this.#open(at);
     endThinking(turn, at);
+    const segment = stamp.turn_id && typeof stamp.segment === "number" ? `${stamp.turn_id}/${stamp.segment}` : void 0;
     const last = turn.blocks.at(-1);
-    if (last?.kind === "text") {
-      last.text += text15;
+    let block = last?.kind === "text" ? last : this.#steeredReply(turn, segment, stamp.offset);
+    if (block) {
+      block.text += text15;
     } else {
-      turn.blocks.push({ id: this.id("x"), kind: "text", text: text15 });
+      block = { id: this.id("x"), kind: "text", text: text15 };
+      turn.blocks.push(block);
     }
+    this.#reply = segment ? { block, segment } : void 0;
     turn.rev++;
+  }
+  /**
+   * The reply a steer was sent during, when the delta in `segment` at `offset` is more of it.
+   * Hermes does not stop the model call for a steer, so the rest of the reply comes in the same
+   * segment, at an offset above 0. It joins the text before the steer, so the reply reads whole
+   * and the steer stays after it. A new model call comes after a tool, a seal (a new segment) or
+   * in a new run of the agent (a new `turn_id`).
+   */
+  #steeredReply(turn, segment, offset) {
+    const reply2 = this.#reply;
+    if (!reply2 || !segment || reply2.segment !== segment || !offset) {
+      return void 0;
+    }
+    const i = turn.blocks.indexOf(reply2.block);
+    return i >= 0 && turn.blocks.slice(i + 1).every((b) => b.kind === "steer") ? reply2.block : void 0;
   }
   /** Interim commentary: seals the streamed text so the next delta starts a new block. */
   interim(text15, { alreadyStreamed }, at = Date.now()) {
@@ -54056,7 +54085,7 @@ var PromptRouter = class {
       return;
     }
     if (r.ok) {
-      host.transcript.steer(shownText(prompt));
+      host.transcript.steer(shownText(prompt), Date.now(), { redirect: mode !== "steer" });
     } else {
       if (r.error) {
         host.transcript.notice(`${mode === "steer" ? "Steer" : "Redirect"} failed: ${r.error}. Queued instead.`, "warning");
