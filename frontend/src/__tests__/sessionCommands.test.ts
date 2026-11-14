@@ -210,6 +210,18 @@ describe('session commands', () => {
     expect(h.panel).toHaveBeenCalledWith('Reload Skills', 'Added: x')
   })
 
+  it('/reload and /reload-skills send nothing without a session: the gateway reloads only for one', async () => {
+    const { h, request } = host({ sid: null })
+
+    await run('reload', h)
+    await run('reload_skills', h)
+
+    expect(request).not.toHaveBeenCalled()
+    expect(h.notice).toHaveBeenCalledTimes(2)
+    expect(h.notice).toHaveBeenCalledWith('No active session.', 'warning')
+    expect(h.panel).not.toHaveBeenCalled()
+  })
+
   it('/reload-mcp calls reload.mcp, confirmed, and names the servers that did not connect', async () => {
     const { h, request } = host(
       {},

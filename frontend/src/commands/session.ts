@@ -185,14 +185,22 @@ async function save(host: SessionHost) {
 
 async function reloadEnv(host: SessionHost) {
   // The shared gateway reloads `.env` only for a session this view controls.
-  const r = await rpc(host.gw, 'reload.env', host.sid ? { session_id: host.sid } : {})
+  if (!host.sid) {
+    return host.notice('No active session.', 'warning')
+  }
+
+  const r = await rpc(host.gw, 'reload.env', { session_id: host.sid })
 
   host.notice(`Reloaded .env (${plural(Number(r?.updated ?? 0), 'var')} updated).`)
 }
 
 async function reloadSkills(host: SessionHost) {
   // Bound to the session, so the rescan sees its repo's project-local skills.
-  const r = await rpc(host.gw, 'skills.reload', host.sid ? { session_id: host.sid } : {})
+  if (!host.sid) {
+    return host.notice('No active session.', 'warning')
+  }
+
+  const r = await rpc(host.gw, 'skills.reload', { session_id: host.sid })
 
   host.panel('Reload Skills', r?.output?.trim() || 'Skills reloaded.')
 }
