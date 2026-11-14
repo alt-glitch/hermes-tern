@@ -5,12 +5,14 @@
 import type { GatewayClient } from '@hermes/shared/gateway-client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { Agents } from '../agents/store.js'
 import { liveSessionId } from '../core/ids.js'
 import type { BackgroundProcess, Block, Entry } from '../model.js'
 import { Processes } from '../processes/store.js'
 import { Charts } from '../processes/widgets/registry.js'
 import { Transcript } from '../transcript/store.js'
 import { Activity } from '../turn/activity.js'
+import { agentFinishedLine } from '../view/backgroundLines.js'
 import { dockActivity } from '../view/dockModel.js'
 import { foldOf } from '../view/workLogModel.js'
 import type { ProcessRow } from '../wire/schemas.js'
@@ -100,6 +102,47 @@ describe('a subagent that ends is a line in the transcript, when it ends', () =>
     const { taskViewHead } = await import('../view/tools/cards/task.js')
     const call = app.transcript.lastCall(c => c.name === 'delegate_task')
     expect(call && taskViewHead(call)).toEqual({ target: '3 background agents', title: 'Launched' })
+  })
+})
+
+describe('a subagent whose end the list showed but did not explain', () => {
+  it('gets its line from the delegation\'s completion, not a guessed "finished"', async () => {
+    vi.useFakeTimers({ now: NOW })
+    const transcript = new Transcript()
+    transcript.messageStart(NOW)
+    transcript.toolStart(stub({ name: 'delegate_task', tool_id: 'c1' }), NOW)
+    transcript.toolComplete(
+      stub({
+        name: 'delegate_task',
+        result: { delegation_id: 'deleg_1', goals: ['goal 0', 'goal 1'], mode: 'background', status: 'dispatched', subagent_ids: ['sa-0-abcd', 'sa-1-abcd'] },
+        tool_id: 'c1'
+      }),
+      NOW
+    )
+    transcript.complete({ text: 'Started.' }, NOW)
+    let listed = true
+    const request = vi.fn(async () => ({
+      subagents: listed ? ['sa-0-abcd', 'sa-1-abcd'].map(subagent_id => ({ delegation_id: 'deleg_1', depth: 0, status: 'running', subagent_id })) : []
+    }))
+    const finished: string[] = []
+    const store = new Agents({
+      agentFinished: a => finished.push(agentFinishedLine(a).text),
+      changed: () => undefined,
+      gw: stub<Pick<GatewayClient, 'request'>>({ request }),
+      sid: liveSessionId('s1'),
+      transcript
+    })
+
+    store.scan()
+    await vi.advanceTimersByTimeAsync(1000)
+    listed = false
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(store.running()).toEqual([])
+    expect(finished).toEqual([])
+
+    store.settle('[ASYNC DELEGATION BATCH COMPLETE — deleg_1]\n\n--- ✓ TASK 1/2: goal 0  (status=completed) ---\n\n--- ✗ TASK 2/2: goal 1  (status=failed) ---')
+    expect(finished).toEqual(['Agent "goal 0" finished · 2s', 'Agent "goal 1" failed · 2s'])
+    store.dispose()
   })
 })
 
