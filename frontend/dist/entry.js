@@ -4456,7 +4456,7 @@ function admissionOf(r) {
 
 // src/hermes/sharedPrompts.ts
 var sharedPromptId = (promptId) => `shared:${String(promptId)}`;
-function sharedPromptRequest(ev, gw2, onNotice) {
+function sharedPromptRequest(ev, gw2, onNotice, place) {
   const kind = ev.type === "approval.request" ? "approval" : "clarify";
   const shared = ev.payload;
   if (!shared?.prompt_id || !ev.session_id || typeof shared.execution_generation !== "number") {
@@ -4482,7 +4482,7 @@ function sharedPromptRequest(ev, gw2, onNotice) {
   return {
     id: sharedPromptId(shared.prompt_id),
     method: kind,
-    params: { ...shared, questions, session_id: ev.session_id },
+    params: { ...shared, questions, session_id: ev.session_id, ...place ? { place } : {} },
     respond: ({ answers: answers2, choice: choice2 }) => kind === "approval" ? send2(() => rpc(gw2, "approval.respond", { choice: typeof choice2 === "string" ? choice2 : "deny", ...control })) : send2(() => rpc(gw2, "clarify.respond", { answer: firstAnswer(answers2), ...control })),
     // Unanswered here: the prompt stays pending for another viewer or its own timeout.
     fail: () => void 0
@@ -4520,8 +4520,9 @@ function button(b) {
     b.key
   );
 }
-function actionsRow(buttons) {
+function actionsRow(buttons, lead) {
   return /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "omp.actions", children: [
+    lead ?? null,
     /* @__PURE__ */ jsx("spacer", { grow: 1 }, "fill"),
     buttons.map(button)
   ] }, "actions");
@@ -4580,7 +4581,8 @@ function optionList(listKey, id, options, selected, select2, pick2) {
       children: options.map((o) => /* @__PURE__ */ jsx(
         "item",
         {
-          ...optional2("detail", o.detail ? [o.role === "omp.ask.other" ? { s: "dim", t: o.detail } : { t: o.detail }] : void 0),
+          ...optional2("detail", o.detail ? [o.role?.startsWith("omp.ask.other") ? { s: "dim", t: o.detail } : { t: o.detail }] : void 0),
+          ...optional2("hint", o.key ? [o.key] : void 0),
           ...optional2("icon", o.checked ? "check" : void 0),
           label: [{ t: o.label }],
           role: o.role ?? "omp.ask.option",
@@ -5495,8 +5497,70 @@ function pastedCommand(text15) {
   return text15.includes("{!") || text15.trimStart().startsWith("!");
 }
 
-// src/prompts/clarify.tsx
+// src/tools/fields.ts
+function text(v) {
+  return typeof v === "string" && v ? v : void 0;
+}
+function num2(v) {
+  return typeof v === "number" ? v : void 0;
+}
+function list(v) {
+  return Array.isArray(v) ? v : void 0;
+}
+function records(v) {
+  return Array.isArray(v) ? v.map((i) => record2(i)) : [];
+}
+function objects(v) {
+  return records(v).filter((r) => r !== void 0);
+}
+function texts(v) {
+  return Array.isArray(v) ? v.map((i) => text(i)).filter((t) => t !== void 0) : [];
+}
+
+// src/tools/ask.ts
+var OUTCOMES = /* @__PURE__ */ new Set(["cancelled", "submitted", "timed_out", "undelivered"]);
+var isOutcome = (v) => v !== void 0 && OUTCOMES.has(v);
+function askDetail({ args, result }) {
+  const asked2 = list(args["questions"]) ?? (text(args["question"]) ? [args] : []);
+  const outcome2 = text(result?.["outcome"]);
+  return {
+    answered: result !== void 0,
+    outcome: isOutcome(outcome2) ? outcome2 : void 0,
+    questions: objects(asked2).map((q2) => ({ choices: texts(q2["choices"]), multi: q2["multi_select"] === true, question: text(q2["question"]) })),
+    responses: records(result?.["responses"]).map((r) => {
+      if (!r) {
+        return void 0;
+      }
+      const raw2 = r["user_response"];
+      const answers2 = texts(Array.isArray(raw2) ? raw2 : [raw2]).filter((a2) => a2.trim());
+      const status = r["status"] === "skipped" ? "skipped" : answers2.length ? "answered" : "unanswered";
+      return { answers: answers2, status };
+    }),
+    tool: "clarify"
+  };
+}
 var RECOMMENDED = /\s*\(recommended\)\s*$/i;
+function splitQuestion(question) {
+  const paragraphs = question.trim().split(/\n[ \t]*\n/);
+  const [first = "", ...rest] = paragraphs;
+  const last = paragraphs.at(-1) ?? "";
+  if (!rest.length) {
+    return { ask: first, context: "" };
+  }
+  return !last.includes("\n") && last.length <= ASK_MAX ? { ask: last, context: paragraphs.slice(0, -1).join("\n\n") } : { ask: first, context: rest.join("\n\n") };
+}
+var ASK_MAX = 200;
+
+// src/prompts/clarify.tsx
+function keysLine(hints) {
+  return /* @__PURE__ */ jsx("row", { align: "center", gap: "md", role: "hermes.ask.keys", children: hints.map(([alternatives, does], i) => /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", children: [
+    alternatives.flatMap((keys2, j) => [
+      ...j ? [/* @__PURE__ */ jsx("text", { spans: [{ s: "dim", t: "/" }], wrap: "none" }, `or${j}`)] : [],
+      /* @__PURE__ */ jsx("kbd", { keys: [...keys2] }, `k${j}`)
+    ]),
+    /* @__PURE__ */ jsx("text", { spans: [{ s: "dim", t: does }], wrap: "none" }, "t")
+  ] }, `k${i}`)) }, "keys");
+}
 function tabLabel(question) {
   const words3 = question.replace(/[?.!:]+$/, "").split(/\s+/);
   return words3.length > 4 ? `${words3.slice(0, 4).join(" ")}\u2026` : words3.join(" ");
@@ -5506,6 +5570,7 @@ function clarifyOverlay(host, prompt) {
   const answers2 = { ...prompt.answers };
   const drafts = questions.map(() => ({
     other: new Composer(),
+    otherOn: false,
     picked: /* @__PURE__ */ new Set(),
     selected: 0,
     typing: false
@@ -5522,12 +5587,32 @@ function clarifyOverlay(host, prompt) {
     ...q2.choices.map((c, i) => ({
       checked: q2.multi && d.picked.has(i),
       id: `option:${i}`,
+      key: String(i + 1),
       label: c.replace(RECOMMENDED, ""),
       recommended: RECOMMENDED.test(c),
       role: q2.multi ? "omp.ask.check" : "omp.ask.option"
     })),
-    { detail: d.other.text || "Type your own answer", id: "other", label: "Other\u2026", role: "omp.ask.other" }
+    {
+      checked: q2.multi && d.otherOn && d.other.text.trim() !== "",
+      // While the field below is open it holds the text; the row says it only once the field closes.
+      ...d.typing ? {} : { detail: d.other.text || "Type your own answer" },
+      id: "other",
+      key: String(q2.choices.length + 1),
+      label: "Other\u2026",
+      role: q2.multi ? "omp.ask.other.check" : "omp.ask.other"
+    }
   ];
+  const hintsOf = (q2, d) => {
+    const typing = d.typing || !q2.choices.length;
+    const tab2 = questions.length > 1 ? [[[["tab"]], "next question"]] : [];
+    if (typing) {
+      return [[[["enter"]], "submit"], [[["escape"]], q2.choices.length ? "back to the choices" : "skip"], ...tab2];
+    }
+    const numbers = [`1\u2013${q2.choices.length + 1}`];
+    const move = [[["up", "down"]], "move"];
+    const skip = [[["escape"]], "skip"];
+    return q2.multi ? [move, [[["space"], numbers], "toggle"], [[["enter"]], "submit"], skip, ...tab2] : [move, [[numbers], "pick"], [[["enter"]], "choose"], skip, ...tab2];
+  };
   const commit = (answer) => {
     const q2 = questions[step];
     if (q2) {
@@ -5556,10 +5641,11 @@ function clarifyOverlay(host, prompt) {
       return commit(d.typing ? typed || null : q2.choices[d.selected]?.replace(RECOMMENDED, "") ?? null);
     }
     const picked = [...d.picked].sort((a2, b) => a2 - b).map((i) => q2.choices[i]?.replace(RECOMMENDED, "") ?? "");
-    if (!picked.length && !typed && d.selected < q2.choices.length) {
+    const other = d.otherOn || d.typing ? typed : "";
+    if (!picked.length && !other && d.selected < q2.choices.length) {
       picked.push(q2.choices[d.selected]?.replace(RECOMMENDED, "") ?? "");
     }
-    const values = typed ? [...picked, typed] : picked;
+    const values = other ? [...picked, other] : picked;
     commit(values.length ? JSON.stringify(values) : null);
   };
   const activate = (i) => {
@@ -5569,8 +5655,11 @@ function clarifyOverlay(host, prompt) {
       return;
     }
     d.selected = i;
-    if (i >= q2.choices.length) {
+    if (i >= q2.choices.length && q2.multi && d.otherOn && !d.typing && d.other.text.trim()) {
+      d.otherOn = false;
+    } else if (i >= q2.choices.length) {
       d.typing = true;
+      d.otherOn = true;
     } else if (q2.multi && d.picked.has(i)) {
       d.picked.delete(i);
     } else if (q2.multi) {
@@ -5602,8 +5691,11 @@ function clarifyOverlay(host, prompt) {
         return /* @__PURE__ */ jsx("overlay", { anchor: "bottom", modal: true, role: "omp.overlay.ask", size: "md" }, key2);
       }
       const freeText = !q2.choices.length;
-      const last = questions.every((other, i) => i === step || other.qid in answers2);
+      const place = prompt.place;
+      const last = questions.every((other, i) => i === step || other.qid in answers2) && (!place || place.index === place.total - 1);
+      const { ask, context } = splitQuestion(q2.question);
       return /* @__PURE__ */ jsx("overlay", { anchor: "bottom", modal: true, role: "omp.overlay.ask", size: "md", children: /* @__PURE__ */ jsxs("col", { gap: "md", children: [
+        place ? /* @__PURE__ */ jsx("row", { align: "center", gap: "sm", role: "omp.ask.head", children: /* @__PURE__ */ jsx("text", { spans: [{ s: "dim", t: `Question ${place.index + 1} of ${place.total}` }], wrap: "none" }, "count") }, "place") : null,
         questions.length > 1 ? /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "omp.ask.head", children: [
           /* @__PURE__ */ jsx(
             "tabs",
@@ -5626,7 +5718,8 @@ function clarifyOverlay(host, prompt) {
           /* @__PURE__ */ jsx("spacer", { grow: 1 }, "fill"),
           /* @__PURE__ */ jsx("text", { spans: [{ s: "dim", t: `${step + 1} of ${questions.length}` }], wrap: "none" }, "count")
         ] }, "head") : null,
-        /* @__PURE__ */ jsx("md", { role: "omp.ask.question", text: q2.question }, "question"),
+        /* @__PURE__ */ jsx("md", { role: "omp.ask.question", text: ask }, "question"),
+        context ? /* @__PURE__ */ jsx("md", { role: "hermes.ask.context", text: context }, "context") : null,
         freeText ? null : optionList(
           `q${step}`,
           `${id}.body.q${step}`,
@@ -5658,17 +5751,13 @@ function clarifyOverlay(host, prompt) {
           "answer"
         ) : null,
         sendingLine(sending),
-        actionsRow([
-          { hint: "escape", key: "skip", keys: ["escape"], label: "Skip", onClick: () => commit(null) },
-          {
-            hint: `enter${q2.multi && !d.typing ? " \xB7 space toggles" : ""} \xB7 up/down move${questions.length > 1 ? " \xB7 tab switches question" : ""}`,
-            key: "submit",
-            keys: ["enter"],
-            kind: "primary",
-            label: last ? "Submit" : "Next",
-            onClick: submit
-          }
-        ])
+        actionsRow(
+          [
+            { hint: "escape", key: "skip", keys: ["escape"], label: "Skip", onClick: () => commit(null) },
+            { hint: "enter", key: "submit", keys: ["enter"], kind: "primary", label: last ? "Submit" : "Next", onClick: submit }
+          ],
+          keysLine(hintsOf(q2, d))
+        )
       ] }, "body") }, key2);
     },
     onKey: (k) => {
@@ -5687,7 +5776,7 @@ function clarifyOverlay(host, prompt) {
         d.typing = false;
       } else if (k.name === "escape") {
         commit(null);
-      } else if (k.name === "enter" && (typing || q2.multi && d.selected < q2.choices.length)) {
+      } else if (k.name === "enter" && (typing || q2.multi && (d.selected < q2.choices.length || d.other.text.trim()))) {
         submit();
       } else if (k.name === "enter") {
         activate(d.selected);
@@ -5698,6 +5787,7 @@ function clarifyOverlay(host, prompt) {
           d.selected = to;
         } else if (k.name !== "up" && k.name !== "down") {
           d.other.key(k);
+          d.otherOn = true;
         }
       } else {
         const to = moved(k, d.selected, count2);
@@ -5711,6 +5801,7 @@ function clarifyOverlay(host, prompt) {
         } else if (k.text && !k.ctrl && !k.meta && k.name !== "space") {
           d.selected = q2.choices.length;
           d.typing = true;
+          d.otherOn = true;
           d.other.key(k);
         }
       }
@@ -5906,16 +5997,275 @@ function confirmOverlay(host, ask) {
   return overlay2;
 }
 
+// src/tools/files.ts
+function readDetail({ args, result }) {
+  return {
+    content: text(result?.["content"]),
+    path: text(args["path"]),
+    tool: "read_file",
+    totalLines: num2(result?.["total_lines"])
+  };
+}
+function editDetail(tool) {
+  return ({ args, result }) => ({ content: text(args["content"]), diff: text(result?.["diff"]), path: text(args["path"]), tool });
+}
+
+// src/tools/misc.ts
+function genericFields({ args, result }) {
+  return {
+    prompt: text(args["prompt"]),
+    query: text(args["query"]),
+    question: text(args["question"]),
+    said: text(result?.["analysis"]) ?? text(result?.["text_summary"]),
+    url: text(args["url"])
+  };
+}
+function plainDetail(tool) {
+  return (raw2) => ({ ...genericFields(raw2), tool });
+}
+function todoDetail(raw2) {
+  return { ...genericFields(raw2), merge: raw2.args["merge"] === true, todos: list(raw2.args["todos"]), tool: "todo_list" };
+}
+function processDetail(raw2) {
+  return { ...genericFields(raw2), action: String(raw2.args["action"]), tool: "process_manage" };
+}
+function evalDetail({ args, result }) {
+  return {
+    code: text(args["code"]),
+    error: text(result?.["error"]) ?? text(result?.["stderr"]),
+    output: text(result?.["output"]) ?? text(result?.["stdout"]),
+    tool: "execute_code"
+  };
+}
+function memoryDetail({ args, result }) {
+  return { action: text(args["action"]), tool: "memory", usage: text(result?.["usage"]) };
+}
+function skillsDetail({ result }) {
+  const skills = list(result?.["skills"]) ?? [];
+  return {
+    message: text(result?.["message"]),
+    names: skills.map((s2) => text(record2(s2)?.["name"]) ?? text(s2)).filter((n) => n !== void 0),
+    tool: "skills_list"
+  };
+}
+function skillDetail({ args, result }) {
+  return { content: text(result?.["content"]), name: text(args["name"]), tool: "skill_view" };
+}
+function toolSearchDetail(raw2) {
+  const { args } = raw2;
+  const queries = list(args["queries"]);
+  return {
+    ...genericFields(raw2),
+    queries: queries ? queries.filter((q2) => typeof q2 === "string") : texts([text(args["queries"]) ?? text(args["query"])]),
+    tool: "tool_search"
+  };
+}
+function toolDescribeDetail(raw2) {
+  const names = raw2.args["names"];
+  return { ...genericFields(raw2), names: texts(Array.isArray(names) ? names : [names]), tool: "tool_describe" };
+}
+function pullRequestDetail(tool) {
+  return (raw2) => ({ ...genericFields(raw2), number: num2(raw2.args["number"]), repository: text(raw2.args["repository"]), tool });
+}
+
+// src/tools/search.ts
+function searchDetail({ args, result }) {
+  const matches2 = list(result?.["matches"]);
+  return {
+    files: list(result?.["files"]) ? texts(result?.["files"]) : void 0,
+    filesOnly: args["target"] === "files",
+    matches: matches2 ? objects(matches2).map((m) => ({
+      line: num2(m["line"]) ?? 0,
+      path: text(m["path"]) ?? "",
+      text: typeof m["content"] === "string" ? m["content"] : ""
+    })) : void 0,
+    path: text(args["path"]),
+    pattern: text(args["pattern"]),
+    tool: "search_files",
+    total: num2(result?.["total_count"])
+  };
+}
+
+// src/tools/task.ts
+function taskDetail({ args, result }) {
+  return {
+    background: result?.["mode"] === "background",
+    briefs: records(args["tasks"]).map((t) => text(t?.["context"])),
+    context: text(args["context"]),
+    dispatched: result?.["status"] === "dispatched",
+    failed: Boolean(result?.["error"]),
+    goal: text(args["goal"]),
+    results: records(result?.["results"]).map((r) => r && { error: text(r["error"]), status: text(r["status"]), summary: text(r["summary"]) }),
+    tasks: objects(args["tasks"]).map((t) => ({ context: text(t["context"]), goal: text(t["goal"]) })),
+    tool: "delegate_task"
+  };
+}
+
+// src/tools/terminal.ts
+function terminalDetail({ args, result }) {
+  return {
+    background: args["background"] === true || typeof result?.["session_id"] === "string",
+    command: text(args["command"]),
+    error: text(result?.["error"]),
+    exit: num2(result?.["exit_code"]),
+    output: text(result?.["output"]),
+    tool: "terminal"
+  };
+}
+
+// src/tools/web.ts
+function source(r) {
+  return { content: text(r["content"]), title: text(r["title"]), url: text(r["url"]) };
+}
+function webSearchDetail({ args, result }) {
+  const web = list(record2(result?.["data"])?.["web"]);
+  return { hits: objects(web ?? result?.["results"]).map(source), query: text(args["query"]), tool: "web_search" };
+}
+function fetchDetail({ args, result }) {
+  return {
+    pages: objects(result?.["results"]).map(source),
+    tool: "web_extract",
+    url: text(args["url"]),
+    urls: (list(args["urls"]) ?? []).filter((u) => typeof u === "string")
+  };
+}
+
+// src/tools/detail.ts
+var PARSERS = {
+  browser: plainDetail("browser"),
+  clarify: askDetail,
+  delegate_task: taskDetail,
+  execute_code: evalDetail,
+  image_generate: plainDetail("image_generate"),
+  link_pull_request: pullRequestDetail("link_pull_request"),
+  list_pull_requests: plainDetail("list_pull_requests"),
+  manage_connections: plainDetail("manage_connections"),
+  memory: memoryDetail,
+  other: plainDetail("other"),
+  patch: editDetail("patch"),
+  process_manage: processDetail,
+  read_file: readDetail,
+  search_files: searchDetail,
+  session_search: plainDetail("session_search"),
+  skill_view: skillDetail,
+  skills_list: skillsDetail,
+  terminal: terminalDetail,
+  todo_list: todoDetail,
+  tool_describe: toolDescribeDetail,
+  tool_search: toolSearchDetail,
+  unlink_pull_request: pullRequestDetail("unlink_pull_request"),
+  vision_analyze: plainDetail("vision_analyze"),
+  web_extract: fetchDetail,
+  web_search: webSearchDetail,
+  write_file: editDetail("write_file")
+};
+var ALIASES = /* @__PURE__ */ new Map([
+  ["process", "process_manage"],
+  ["todo", "todo_list"]
+]);
+var KEYS2 = new Set(Object.keys(PARSERS));
+function isToolKey(name) {
+  return KEYS2.has(name);
+}
+function toolKeyOf(name) {
+  if (isToolKey(name)) {
+    return name;
+  }
+  return ALIASES.get(name) ?? (name.startsWith("browser") ? "browser" : "other");
+}
+var parsed = /* @__PURE__ */ new WeakMap();
+function parsedOf(call) {
+  const hit = parsed.get(call);
+  if (hit?.name === call.name && hit.args === call.args && hit.result === call.result) {
+    return hit;
+  }
+  const result = record2(call.result);
+  const fresh = { args: call.args, detail: PARSERS[toolKeyOf(call.name)]({ args: call.args, result }), name: call.name, record: result, result: call.result };
+  parsed.set(call, fresh);
+  return fresh;
+}
+function detailOf(call) {
+  return parsedOf(call).detail;
+}
+function resultOf(call) {
+  return parsedOf(call).record;
+}
+
+// src/transcript/calls.ts
+function findCall(entries, match) {
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const turn = entries[i];
+    if (turn?.kind !== "turn") {
+      continue;
+    }
+    const located = callIn(turn, match);
+    if (located) {
+      return located;
+    }
+  }
+  return void 0;
+}
+function callIn(turn, match) {
+  const hit = turn.blocks.findLast((b) => b.kind === "tool" && match(b.call));
+  return hit && { call: hit.call, turn };
+}
+function callsWhere(entries, match) {
+  return entries.flatMap((e) => e.kind === "turn" ? e.blocks.flatMap((b) => b.kind === "tool" && match(b.call) ? [b.call] : []) : []);
+}
+function tookMs(call) {
+  return call.outcome.kind === "running" ? void 0 : call.outcome.duration;
+}
+var isAsk = (call) => call.name === "clarify";
+function isTodoName(name) {
+  return name === "todo_list" || name === "todo";
+}
+function isProcessTool(name) {
+  return name === "process_manage" || name === "process";
+}
+function isWatchCall(call) {
+  return isProcessTool(call.name) && ["log", "poll", "wait"].includes(String(call.args["action"])) && typeof call.args["session_id"] === "string";
+}
+function isBackgroundCall(call) {
+  return call.name === "terminal" && (call.args["background"] === true || typeof record2(call.result)?.["session_id"] === "string");
+}
+function isToolError(p3) {
+  const r = record2(p3.result);
+  if (r?.["error"]) {
+    return true;
+  }
+  if (p3.name === "terminal" && typeof r?.["exit_code"] === "number" && r["exit_code"] !== 0) {
+    return true;
+  }
+  return typeof p3.summary === "string" && /^(error|failed)\b/i.test(p3.summary);
+}
+
 // src/gateway/handlers/prompts.ts
 function asked(ev, cx) {
-  const req = sharedPromptRequest(ev, cx.gw, (message) => {
-    cx.transcript.notice(message, "warning");
-    cx.changed();
-  });
+  const place = ev.type === "clarify.request" ? placeIn(cx.transcript, ev.payload) : void 0;
+  const req = sharedPromptRequest(
+    ev,
+    cx.gw,
+    (message) => {
+      cx.transcript.notice(message, "warning");
+      cx.changed();
+    },
+    place
+  );
   if (req) {
     cx.request(req);
   }
   return "render";
+}
+function placeIn(transcript, card) {
+  const asked2 = typeof card?.question === "string" ? card.question.trim() : "";
+  const call = asked2 ? transcript.lastCall((c) => isAsk(c) && c.outcome.kind === "running") : void 0;
+  const d = call ? detailOf(call) : void 0;
+  const questions = d?.tool === "clarify" ? d.questions : [];
+  const offered = (card?.choices ?? []).map((c) => c.replace(RECOMMENDED, "")).join("\n");
+  const same = questions.flatMap((q2, i) => q2.question?.trim() === asked2 ? [i] : []);
+  const matches2 = same.length > 1 ? same.filter((i) => questions[i]?.choices.join("\n") === offered) : same;
+  const [index2] = matches2;
+  return matches2.length === 1 && index2 !== void 0 && questions.length > 1 ? { index: index2, total: questions.length } : void 0;
 }
 function settled(ev, cx) {
   cx.sheets.drop(sharedPromptId(ev.payload?.prompt_id));
@@ -5944,7 +6294,7 @@ var promptHandlers = {
 };
 
 // node_modules/@hermes/shared/src/usage-tick.ts
-var num2 = (value) => value !== null && value !== void 0 && Number.isFinite(value) ? value : void 0;
+var num3 = (value) => value !== null && value !== void 0 && Number.isFinite(value) ? value : void 0;
 var round1 = (value) => Math.round(value * 10) / 10;
 var pct = (part, whole) => Math.max(0, Math.min(100, Math.round(part / whole * 100)));
 var COUNTERS = [
@@ -5957,9 +6307,9 @@ var COUNTERS = [
   ["total", ["total_tokens"]]
 ];
 function contextFields(p3) {
-  const used = num2(p3.last_prompt_tokens) ?? 0;
-  const max = num2(p3.context_length) ?? 0;
-  const compressions = num2(p3.compression_count);
+  const used = num3(p3.last_prompt_tokens) ?? 0;
+  const max = num3(p3.context_length) ?? 0;
+  const compressions = num3(p3.compression_count);
   const fields = p3.context_source == null || compressions === void 0 ? {} : { compressions };
   if (!used || !max) {
     return fields;
@@ -5977,11 +6327,11 @@ function contextFields(p3) {
 }
 function rateFields(p3) {
   const fields = {};
-  const promptTotal = num2(p3.prompt_tokens) ?? 0;
-  const cacheRead = num2(p3.cache_read_tokens) ?? 0;
-  const latency = num2(p3.avg_latency_s);
-  const tps = num2(p3.tokens_per_s);
-  const subagents = num2(p3.active_subagents);
+  const promptTotal = num3(p3.prompt_tokens) ?? 0;
+  const cacheRead = num3(p3.cache_read_tokens) ?? 0;
+  const latency = num3(p3.avg_latency_s);
+  const tps = num3(p3.tokens_per_s);
+  const subagents = num3(p3.active_subagents);
   if (promptTotal > 0 && cacheRead > 0) {
     fields.cache_hit_pct = pct(cacheRead, promptTotal);
   }
@@ -6005,7 +6355,7 @@ function usageFromTick(payload) {
   }
   const usage = {};
   for (const [key2, sources] of COUNTERS) {
-    const values = sources.map((source2) => num2(payload[source2]));
+    const values = sources.map((source2) => num3(payload[source2]));
     const value = values.find(Boolean) ?? values.find((v) => v !== void 0);
     if (value !== void 0) {
       usage[key2] = value;
@@ -6398,16 +6748,16 @@ function parseTargets(targets) {
     const needs = fields.filter((f) => f.required && !f.default).map((f) => f.name);
     return name ? [
       {
-        alias: text(r?.["alias"]),
-        detail: text(r?.["detail"]),
+        alias: text2(r?.["alias"]),
+        detail: text2(r?.["detail"]),
         env: Object.keys(env2).length ? env2 : void 0,
-        kind: text(r?.["kind"]),
+        kind: text2(r?.["kind"]),
         launch: launchOf(r?.["launch"]),
         name,
         needs: needs.length ? needs : void 0,
         state: typeof r?.["state"] === "string" ? r["state"] : "pending",
         title: appTitle(name),
-        url: text(r?.["connect_url"])
+        url: text2(r?.["connect_url"])
       }
     ] : [];
   });
@@ -6415,17 +6765,17 @@ function parseTargets(targets) {
 function launchOf(raw2) {
   const r = record2(raw2);
   const kind = r?.["kind"];
-  const target2 = text(r?.["target"]);
+  const target2 = text2(r?.["target"]);
   if (kind !== "remote" && kind !== "stdio" || !target2) {
     return void 0;
   }
   const env2 = Array.isArray(r?.["env"]) ? r["env"].filter((k) => typeof k === "string" && k !== "") : [];
-  return { cwd: text(r?.["cwd"]), env: env2.length ? env2 : void 0, kind, target: target2 };
+  return { cwd: text2(r?.["cwd"]), env: env2.length ? env2 : void 0, kind, target: target2 };
 }
-var text = (v) => typeof v === "string" && v ? v : void 0;
+var text2 = (v) => typeof v === "string" && v ? v : void 0;
 function envField(raw2) {
   const r = record2(raw2);
-  const name = text(r?.["name"]);
+  const name = text2(r?.["name"]);
   return name ? [{ default: typeof r?.["default"] === "string" ? r["default"] : "", name, required: r?.["required"] === true }] : [];
 }
 var waiting = (t) => t.state === "initiated" || t.state === "pending";
@@ -7859,237 +8209,6 @@ function withoutEscapes(text15) {
   return text15.replace(ESCAPES, "");
 }
 
-// src/tools/fields.ts
-function text2(v) {
-  return typeof v === "string" && v ? v : void 0;
-}
-function num3(v) {
-  return typeof v === "number" ? v : void 0;
-}
-function list(v) {
-  return Array.isArray(v) ? v : void 0;
-}
-function records(v) {
-  return Array.isArray(v) ? v.map((i) => record2(i)) : [];
-}
-function objects(v) {
-  return records(v).filter((r) => r !== void 0);
-}
-function texts(v) {
-  return Array.isArray(v) ? v.map((i) => text2(i)).filter((t) => t !== void 0) : [];
-}
-
-// src/tools/ask.ts
-function askDetail({ args, result }) {
-  const asked2 = list(args["questions"]) ?? (text2(args["question"]) ? [args] : []);
-  return {
-    answered: result !== void 0,
-    questions: objects(asked2).map((q2) => ({ choices: texts(q2["choices"]), question: text2(q2["question"]) })),
-    responses: records(result?.["responses"]).map((r) => {
-      if (!r) {
-        return void 0;
-      }
-      const raw2 = r["user_response"];
-      return { answers: texts(Array.isArray(raw2) ? raw2 : [raw2]), skipped: r["status"] === "skipped" };
-    }),
-    tool: "clarify"
-  };
-}
-
-// src/tools/files.ts
-function readDetail({ args, result }) {
-  return {
-    content: text2(result?.["content"]),
-    path: text2(args["path"]),
-    tool: "read_file",
-    totalLines: num3(result?.["total_lines"])
-  };
-}
-function editDetail(tool) {
-  return ({ args, result }) => ({ content: text2(args["content"]), diff: text2(result?.["diff"]), path: text2(args["path"]), tool });
-}
-
-// src/tools/misc.ts
-function genericFields({ args, result }) {
-  return {
-    prompt: text2(args["prompt"]),
-    query: text2(args["query"]),
-    question: text2(args["question"]),
-    said: text2(result?.["analysis"]) ?? text2(result?.["text_summary"]),
-    url: text2(args["url"])
-  };
-}
-function plainDetail(tool) {
-  return (raw2) => ({ ...genericFields(raw2), tool });
-}
-function todoDetail(raw2) {
-  return { ...genericFields(raw2), merge: raw2.args["merge"] === true, todos: list(raw2.args["todos"]), tool: "todo_list" };
-}
-function processDetail(raw2) {
-  return { ...genericFields(raw2), action: String(raw2.args["action"]), tool: "process_manage" };
-}
-function evalDetail({ args, result }) {
-  return {
-    code: text2(args["code"]),
-    error: text2(result?.["error"]) ?? text2(result?.["stderr"]),
-    output: text2(result?.["output"]) ?? text2(result?.["stdout"]),
-    tool: "execute_code"
-  };
-}
-function memoryDetail({ args, result }) {
-  return { action: text2(args["action"]), tool: "memory", usage: text2(result?.["usage"]) };
-}
-function skillsDetail({ result }) {
-  const skills = list(result?.["skills"]) ?? [];
-  return {
-    message: text2(result?.["message"]),
-    names: skills.map((s2) => text2(record2(s2)?.["name"]) ?? text2(s2)).filter((n) => n !== void 0),
-    tool: "skills_list"
-  };
-}
-function skillDetail({ args, result }) {
-  return { content: text2(result?.["content"]), name: text2(args["name"]), tool: "skill_view" };
-}
-function toolSearchDetail(raw2) {
-  const { args } = raw2;
-  const queries = list(args["queries"]);
-  return {
-    ...genericFields(raw2),
-    queries: queries ? queries.filter((q2) => typeof q2 === "string") : texts([text2(args["queries"]) ?? text2(args["query"])]),
-    tool: "tool_search"
-  };
-}
-function toolDescribeDetail(raw2) {
-  const names = raw2.args["names"];
-  return { ...genericFields(raw2), names: texts(Array.isArray(names) ? names : [names]), tool: "tool_describe" };
-}
-function pullRequestDetail(tool) {
-  return (raw2) => ({ ...genericFields(raw2), number: num3(raw2.args["number"]), repository: text2(raw2.args["repository"]), tool });
-}
-
-// src/tools/search.ts
-function searchDetail({ args, result }) {
-  const matches2 = list(result?.["matches"]);
-  return {
-    files: list(result?.["files"]) ? texts(result?.["files"]) : void 0,
-    filesOnly: args["target"] === "files",
-    matches: matches2 ? objects(matches2).map((m) => ({
-      line: num3(m["line"]) ?? 0,
-      path: text2(m["path"]) ?? "",
-      text: typeof m["content"] === "string" ? m["content"] : ""
-    })) : void 0,
-    path: text2(args["path"]),
-    pattern: text2(args["pattern"]),
-    tool: "search_files",
-    total: num3(result?.["total_count"])
-  };
-}
-
-// src/tools/task.ts
-function taskDetail({ args, result }) {
-  return {
-    background: result?.["mode"] === "background",
-    briefs: records(args["tasks"]).map((t) => text2(t?.["context"])),
-    context: text2(args["context"]),
-    dispatched: result?.["status"] === "dispatched",
-    failed: Boolean(result?.["error"]),
-    goal: text2(args["goal"]),
-    results: records(result?.["results"]).map((r) => r && { error: text2(r["error"]), status: text2(r["status"]), summary: text2(r["summary"]) }),
-    tasks: objects(args["tasks"]).map((t) => ({ context: text2(t["context"]), goal: text2(t["goal"]) })),
-    tool: "delegate_task"
-  };
-}
-
-// src/tools/terminal.ts
-function terminalDetail({ args, result }) {
-  return {
-    background: args["background"] === true || typeof result?.["session_id"] === "string",
-    command: text2(args["command"]),
-    error: text2(result?.["error"]),
-    exit: num3(result?.["exit_code"]),
-    output: text2(result?.["output"]),
-    tool: "terminal"
-  };
-}
-
-// src/tools/web.ts
-function source(r) {
-  return { content: text2(r["content"]), title: text2(r["title"]), url: text2(r["url"]) };
-}
-function webSearchDetail({ args, result }) {
-  const web = list(record2(result?.["data"])?.["web"]);
-  return { hits: objects(web ?? result?.["results"]).map(source), query: text2(args["query"]), tool: "web_search" };
-}
-function fetchDetail({ args, result }) {
-  return {
-    pages: objects(result?.["results"]).map(source),
-    tool: "web_extract",
-    url: text2(args["url"]),
-    urls: (list(args["urls"]) ?? []).filter((u) => typeof u === "string")
-  };
-}
-
-// src/tools/detail.ts
-var PARSERS = {
-  browser: plainDetail("browser"),
-  clarify: askDetail,
-  delegate_task: taskDetail,
-  execute_code: evalDetail,
-  image_generate: plainDetail("image_generate"),
-  link_pull_request: pullRequestDetail("link_pull_request"),
-  list_pull_requests: plainDetail("list_pull_requests"),
-  manage_connections: plainDetail("manage_connections"),
-  memory: memoryDetail,
-  other: plainDetail("other"),
-  patch: editDetail("patch"),
-  process_manage: processDetail,
-  read_file: readDetail,
-  search_files: searchDetail,
-  session_search: plainDetail("session_search"),
-  skill_view: skillDetail,
-  skills_list: skillsDetail,
-  terminal: terminalDetail,
-  todo_list: todoDetail,
-  tool_describe: toolDescribeDetail,
-  tool_search: toolSearchDetail,
-  unlink_pull_request: pullRequestDetail("unlink_pull_request"),
-  vision_analyze: plainDetail("vision_analyze"),
-  web_extract: fetchDetail,
-  web_search: webSearchDetail,
-  write_file: editDetail("write_file")
-};
-var ALIASES = /* @__PURE__ */ new Map([
-  ["process", "process_manage"],
-  ["todo", "todo_list"]
-]);
-var KEYS2 = new Set(Object.keys(PARSERS));
-function isToolKey(name) {
-  return KEYS2.has(name);
-}
-function toolKeyOf(name) {
-  if (isToolKey(name)) {
-    return name;
-  }
-  return ALIASES.get(name) ?? (name.startsWith("browser") ? "browser" : "other");
-}
-var parsed = /* @__PURE__ */ new WeakMap();
-function parsedOf(call) {
-  const hit = parsed.get(call);
-  if (hit?.name === call.name && hit.args === call.args && hit.result === call.result) {
-    return hit;
-  }
-  const result = record2(call.result);
-  const fresh = { args: call.args, detail: PARSERS[toolKeyOf(call.name)]({ args: call.args, result }), name: call.name, record: result, result: call.result };
-  parsed.set(call, fresh);
-  return fresh;
-}
-function detailOf(call) {
-  return parsedOf(call).detail;
-}
-function resultOf(call) {
-  return parsedOf(call).record;
-}
-
 // src/view/tools/steps.ts
 import { homedir as homedir2 } from "node:os";
 function shortPath(path2) {
@@ -8667,53 +8786,6 @@ function waiting2() {
   return /* @__PURE__ */ jsx("text", { spans: [sp("waiting for data", "dim")], wrap: "none" }, "waiting");
 }
 
-// src/transcript/calls.ts
-function findCall(entries, match) {
-  for (let i = entries.length - 1; i >= 0; i--) {
-    const turn = entries[i];
-    if (turn?.kind !== "turn") {
-      continue;
-    }
-    const located = callIn(turn, match);
-    if (located) {
-      return located;
-    }
-  }
-  return void 0;
-}
-function callIn(turn, match) {
-  const hit = turn.blocks.findLast((b) => b.kind === "tool" && match(b.call));
-  return hit && { call: hit.call, turn };
-}
-function callsWhere(entries, match) {
-  return entries.flatMap((e) => e.kind === "turn" ? e.blocks.flatMap((b) => b.kind === "tool" && match(b.call) ? [b.call] : []) : []);
-}
-function tookMs(call) {
-  return call.outcome.kind === "running" ? void 0 : call.outcome.duration;
-}
-function isTodoName(name) {
-  return name === "todo_list" || name === "todo";
-}
-function isProcessTool(name) {
-  return name === "process_manage" || name === "process";
-}
-function isWatchCall(call) {
-  return isProcessTool(call.name) && ["log", "poll", "wait"].includes(String(call.args["action"])) && typeof call.args["session_id"] === "string";
-}
-function isBackgroundCall(call) {
-  return call.name === "terminal" && (call.args["background"] === true || typeof record2(call.result)?.["session_id"] === "string");
-}
-function isToolError(p3) {
-  const r = record2(p3.result);
-  if (r?.["error"]) {
-    return true;
-  }
-  if (p3.name === "terminal" && typeof r?.["exit_code"] === "number" && r["exit_code"] !== 0) {
-    return true;
-  }
-  return typeof p3.summary === "string" && /^(error|failed)\b/i.test(p3.summary);
-}
-
 // src/view/describe.ts
 var MAX2 = 72;
 function words(segment) {
@@ -9167,39 +9239,65 @@ function batchBody(call, batch) {
 
 // src/view/tools/cards/ask.tsx
 var askView = { action: "other", card: askCard, step: namedStep };
+var asking = (q2) => flat(splitQuestion(q2?.question ?? "").ask);
 function askCard(call, d) {
   const qs = d.questions;
+  const several = qs.length > 1;
+  const asked2 = several ? `${qs.length} questions` : asking(qs[0]) || call.context;
+  const head2 = { name: "ask", targetKind: "text", title: "Ask" };
+  if (call.outcome.kind === "running") {
+    return { ...head2, body: [/* @__PURE__ */ jsx("text", { role: "hermes.ask.waiting", spans: [{ s: "muted", t: "Waiting for your answer" }] }, "waiting")], target: asked2 };
+  }
   const body = [];
   for (const [i, q2] of qs.entries()) {
-    const choices = q2.choices;
-    const answers2 = d.responses[i]?.answers ?? [];
-    if (qs.length > 1) {
-      body.push(/* @__PURE__ */ jsx("md", { children: q2.question ?? "" }, `q${i}`));
+    if (several || (q2.question ?? "").trim().includes("\n")) {
+      body.push(/* @__PURE__ */ jsx("md", { role: "hermes.ask.question", children: q2.question ?? "" }, `q${i}`));
     }
-    for (const [j, c] of choices.entries()) {
-      body.push(answerRow(`q${i}.o${j}`, c, answers2.includes(c)));
+    const r = d.responses[i];
+    const picked = new Set(r?.answers ?? []);
+    for (const [j, c] of q2.choices.entries()) {
+      body.push(choiceRow(`q${i}.o${j}`, c, picked.has(c)));
     }
-    for (const [j, typed] of answers2.filter((a2) => !choices.includes(a2)).entries()) {
-      body.push(answerRow(`q${i}.a${j}`, typed, true));
+    for (const [j, typed] of (r?.answers ?? []).filter((a2) => !q2.choices.includes(a2)).entries()) {
+      body.push(choiceRow(`q${i}.a${j}`, typed, true));
     }
-    if (!answers2.length && call.outcome.kind !== "running" && d.answered) {
-      const skipped2 = d.responses[i]?.skipped === true;
-      body.push(/* @__PURE__ */ jsx("text", { role: "omp.tool.notice", spans: [{ s: "muted", t: skipped2 ? "Skipped" : "No answer" }] }, `q${i}.none`));
+    if (d.answered && r?.status !== "answered") {
+      body.push(
+        /* @__PURE__ */ jsxs("row", { align: "start", gap: "sm", role: "hermes.ask.verdict", children: [
+          /* @__PURE__ */ jsx("icon", { name: d.outcome === "timed_out" ? "clock" : "minus", tone: "muted" }, "icon"),
+          /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: noAnswer(r, d) }], wrap: "word" }, "t")
+        ] }, `q${i}.none`)
+      );
     }
   }
-  return {
-    body,
-    name: "ask",
-    // Several questions each read in the body; the head counts them instead of repeating one.
-    target: qs.length > 1 ? `${qs.length} questions` : qs[0]?.question ?? call.context,
-    targetKind: "text",
-    title: "Ask"
-  };
+  return { ...head2, body, folded: d.answered, target: [{ t: asked2 }, ...verdictSpans(d)] };
 }
-function answerRow(key2, text15, picked) {
-  return /* @__PURE__ */ jsxs("row", { role: picked ? "omp.tool.answer" : "omp.tool.answer.off", children: [
-    /* @__PURE__ */ jsx("text", { spans: [picked ? { s: "success", t: "\u2713" } : { s: "dim", t: "\xB7" }] }, "c"),
-    /* @__PURE__ */ jsx("text", { spans: [{ t: text15 }] }, "t")
+function verdictSpans(d) {
+  if (!d.answered) {
+    return [];
+  }
+  const parts3 = d.questions.map((_, i) => {
+    const r = d.responses[i];
+    return r?.status === "answered" ? { s: "success", t: r.answers.join(", ") } : { s: "muted", t: noAnswer(r, d) };
+  });
+  return [{ s: "dim", t: "  \u2192  " }, ...parts3.flatMap((p3, i) => i ? [{ s: "dim", t: " \xB7 " }, p3] : [p3])];
+}
+function noAnswer(r, d) {
+  if (r?.status === "skipped" || d.outcome === "cancelled") {
+    return "Skipped";
+  }
+  if (d.outcome === "timed_out") {
+    return "No answer: the question timed out";
+  }
+  if (d.outcome === "undelivered") {
+    return "No answer: no window showed the question";
+  }
+  return "No answer";
+}
+function choiceRow(key2, text15, picked) {
+  return /* @__PURE__ */ jsxs("row", { align: "start", gap: "sm", role: picked ? "hermes.ask.choice.on" : "hermes.ask.choice", children: [
+    picked ? /* @__PURE__ */ jsx("icon", { name: "check", tone: "success" }, "mark") : /* @__PURE__ */ jsx("text", { spans: [{ s: "dim", t: "\xB7" }] }, "mark"),
+    /* @__PURE__ */ jsx("text", { spans: [picked ? { t: text15 } : { s: "muted", t: text15 }], wrap: "word" }, "t")
   ] }, key2);
 }
 
@@ -43339,7 +43437,7 @@ function foldOf(turn) {
     if (i === answer || b.kind === "steer" || b.kind === "compaction") {
       continue;
     }
-    if (b.kind === "tool" && (isBackgroundCall(b.call) || waiting4(b.call) || isConnectCall(b.call) || showsImage(b.call) || b.call.subagents?.some((a2) => a2.status === "running" || a2.status === "queued"))) {
+    if (b.kind === "tool" && (isAsk(b.call) || isBackgroundCall(b.call) || waiting4(b.call) || isConnectCall(b.call) || showsImage(b.call) || b.call.subagents?.some((a2) => a2.status === "running" || a2.status === "queued"))) {
       continue;
     }
     if (answer >= 0 && i > answer && b.kind === "tool" && b.call.outcome.kind !== "done") {
@@ -43492,7 +43590,7 @@ function liveLabel(item3, active = false) {
   return `${verb} ${commandProgramName(command2) ?? "command"}`;
 }
 function busyLabel(call) {
-  return `${liveLabel({ call, id: call.id, kind: "tool" }, true)}\u2026`;
+  return isAsk(call) ? "Waiting for your answer\u2026" : `${liveLabel({ call, id: call.id, kind: "tool" }, true)}\u2026`;
 }
 function preparingLabel(name) {
   const app2 = appOf(name);
@@ -45876,9 +45974,72 @@ var STYLES = css`
     font: 500 12px/20px var(--sans) !important;
   }
 
-  /* omp's ask theme draws a radio at the start of each option without moving the text over. */
-  [data-role='omp.ask.option'] {
-    padding-left: 34px !important;
+  /* The clarify sheet's options: Tern spaces omp's ask rows inside the dock's ask editor; in a
+     sheet the rows lose their padding, so the radio or checkbox sits under the label. */
+  .sf-overlay[data-role='omp.overlay.ask'] .sf-list[data-role='omp.ask.options'] .sf-item {
+    padding: 8px 12px 8px 40px !important;
+  }
+
+  .sf-overlay[data-role='omp.overlay.ask'] .sf-list[data-role='omp.ask.options'] .sf-item-detail:empty {
+    display: none;
+  }
+
+  /* A long label wraps beside the key that picks it, which stays at the row's end (after its
+     Recommended chip) on the first line. */
+  .sf-overlay[data-role='omp.overlay.ask'] .sf-list[data-role='omp.ask.options'] .sf-item-label {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .sf-overlay[data-role='omp.overlay.ask'] .sf-list[data-role='omp.ask.options'] .sf-item-value {
+    align-self: flex-start;
+  }
+
+  .sf-overlay[data-role='omp.overlay.ask'] .sf-list[data-role='omp.ask.options'] .sf-item-hint {
+    align-self: flex-start;
+    margin-top: 2px;
+    margin-left: auto;
+  }
+
+  .sf-overlay[data-role='omp.overlay.ask'] .sf-list[data-role='omp.ask.options'] .sf-item-value:not(.sf-hidden) + .sf-item-hint {
+    margin-left: 0;
+  }
+
+  /* A long question's context under its title: body text, scrolling when it is long. */
+  [data-role='hermes.ask.context'] {
+    max-height: 30vh;
+    overflow-y: auto;
+    font: 400 13.5px/1.5 var(--sans) !important;
+    color: var(--t2);
+  }
+
+  /* The keys a question sheet takes, quiet beside its buttons. */
+  .sf-row[data-role='hermes.ask.keys'] {
+    flex: 0 1 auto;
+    min-width: 0;
+    flex-wrap: wrap;
+    row-gap: 4px;
+    font: 500 11.5px/1 var(--sans);
+    color: var(--t3);
+  }
+
+  [data-role='hermes.ask.keys'] .kbd {
+    height: 16px;
+    min-width: 18px;
+    font-size: 10.5px;
+  }
+
+  /* The clarify card: the user's answer, then the choices offered, each after a mark in one column. */
+  :is([data-role='hermes.ask.verdict'], [data-role^='hermes.ask.choice'], [data-role='hermes.ask.waiting']) {
+    font: 400 14px/22px var(--sans) !important;
+  }
+
+  :is([data-role='hermes.ask.verdict'], [data-role^='hermes.ask.choice']) > :first-child {
+    flex: none;
+    width: 16px;
+    height: 22px;
+    justify-content: center;
+    text-align: center;
   }
 
   /* A steer's status under its words is a note, not code. */
@@ -47117,7 +47278,13 @@ function parsePrompt(req) {
     case "approval":
       return approvalOf(req, known2);
     case "clarify":
-      return { answers: lockedAnswers(known2.params.answers), kind: "clarify", questions: questionsOf(known2.params.questions), req };
+      return {
+        answers: lockedAnswers(known2.params.answers),
+        kind: "clarify",
+        place: placeOf(req.params["place"]),
+        questions: questionsOf(known2.params.questions),
+        req
+      };
     case "sudo":
     case "secret":
     case "vault.unlock_prompt":
@@ -47158,6 +47325,14 @@ function questionsOf(raw2) {
     const question = text13(q2.question).trim();
     return question ? [{ choices: "choices" in q2 ? strings3(q2.choices) : [], multi: "multi_select" in q2 && q2.multi_select === true, qid: text13(q2.qid), question }] : [];
   });
+}
+function placeOf(raw2) {
+  if (!raw2 || typeof raw2 !== "object") {
+    return void 0;
+  }
+  const index2 = Reflect.get(raw2, "index");
+  const total = Reflect.get(raw2, "total");
+  return Number.isInteger(index2) && Number.isInteger(total) && typeof index2 === "number" && typeof total === "number" && total > 1 && index2 >= 0 && index2 < total ? { index: index2, total } : void 0;
 }
 function lockedAnswers(preset) {
   const answers2 = {};
@@ -49012,8 +49187,8 @@ function turnNode(turn, id, cx) {
   }
   const last = pieces(turn.blocks).at(-1);
   const compacting = last?.kind === "block" && last.block.kind === "compaction" && last.block.compaction.state.status === "running";
-  const asking = last?.kind === "block" && last.block.kind === "tool" && liveOpen(last.block.call.connect);
-  if (live && !compacting && !asking && (!last || last.kind === "block" && last.block.kind !== "text" || last.kind === "work" && latestFailed(last.items))) {
+  const asking2 = last?.kind === "block" && last.block.kind === "tool" && (isAsk(last.block.call) && last.block.call.outcome.kind === "running" || liveOpen(last.block.call.connect));
+  if (live && !compacting && !asking2 && (!last || last.kind === "block" && last.block.kind !== "text" || last.kind === "work" && latestFailed(last.items))) {
     children3.push(thinkingRow());
   }
   const end = turn.end;
