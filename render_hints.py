@@ -1,18 +1,21 @@
-"""What Tern draws in a reply, told to the agent of a conversation a Tern pane shows.
+"""What Tern draws in a reply, told to the agent of a conversation the Tern frontend created.
 
 Tern's `md` node draws more than Markdown: mermaid (through merman), svg and 3D fences, TeX math,
 callouts and file links, and the frontend turns a ``MEDIA:`` line into Tern's media viewer. Nothing
 in Hermes says so: a session the plugin's frontend attaches to gets the Ink TUI's platform hint.
-The section is frozen into a session's prompt when its first turn builds it, and only a session a
-live ``hermes tern`` pane shows gets it (the pane's viewer marker, :mod:`tern_env`; the frontend
-runs only once Tern answered its handshake); the platform cannot tell (a gateway the desktop app started reads every session as ``desktop``).
+The section is frozen into a session's prompt when its first turn builds it, and only a session the
+plugin's frontend created gets it: the frontend names itself ``hermes-tern`` on ``session.create``
+(``frontend/src/hermes/gatewayClient.ts``), and Hermes hands that name to prompt sections as
+``info["client"]``. The platform cannot tell: a gateway the desktop app started reads every session
+as ``desktop``. The name is the client's own label, which is enough for a hint about drawing.
 """
 
 from __future__ import annotations
 
 from typing import Any, Mapping
 
-from . import tern_env
+# The client name the frontend sends on session.create (frontend/src/hermes/gatewayClient.ts CLIENT).
+CLIENT = "hermes-tern"
 
 PROMPT = """<tern_rendering>
 This conversation is shown in Tern, which draws your Markdown natively. Use a figure when it says more than prose; keep short answers plain, and never announce or restate a figure.
@@ -29,8 +32,8 @@ This conversation is shown in Tern, which draws your Markdown natively. Use a fi
 
 
 def section(info: Mapping[str, Any]) -> str:
-    """The section for a session a live Tern pane shows, else nothing."""
-    if not tern_env.viewer(str(info.get("session_id") or "")):
+    """The section for a session the Tern frontend created, else nothing."""
+    if info.get("client") != CLIENT:
         return ""
     return PROMPT.replace("{cwd}", str(info.get("cwd") or "the chat's working directory"))
 

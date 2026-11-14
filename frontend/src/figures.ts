@@ -1,16 +1,14 @@
 // Figures in a finished reply that Tern draws from a fence: ```mermaid through merman, ```svg as a
 // picture. A diagram merman cannot parse shows as its source in an empty frame, so after a turn the
-// app checks them (figure_check.py, in Hermes' interpreter) and asks the agent once to send the
-// broken ones again. Hermes has no hook to keep a turn going after a text-only answer (pre_verify
-// fires only after file edits), so the ask is a prompt of its own.
+// app has the plugin's Python half check them (figure_check.py, over plugin RPC) and asks the agent
+// once to send the broken ones again. Hermes has no hook to keep a turn going after a text-only
+// answer (pre_verify fires only after file edits), so the ask is a prompt of its own.
 
-import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { mkdirSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
 
-import { dataDir } from './connections/cards.js'
-import { parseJson, record } from './wire/json.js'
+import type { MessageCompletePayload } from '@hermes/shared/gateway-events'
+
+import { record } from './wire/json.js'
 
 export type FigureLang = 'mermaid' | 'svg'
 
@@ -27,7 +25,11 @@ export interface FigureFailure extends Figure {
   line?: number | undefined
 }
 
-export type FigureCheck = (figures: readonly Figure[], signal?: AbortSignal) => Promise<FigureFailure[] | undefined>
+/**
+ * Checks the figures of session `sid`'s reply `text`: the ones that would not render, or undefined
+ * when they cannot be checked or another pane showing the session claimed the reply.
+ */
+export type FigureCheck = (sid: string, text: string, figures: readonly Figure[]) => Promise<FigureFailure[] | undefined>
 
 const OPEN = /^ {0,3}(`{3,}|~{3,})\s*([^\s`]*)/
 // A first check downloads merman through uv.
@@ -82,65 +84,120 @@ export function fixPrompt(failed: readonly FigureFailure[]): string {
   ].join('\n')
 }
 
-/** True for the one pane that may ask about this reply; other panes showing the session stay quiet. */
-export function claimFigures(sid: string, text: string, dir = dataDir()): boolean {
-  const key = createHash('sha256').update(`${sid}\0${text}`).digest('hex').slice(0, 32)
+/** The plugin RPC method that starts a check, and the session event that answers it (figure_check.py). */
+export const CHECK_METHOD = 'plugin.hermes-tern.figures.check'
+export const CHECKED_EVENT = 'plugin.hermes-tern.figures.checked'
 
-  try {
-    mkdirSync(join(dir, 'figures'), { recursive: true })
-    writeFileSync(join(dir, 'figures', `${key}.asked`), '', { flag: 'wx' })
-
-    return true
-  } catch {
-    return false
-  }
+/** What the check reaches of the gateway client: its requests, and its events for the result. */
+export interface FigureGateway {
+  request(method: string, params?: Record<string, unknown>): Promise<unknown>
+  on(event: 'event', listener: (ev: { type: string; payload?: unknown }) => void): unknown
 }
 
-/**
- * A {@link FigureCheck} that runs `figure_check.py` in Hermes' interpreter; undefined when the
- * launcher named no interpreter or checkout. It answers undefined when the figures cannot be checked.
- */
-export function hermesFigureCheck(env: NodeJS.ProcessEnv = process.env): FigureCheck | undefined {
-  const python = env['HERMES_PYTHON']?.trim()
-  const root = env['HERMES_PYTHON_SRC_ROOT']
-  const ui = env['HERMES_TUI_DIR']
+/** The failed figures of a `figures.checked` payload; undefined when it holds no result per figure. */
+export function checkedFailures(figs: readonly Figure[], payload: unknown): FigureFailure[] | undefined {
+  const results = record(payload)?.['results']
 
-  if (!python || !root || !ui) {
+  if (!Array.isArray(results) || results.length !== figs.length) {
     return undefined
   }
 
-  const script = join(ui, '..', 'figure_check.py')
+  return figs.flatMap((f, i) => {
+    const r = record(results[i])
 
-  return (figs, signal) =>
-    new Promise(resolve => {
-      const child = spawn(python, ['-I', script], { cwd: root, env, signal, stdio: ['pipe', 'pipe', 'ignore'], timeout: CHECK_TIMEOUT_MS })
-      let stdout = ''
+    if (r?.['ok'] !== false) {
+      return []
+    }
 
-      child.stdout.setEncoding('utf8').on('data', (chunk: string) => (stdout += chunk))
-      child.on('error', () => resolve(undefined))
-      child.stdin.on('error', () => undefined)
-      child.on('close', () => {
-        const results = record(parseJson(stdout.trim().split('\n').at(-1) ?? ''))?.['results']
+    const error = r['error']
+    const line = r['line']
 
-        if (!Array.isArray(results) || results.length !== figs.length) {
-          return resolve(undefined)
-        }
+    return [{ ...f, error: (typeof error === 'string' && error) || 'it does not parse', line: typeof line === 'number' ? line : undefined }]
+  })
+}
 
-        resolve(
-          figs.flatMap((f, i) => {
-            const r = record(results[i])
+/**
+ * A {@link FigureCheck} that asks the plugin's Python half over `gw`. The call answers at once
+ * whether this pane claimed the reply (one pane per reply asks the agent); the result arrives as
+ * the `plugin.hermes-tern.figures.checked` event, keyed by the reply's hash.
+ */
+export function gatewayFigureCheck(gw: FigureGateway): FigureCheck {
+  const waiting = new Map<string, (payload: unknown) => void>()
 
-            if (r?.['ok'] !== false) {
-              return []
-            }
+  gw.on('event', ev => {
+    const reply = ev.type === CHECKED_EVENT ? record(ev.payload)?.['reply'] : undefined
 
-            const error = r['error']
-            const line = r['line']
+    if (typeof reply === 'string') {
+      waiting.get(reply)?.(ev.payload)
+    }
+  })
 
-            return [{ ...f, error: (typeof error === 'string' && error) || 'it does not parse', line: typeof line === 'number' ? line : undefined }]
-          })
-        )
-      })
-      child.stdin.end(JSON.stringify({ figures: figs.map(f => ({ lang: f.lang, source: f.source })) }))
+  return async (sid, text, figs) => {
+    const reply = createHash('sha256').update(`${sid}\0${text}`).digest('hex').slice(0, 32)
+    // Waiting starts before the call: the result can arrive before the call's answer.
+    const result = new Promise<unknown>(resolve => {
+      const finish = (payload: unknown) => {
+        clearTimeout(timer)
+        waiting.delete(reply)
+        resolve(payload)
+      }
+      const timer = setTimeout(() => finish(undefined), CHECK_TIMEOUT_MS)
+
+      waiting.set(reply, finish)
     })
+
+    const claimed = await gw
+      .request(CHECK_METHOD, { figures: figs.map(f => ({ lang: f.lang, source: f.source })), reply, session_id: sid })
+      .then(r => record(r)?.['claimed'] === true)
+      // A gateway without the plugin's method, or a session that went: nothing to check.
+      .catch(() => false)
+
+    if (!claimed) {
+      waiting.get(reply)?.(undefined)
+
+      return undefined
+    }
+
+    return checkedFailures(figs, await result)
+  }
+}
+
+/** Asks the agent to resend the figures of a finished reply that would not render, once per user prompt. */
+export class FigureAsk {
+  readonly #check: FigureCheck
+  readonly #live: () => null | string
+  readonly #send: (prompt: string) => void
+  /** The agent was asked since the user's last prompt. */
+  #asked = false
+
+  constructor(check: FigureCheck, live: () => null | string, send: (prompt: string) => void) {
+    this.#check = check
+    this.#live = live
+    this.#send = send
+  }
+
+  /** The user sent a prompt: its reply may be asked about again. */
+  reset() {
+    this.#asked = false
+  }
+
+  /** Checks a finished reply's figures; when one would not render, sends the prompt that asks for it again. */
+  afterReply(payload: Pick<MessageCompletePayload, 'status' | 'text'>) {
+    const text = payload.status === 'complete' && typeof payload.text === 'string' ? payload.text : undefined
+    const sid = this.#live()
+    const figs = text && !this.#asked ? figures(text) : []
+
+    if (!text || !sid || !figs.length) {
+      return
+    }
+
+    void this.#check(sid, text, figs).then(failed => {
+      if (!failed?.length || this.#live() !== sid || this.#asked) {
+        return
+      }
+
+      this.#asked = true
+      this.#send(fixPrompt(failed))
+    })
+  }
 }

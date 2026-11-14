@@ -61,7 +61,7 @@ A pane remembers its conversation. If `hermes tern` dies in a pane (a crash, a k
 | Plugin RPC methods (`ctx.register_rpc`) | The pane's own calls to the plugin: which session it shows, a conversation's linked PRs, a chart's rules |
 | Per-session environment (`ctx.register_session_env`) | The agent's shell commands run with the chat's `TERN_PANE`, so `tern open` works beside the chat |
 | `tern_charts` auxiliary task | Writes the rules behind a background process's live chart (`auxiliary.tern_charts` picks its model) |
-| System prompt sections | Tell the agent to link the PRs it opens, and (only in a session a Tern pane shows) what Tern draws in a reply |
+| System prompt sections | Tell the agent to link the PRs it opens, and (only in a session `hermes tern` started) what Tern draws in a reply |
 
 ## The chat
 
@@ -113,7 +113,7 @@ A turn shows what the agent does while it works: its reasoning, short notes, and
 Tern draws more than Markdown in a reply: ```` ```mermaid ```` diagrams (through merman, the Rust
 port of Mermaid, so 35 kinds from flowcharts to Wardley maps), ```` ```svg ```` figures in the
 theme's colors, TeX math, 3D fences (` ```stl `, ` ```obj `), callouts and links to files at a line.
-The plugin tells the agent so in sessions a Tern pane shows, and a line `MEDIA:/path` in a reply
+The plugin tells the agent so in sessions `hermes tern` started, and a line `MEDIA:/path` in a reply
 shows that file (an image, PDF, video, audio or 3D model) in Tern's viewer.
 
 After a turn, the plugin checks the reply's diagrams with merman and its svg figures against Tern's

@@ -282,8 +282,9 @@ function textNodes(id: string, text: string, streaming: boolean): JSX.Element {
     )
   }
 
+  // Its own key: Tern 0.9.12 drops the subtree when a streamed `md` turns into a `col` under one key.
   return (
-    <col gap="sm" key={id} role="hermes.reply.parts">
+    <col gap="sm" key={`${id}.parts`} role="hermes.reply.parts">
       {parts.map((p, i) =>
         p.kind === 'md' ? (
           <md key={`md${i}`} {...optional('stream', (streaming && i === parts.length - 1) || undefined)}>

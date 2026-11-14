@@ -1,23 +1,24 @@
-"""The rendering section reaches only sessions a Tern pane shows, and figure_check.py follows Tern's figure rules."""
+"""The rendering section reaches only sessions the Tern frontend created, and figure_check.py follows Tern's figure rules."""
 
 from __future__ import annotations
 
 import importlib.util
 import json
+import threading
 from pathlib import Path
 
 import pytest
 
-from hermes_tern_plugin import render_hints
+from hermes_tern_plugin import figure_check, render_hints
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_the_section_is_for_sessions_a_tern_pane_shows(monkeypatch):
-    monkeypatch.setattr(render_hints.tern_env, "viewer", lambda sid: {"pid": 1} if sid == "shown" else None)
-    text = render_hints.section({"session_id": "shown", "cwd": "/work/repo"})
+def test_the_section_is_for_sessions_the_tern_frontend_created():
+    text = render_hints.section({"session_id": "s1", "client": "hermes-tern", "cwd": "/work/repo"})
     assert "```mermaid" in text and "against /work/repo;" in text
-    assert render_hints.section({"session_id": "elsewhere", "cwd": "/work/repo"}) == ""
+    for client in ("", "desktop", "hermes-tern-other"):
+        assert render_hints.section({"session_id": "s1", "client": client, "cwd": "/work/repo"}) == ""
     assert len(render_hints.PROMPT) < 4000
 
 
@@ -50,3 +51,42 @@ def test_mermaid_is_checked_by_merman(check):
     assert results[0]["ok"] is False and results[0]["line"] == 2
     assert results[1] == {"ok": True}
     assert results[2]["ok"] is False and "C4Context" in results[2]["error"]
+
+
+class Ctx:
+    def __init__(self):
+        self.rpc, self.events, self.done = {}, [], threading.Event()
+
+    def register_rpc(self, name, handler):
+        self.rpc[name] = handler
+
+    def emit_to_session(self, session_id, event, payload):
+        self.events.append((session_id, event, payload))
+        self.done.set()
+
+
+def test_one_pane_claims_a_reply_and_the_result_reaches_the_session():
+    ctx = Ctx()
+    figure_check.register(ctx)
+    params = {"reply": "r-claim", "figures": [svg('<svg width="10"/>')]}
+    assert ctx.rpc["figures.check"](dict(params), session_id="s1") == {"claimed": True}
+    assert ctx.rpc["figures.check"](dict(params), session_id="s1") == {"claimed": False}
+    assert ctx.done.wait(5)
+    ((sid, event, payload),) = ctx.events
+    assert (sid, event, payload["reply"]) == ("s1", "figures.checked", "r-claim")
+    assert payload["results"][0]["ok"] is False and "viewBox" in payload["results"][0]["error"]
+
+
+@pytest.mark.parametrize("params, session_id", [
+    ({"reply": "r-no-session", "figures": [svg("<svg/>")]}, None),
+    ({"figures": [svg("<svg/>")]}, "s1"),
+    ({"reply": "r-no-figures", "figures": []}, "s1"),
+    ({"reply": "r-html", "figures": [{"lang": "html", "source": "<p/>"}]}, "s1"),
+])
+def test_bad_params_fail_the_call_and_claim_nothing(params, session_id):
+    ctx = Ctx()
+    figure_check.register(ctx)
+    with pytest.raises(ValueError):
+        ctx.rpc["figures.check"](dict(params), session_id=session_id)
+    assert ctx.rpc["figures.check"]({"reply": params.get("reply", "r-no-reply"), "figures": [svg("<svg/>")]},
+                                    session_id=session_id or "s1") == {"claimed": True}

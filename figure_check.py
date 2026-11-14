@@ -1,29 +1,44 @@
 """Checks the figures of a finished reply the way Tern will draw them.
 
-The frontend runs it after a turn whose reply has a ```mermaid or ```svg fence
-(frontend/src/figures.ts), in Hermes' own interpreter:
+The frontend (frontend/src/figures.ts) calls the plugin RPC method ``plugin.hermes-tern.figures.check``
+after a turn whose reply has a ```mermaid or ```svg fence::
 
-    $HERMES_PYTHON figure_check.py < {"figures": [{"lang": "mermaid", "source": "..."}, ...]}
+    {"session_id": "...", "reply": "<hash of the reply>", "figures": [{"lang": "mermaid", "source": "..."}, ...]}
 
-One JSON line answers: ``{"results": [{"ok": true} | {"ok": false, "error": "...", "line": 3}, ...]}``
-in the request's order, or ``{"unavailable": "<why>"}`` when mermaid cannot be checked here.
+The first call for a reply answers ``{"claimed": true}``; a second pane showing the same session gets
+``{"claimed": false}`` and stays quiet, so the agent is asked once. The check runs in a thread here (a
+first run downloads merman, and the gateway serves one connection's requests in order), and its result
+goes to the session's viewers as the event ``plugin.hermes-tern.figures.checked``: ``reply`` and
+``{"results": [{"ok": true} | {"ok": false, "error": "...", "line": 3}, ...]}`` in the request's order,
+or ``{"unavailable": "<why>"}`` when mermaid cannot be checked here.
 
 Tern draws mermaid with merman (merman-render 0.8.0 against Mermaid 12.1.0 in Tern 0.9.5), so the
 check is merman's own parser. merman is not a dependency of the plugin: it has wheels for macOS
 arm64, Linux x86_64 (glibc 2.35+) and Windows only, and a dependency the platform has no wheel for
-would fail Hermes' whole dependency sync. Without it here, the script runs itself again through
-Hermes' uv with merman pinned, which uv caches after the first run.
+would fail Hermes' whole dependency sync. Without it in the gateway's interpreter, this file runs as a
+script through Hermes' uv with merman pinned, which uv caches after the first run::
+
+    python figure_check.py < {"figures": [...]}
 """
 
 from __future__ import annotations
 
+import contextlib
+import contextvars
+import hashlib
 import json
+import logging
 import os
 import shutil
 import subprocess
 import sys
+import threading
 import xml.etree.ElementTree as ET
-from pathlib import Path
+from collections import OrderedDict
+from concurrent.futures import ThreadPoolExecutor
+from typing import Any
+
+logger = logging.getLogger(__name__)
 
 MERMAN = "merman==0.8.0"
 # A first run downloads the 8 MB wheel.
@@ -91,15 +106,13 @@ def _mermaid(checker, source: str) -> dict:
 
 
 def _uv() -> str | None:
-    if found := shutil.which("uv"):
-        return found
-    tools = Path(os.environ.get("HERMES_HOME") or Path.home() / ".hermes")
-    # A profile's home sits under the root's profiles/; PM's tools live beside the root's.
-    for home in (tools, *tools.parents):
-        for candidate in sorted((home / "tools").glob("uv-*/uv*"), reverse=True):
-            if candidate.name in ("uv", "uv.exe"):
-                return str(candidate)
-    return None
+    """Hermes' own uv (published as ``pm.uv_launcher``), else one on PATH."""
+    with contextlib.suppress(Exception):
+        from pm import uv_launcher
+
+        if found := uv_launcher("uv"):
+            return str(found)
+    return shutil.which("uv")
 
 
 def _through_uv(request: str) -> dict:
@@ -127,6 +140,80 @@ def check(request: str) -> dict:
         checker = merman.Merman()
     return {"results": [_mermaid(checker, f.get("source", "")) if f.get("lang") == "mermaid" else _svg(f.get("source", ""))
                         for f in figures]}
+
+
+METHOD = "figures.check"
+EVENT = "figures.checked"
+# Bounds on what a caller may send (any client this gateway authenticated can call the method).
+MAX_FIGURES = 16
+MAX_SOURCE_CHARS = 64 * 1024
+MAX_REPLY_CHARS = 64
+# Replies already claimed, oldest first; enough to cover every pane's last few turns.
+MAX_CLAIMS = 512
+
+_claims: OrderedDict[str, None] = OrderedDict()
+_claims_lock = threading.Lock()
+_pool: ThreadPoolExecutor | None = None
+
+
+def _executor() -> ThreadPoolExecutor:
+    # One check at a time across the gateway: each is a short subprocess once merman is cached.
+    global _pool
+    with _claims_lock:
+        if _pool is None:
+            _pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="tern-figures")
+        return _pool
+
+
+def _figures(raw: Any) -> list[dict[str, str]]:
+    if not isinstance(raw, list) or not raw or len(raw) > MAX_FIGURES:
+        raise ValueError(f"figures.check needs 1 to {MAX_FIGURES} figures")
+    out = []
+    for f in raw:
+        lang, source = (f.get("lang"), f.get("source")) if isinstance(f, dict) else (None, None)
+        if lang not in ("mermaid", "svg") or not isinstance(source, str) or len(source) > MAX_SOURCE_CHARS:
+            raise ValueError("each figure needs lang mermaid or svg and a source")
+        out.append({"lang": lang, "source": source})
+    return out
+
+
+def _claim(session_id: str, reply: str) -> bool:
+    """True for the first call about this reply of this session."""
+    key = hashlib.sha256(f"{session_id}\0{reply}".encode()).hexdigest()
+    with _claims_lock:
+        if key in _claims:
+            return False
+        _claims[key] = None
+        while len(_claims) > MAX_CLAIMS:
+            _claims.popitem(last=False)
+    return True
+
+
+def register(ctx) -> None:
+    def check_figures(params: dict, *, session_id: str | None = None, **_: Any) -> dict[str, bool]:
+        if not session_id:
+            raise ValueError("figures.check needs the session_id whose viewers get the result")
+        reply = params.get("reply")
+        if not isinstance(reply, str) or not reply or len(reply) > MAX_REPLY_CHARS:
+            raise ValueError("figures.check needs the reply's hash")
+        request = json.dumps({"figures": _figures(params.get("figures"))})
+        if not _claim(session_id, reply):
+            return {"claimed": False}
+
+        def run() -> None:
+            try:
+                answer = check(request)
+            except Exception as exc:  # noqa: BLE001 - the pane gets an answer, whatever went wrong
+                answer = {"unavailable": str(exc) or type(exc).__name__}
+            try:
+                ctx.emit_to_session(session_id, EVENT, {"reply": reply, **answer})
+            except Exception:  # noqa: BLE001 - the session may be gone
+                logger.debug("hermes-tern: figure check for %s not delivered", session_id, exc_info=True)
+
+        _executor().submit(contextvars.copy_context().run, run)
+        return {"claimed": True}
+
+    ctx.register_rpc(METHOD, check_figures)
 
 
 def main() -> None:
