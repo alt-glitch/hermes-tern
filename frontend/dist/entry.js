@@ -6858,6 +6858,7 @@ function afterToolComplete(p3, cx) {
 function afterMessageComplete(p3, cx) {
   cx.transcript.complete(p3);
   cx.activity.endBusy();
+  cx.checkFigures(p3);
   cx.activity.endCompaction();
   cx.transcript.compactions.uncompact("running");
   cx.summarize();
@@ -46994,6 +46995,123 @@ async function dispatched(raw2, cx, { arg, title }) {
   }
 }
 
+// src/figures.ts
+import { createHash as createHash2 } from "node:crypto";
+var OPEN = /^ {0,3}(`{3,}|~{3,})\s*([^\s`]*)/;
+var CHECK_TIMEOUT_MS = 15e4;
+function figures(text15) {
+  const out = [];
+  const counts = { mermaid: 0, svg: 0 };
+  let open;
+  for (const line of text15.split("\n")) {
+    if (open) {
+      const close = line.trim();
+      if (close.length >= open.mark.length && close === open.mark.charAt(0).repeat(close.length)) {
+        if (open.lang === "mermaid" || open.lang === "svg") {
+          out.push({ lang: open.lang, n: ++counts[open.lang], source: open.lines.join("\n") });
+        }
+        open = void 0;
+      } else {
+        open.lines.push(line);
+      }
+      continue;
+    }
+    const m = OPEN.exec(line);
+    if (m?.[1]) {
+      open = { lang: (m[2] ?? "").toLowerCase(), lines: [], mark: m[1] };
+    }
+  }
+  return out;
+}
+var NAME = { mermaid: "Mermaid diagram", svg: "SVG figure" };
+function fixPrompt(failed) {
+  const lines = failed.map((f) => `- ${NAME[f.lang]} ${f.n}${f.line ? `, line ${f.line}` : ""}: ${f.error}`);
+  const one5 = failed.length === 1;
+  return [
+    `${one5 ? "A figure" : "Some figures"} in your last reply ${one5 ? "does" : "do"} not render in Tern:`,
+    "",
+    ...lines,
+    "",
+    `Send ${one5 ? "it" : "them"} again, fixed, each in its fence, with no other text.`
+  ].join("\n");
+}
+var CHECK_METHOD = "plugin.hermes-tern.figures.check";
+var CHECKED_EVENT = "plugin.hermes-tern.figures.checked";
+function checkedFailures(figs, payload) {
+  const results = record2(payload)?.["results"];
+  if (!Array.isArray(results) || results.length !== figs.length) {
+    return void 0;
+  }
+  return figs.flatMap((f, i) => {
+    const r = record2(results[i]);
+    if (r?.["ok"] !== false) {
+      return [];
+    }
+    const error = r["error"];
+    const line = r["line"];
+    return [{ ...f, error: typeof error === "string" && error || "it does not parse", line: typeof line === "number" ? line : void 0 }];
+  });
+}
+function gatewayFigureCheck(gw2) {
+  const waiting5 = /* @__PURE__ */ new Map();
+  gw2.on("event", (ev) => {
+    const reply2 = ev.type === CHECKED_EVENT ? record2(ev.payload)?.["reply"] : void 0;
+    if (typeof reply2 === "string") {
+      waiting5.get(reply2)?.(ev.payload);
+    }
+  });
+  return async (sid, text15, figs) => {
+    const reply2 = createHash2("sha256").update(`${sid}\0${text15}`).digest("hex").slice(0, 32);
+    const result = new Promise((resolve5) => {
+      const finish = (payload) => {
+        clearTimeout(timer);
+        waiting5.delete(reply2);
+        resolve5(payload);
+      };
+      const timer = setTimeout(() => finish(void 0), CHECK_TIMEOUT_MS);
+      waiting5.set(reply2, finish);
+    });
+    const claimed = await gw2.request(CHECK_METHOD, { figures: figs.map((f) => ({ lang: f.lang, source: f.source })), reply: reply2, session_id: sid }).then((r) => record2(r)?.["claimed"] === true).catch(() => false);
+    if (!claimed) {
+      waiting5.get(reply2)?.(void 0);
+      return void 0;
+    }
+    return checkedFailures(figs, await result);
+  };
+}
+var FigureAsk = class {
+  #check;
+  #live;
+  #send;
+  /** The agent was asked since the user's last prompt. */
+  #asked = false;
+  constructor(check2, live, send2) {
+    this.#check = check2;
+    this.#live = live;
+    this.#send = send2;
+  }
+  /** The user sent a prompt: its reply may be asked about again. */
+  reset() {
+    this.#asked = false;
+  }
+  /** Checks a finished reply's figures; when one would not render, sends the prompt that asks for it again. */
+  afterReply(payload) {
+    const text15 = payload.status === "complete" && typeof payload.text === "string" ? payload.text : void 0;
+    const sid = this.#live();
+    const figs = text15 && !this.#asked ? figures(text15) : [];
+    if (!text15 || !sid || !figs.length) {
+      return;
+    }
+    void this.#check(sid, text15, figs).then((failed) => {
+      if (!failed?.length || this.#live() !== sid || this.#asked) {
+        return;
+      }
+      this.#asked = true;
+      this.#send(fixPrompt(failed));
+    });
+  }
+};
+
 // node_modules/@hermes/shared/src/interpolation.ts
 var INTERPOLATION_RE = /\{!(.+?)\}/g;
 
@@ -47768,6 +47886,8 @@ var AppActions = class {
   #copied = new Flash(() => this.#cx.changed());
   /** The folder last reported to Tern by OSC 7. */
   #reportedCwd;
+  /** Asks the agent once per prompt to resend a finished reply's figures that would not render. */
+  figures;
   /** What the dock's buttons and fields do. */
   dock;
   /** What the key rules (draft/keys.ts) reach. */
@@ -47780,6 +47900,7 @@ var AppActions = class {
   host;
   constructor(cx) {
     this.#cx = cx;
+    this.figures = new FigureAsk(gatewayFigureCheck(cx.gw), () => cx.state.ref.live, (text15) => cx.router.route({ images: [], kind: "typed", pasted: [], text: text15 }, "queue"));
     const { attachments, chat, composer: composer2, gw: gw2, life, queue: queue2, transcript } = cx;
     const changed = () => cx.changed();
     this.dock = {
@@ -47890,6 +48011,7 @@ var AppActions = class {
   /** Sends the composer's draft, with the pastes it holds. */
   submitDraft() {
     const pasted = [...this.#cx.composer.pasted];
+    this.figures.reset();
     this.submit(this.#cx.composer.take(), this.#cx.state.busyMode, pasted);
   }
   /**
@@ -48587,6 +48709,62 @@ function imageChip(a2, i, onRemove) {
     ),
     /* @__PURE__ */ jsx("icon", { name: "x", onClick: () => onRemove(i), role: "hermes.composer.remove", title: `Remove ${a2.label}` }, "remove")
   ] }, `a${i}`);
+}
+
+// src/view/transcript.tsx
+import { homedir as homedir8 } from "node:os";
+
+// src/replyParts.ts
+var MEDIA_LINE = /^\s*MEDIA:\s*(\S(?:.*\S)?)\s*$/;
+var IMAGE_LINE = /^\s*!\[[^\]\n]*\]\(\s*<?([^)\s>]+)>?(?:\s+"[^"]*")?\s*\)\s*$/;
+var FENCE2 = /^ {0,3}(`{3,}|~{3,})/;
+var VIEWABLE = /\.(png|jpe?g|gif|webp|bmp|avif|svg|pdf|mp4|mov|webm|m4v|mp3|wav|flac|ogg|m4a|aac|obj|ply|wrl|x3dv?|stl|gltf|glb|fbx|usdz?|usda|usdc|3ds)$/i;
+function localImage(target2) {
+  if (/^[a-z][\w+.-]*:/i.test(target2) && !/^file:\/\//i.test(target2)) {
+    return void 0;
+  }
+  const path2 = /^file:\/\//i.test(target2) ? decodeURIComponent(target2.replace(/^file:\/\//i, "")) : target2;
+  return VIEWABLE.test(path2) ? path2 : void 0;
+}
+function replyParts(text15, streaming = false) {
+  if (!text15.includes("MEDIA:") && !text15.includes("![")) {
+    return [{ kind: "md", text: text15 }];
+  }
+  const lines = text15.split("\n");
+  const parts3 = [];
+  let run6 = [];
+  let fence;
+  const flush = () => {
+    if (run6.some((l) => l.trim())) {
+      parts3.push({ kind: "md", text: run6.join("\n") });
+    }
+    run6 = [];
+  };
+  lines.forEach((line, i) => {
+    const mark2 = FENCE2.exec(line)?.[1];
+    if (fence) {
+      if (mark2 && mark2[0] === fence[0] && mark2.length >= fence.length && !line.trim().slice(mark2.length)) {
+        fence = void 0;
+      }
+      run6.push(line);
+      return;
+    }
+    if (mark2) {
+      fence = mark2;
+      run6.push(line);
+      return;
+    }
+    const done = !streaming || i < lines.length - 1;
+    const media2 = done ? MEDIA_LINE.exec(line)?.[1] ?? localImage(IMAGE_LINE.exec(line)?.[1] ?? "") : void 0;
+    if (media2) {
+      flush();
+      parts3.push({ kind: "media", path: media2.replace(/^`|`$/g, "") });
+    } else {
+      run6.push(line);
+    }
+  });
+  flush();
+  return parts3.length ? parts3 : [{ kind: "md", text: text15 }];
 }
 
 // src/transcript/messages.ts
@@ -49338,7 +49516,7 @@ function pieceNodes(turn, blocks2, parent, cx) {
     const b = p3.block;
     switch (b.kind) {
       case "text":
-        return /* @__PURE__ */ jsx("md", { ...optional2("stream", live && b === lastText || void 0), children: b.text }, b.id);
+        return textNodes(b.id, b.text, live && b === lastText);
       case "tool":
         return toolNode(b.call, cx.now);
       case "steer":
@@ -49351,6 +49529,15 @@ function pieceNodes(turn, blocks2, parent, cx) {
         return null;
     }
   });
+}
+function textNodes(id, text15, streaming) {
+  const parts3 = replyParts(text15, streaming);
+  if (parts3.length === 1 && parts3[0]?.kind === "md") {
+    return /* @__PURE__ */ jsx("md", { ...optional2("stream", streaming || void 0), children: text15 }, id);
+  }
+  return /* @__PURE__ */ jsx("col", { gap: "sm", role: "hermes.reply.parts", children: parts3.map(
+    (p3, i) => p3.kind === "md" ? /* @__PURE__ */ jsx("md", { ...optional2("stream", streaming && i === parts3.length - 1 || void 0), children: p3.text }, `md${i}`) : node("media", { key: `media${i}`, path: p3.path.replace(/^~(?=\/)/, homedir8()) })
+  ) }, `${id}.parts`);
 }
 function continuedIcon(why) {
   return /^(\d+ )?subagent/i.test(why) ? "users" : why.startsWith("Watcher") ? "eye" : why.startsWith("Background") ? "terminal" : "loop";
@@ -50541,7 +50728,7 @@ import { basename as basename4 } from "node:path";
 import { execFile as execFile6 } from "node:child_process";
 import { existsSync as existsSync2 } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
-import { homedir as homedir8, tmpdir } from "node:os";
+import { homedir as homedir9, tmpdir } from "node:os";
 import { join as join7, resolve as resolve4 } from "node:path";
 var runFile2 = (file2, args, options) => new Promise((done, fail) => {
   execFile6(file2, args, { ...options, encoding: "utf8" }, (error, stdout, stderr) => {
@@ -50628,7 +50815,7 @@ function imagePathOf(text15, cwd) {
       return void 0;
     }
   }
-  raw2 = raw2.replace(/\\(.)/g, "$1").replace(/^~(?=$|\/)/, homedir8());
+  raw2 = raw2.replace(/\\(.)/g, "$1").replace(/^~(?=$|\/)/, homedir9());
   if (!IMAGE.test(raw2)) {
     return void 0;
   }
@@ -52743,7 +52930,7 @@ var SessionTitle = class {
 import { existsSync as existsSync4 } from "node:fs";
 import { basename as basename5 } from "node:path";
 var VALUE = "(`[^`\\n]+`|\"[^\"\\n]+\"|'[^'\\n]+'|\\S+)";
-var IMAGE_LINE = new RegExp(`^@image:${VALUE}[ \\t]*$`, "gm");
+var IMAGE_LINE2 = new RegExp(`^@image:${VALUE}[ \\t]*$`, "gm");
 var SCREENSHOT_LINE = /^\[screenshot\][ \t]*(?:\n|$)/gm;
 var HINTS = /\n\n((?:\[Image attached(?: at)?: [^\n]+\]\n?)+)((?:\[screenshot\](?:\n|$))*)$/;
 var ATTACHED_CONTEXT = /(?:^|\n)--- Attached Context ---\s*\n/;
@@ -52764,7 +52951,7 @@ function splitPrompt(raw2) {
     }
   }
   const refs = [];
-  text15 = text15.replace(IMAGE_LINE, (_line, value) => {
+  text15 = text15.replace(IMAGE_LINE2, (_line, value) => {
     refs.push(unquote2(value));
     return "";
   });
@@ -54189,6 +54376,7 @@ var App = class {
     }
     followGateway(this.#gw, {
       ...s2,
+      checkFigures: (p3) => this.#act.figures.afterReply(p3),
       drain: () => s2.queue.drain(),
       eventLog: this.#launch.eventLog,
       gw: this.#gw,
