@@ -9,9 +9,9 @@ files: sessions, transcripts, subagents and connect cards all come from the gate
 
 ## Running
 
-The plugin's `hermes tern` command (`../launcher.py`) runs `node dist/entry.js` with its own
-`HERMES_TERN_*` variables: the session to open, the first prompt, the launch flags as
-`session.create` fields, and the command that runs this Hermes. The frontend asks the terminal for
+The plugin's `hermes tern` command (`../backend/launch/launcher.py`) runs `node dist/entry.js` with
+one LaunchSpec as JSON in `HERMES_TERN_LAUNCH` (`src/config/env.ts` reads it): the session to open,
+the first prompt, the launch flags as `session.create` fields, and the command that runs this Hermes. The frontend asks the terminal for
 TSP first. A terminal that does not answer makes it exit with code 75, and `hermes tern` says
 that it needs a Tern pane. Otherwise it attaches to the profile's gateway with
 `hermes gateway attach --json` (`src/hermes/connect.ts`) and dials it with Hermes' shared Node
