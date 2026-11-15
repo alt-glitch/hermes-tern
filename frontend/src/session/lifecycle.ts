@@ -190,7 +190,7 @@ export class SessionLifecycle {
     return this.#views.leaveAll(endReason)
   }
 
-  /** The first session: HERMES_TERN_RESUME's, else a new one; then the launcher's startup image, if any. */
+  /** The first session: the launch's `resume`, else a new one; then the launcher's startup image, if any. */
   async #bootstrap() {
     const host = this.#host
     const resume = host.launch.resume
@@ -299,7 +299,7 @@ export class SessionLifecycle {
         return
       }
 
-      // The launch flags (`hermes tern -m … --yolo -s …`, HERMES_TERN_CREATE) are the session's creation policy.
+      // The launch flags (`hermes tern -m … --yolo -s …`, the launch's `create`) are the session's creation policy.
       const r: Snapshot = await rpc(host.gw, 'session.create', { ...host.launch.create, ...optional('cwd', cwd || undefined) })
 
       if (!this.#switches.current(token)) {

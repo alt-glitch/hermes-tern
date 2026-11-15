@@ -33,10 +33,6 @@ from ..shared import plugin_data, processes, sessions
 
 logger = logging.getLogger(__name__)
 
-# Tells the frontend its first session is the pane's, resumed after a restart (its notice).
-RESTORED_ENV = "HERMES_TERN_RESTORED"
-# The folder `hermes tern` started in, before a resume moves to the session's: the pane file records it.
-LAUNCH_CWD_ENV = "HERMES_TERN_LAUNCH_CWD"
 # Pane files and claims of dead processes older than this are removed.
 STALE_S = 30 * 24 * 3600
 

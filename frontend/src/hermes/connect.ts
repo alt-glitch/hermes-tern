@@ -1,5 +1,5 @@
 // Where the gateway connection comes from: `hermes gateway attach --json`, run with the command the
-// launcher hands the pane (HERMES_TERN_HERMES: Hermes' own `hermes_command()`), once per dial. `--start` ensures the profile's gateway on the first dial; `--recover` re-ensures one that is
+// launcher hands the pane (its LaunchSpec's `hermes`: Hermes' own `hermes_command()`), once per dial. `--start` ensures the profile's gateway on the first dial; `--recover` re-ensures one that is
 // not ready when the client asks. Each run mints a new single-use ticket.
 //
 // The only module that knows how: when Hermes ships a library call for the attach step, it replaces
@@ -15,12 +15,8 @@ import { parseJson } from '../wire/json.js'
 /** How to run this Hermes: an argv that needs nothing added to the environment. */
 export type HermesCommand = readonly [string, ...string[]]
 
-const command = z.tuple([z.string()], z.string())
-
-/** The argv HERMES_TERN_HERMES holds (a JSON list); undefined when it is unset or unreadable. */
-export function readHermesCommand(raw: string | undefined): HermesCommand | undefined {
-  return raw ? command.safeParse(parseJson(raw)).data : undefined
-}
+/** A HermesCommand as JSON: a non-empty list of strings. */
+export const hermesCommand = z.tuple([z.string()], z.string())
 
 // `attach` exits with `ensure`'s codes; a start may take its 60 s deadline plus discovery and the ticket.
 const ATTACH_TIMEOUT_MS = 90_000

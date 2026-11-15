@@ -33,10 +33,11 @@ beforeEach(() => {
   gw.handlers.set('session.resume', p => ({ info: { stored_session_id: p['session_id'], title: 'Fix the parser' }, running: false, session_id: p['session_id'], subscription_id: 'sub' }))
 })
 
-/** An app in Tern pane `pane`, started with `env` from the launcher. */
-async function started(env: Record<string, string> = {}) {
+/** An app in Tern pane `pane`, started with `spec`'s fields of the launcher's LaunchSpec. */
+async function started(spec: Record<string, unknown> = {}) {
   const tern = fakeTern()
-  const app = new App(tern.session, gw.client, '', { launch: readLaunchEnv({ HERMES_TERN_LAUNCH_CWD: '/work', TERN_PANE: String(pane), ...env }, '/elsewhere') })
+  const launch = readLaunchEnv({ HERMES_TERN_LAUNCH: JSON.stringify({ pane_cwd: '/work', ...spec }), TERN_PANE: String(pane) }, '/elsewhere')
+  const app = new App(tern.session, gw.client, '', { launch })
   const done = app.run()
   gw.event({ type: 'gateway.ready', payload: {} })
   await flush()
@@ -70,7 +71,7 @@ describe('the pane file', () => {
 
   it("writes each shown session to the launcher's session file, which outlives a quit", async () => {
     const file = join(mkdtempSync(join(tmpdir(), 'hermes-tern-session-')), 'session.json')
-    const { app, done } = await started({ HERMES_TERN_SESSION_FILE: file })
+    const { app, done } = await started({ session_file: file })
     const shown = () => record(parseJson(readFileSync(file, 'utf8')))
 
     expect(shown()).toEqual({ session_id: 'new' })
@@ -97,7 +98,7 @@ describe('the pane file', () => {
 
 describe('a pane restarted after its program died', () => {
   it('resumes the launcher’s session and says so', async () => {
-    const { app } = await started({ HERMES_TERN_RESTORED: 'root', HERMES_TERN_RESUME: 'tip' })
+    const { app } = await started({ restored: true, resume: 'tip' })
 
     expect(gw.methods('session.create')).toHaveLength(0)
     expect(app.session.ref.stored).toBe('tip')
@@ -108,7 +109,7 @@ describe('a pane restarted after its program died', () => {
     gw.handlers.set('session.resume', () => {
       throw new Error('session not found')
     })
-    const { app } = await started({ HERMES_TERN_RESTORED: 'root', HERMES_TERN_RESUME: 'tip' })
+    const { app } = await started({ restored: true, resume: 'tip' })
 
     expect(app.session.ref.live).toBe('new')
     expect(notices(app)).toEqual(["Could not resume this pane's last session (session not found); started a new one."])
@@ -116,7 +117,7 @@ describe('a pane restarted after its program died', () => {
 
   it('starts a new session when another live pane shows that one (the plugin says so)', async () => {
     gw.handlers.set('plugin.hermes-tern.viewer.shown', p => ({ shown: JSON.stringify(p['ids']) === '["tip"]' }))
-    const { app } = await started({ HERMES_TERN_RESTORED: 'root', HERMES_TERN_RESUME: 'tip' })
+    const { app } = await started({ restored: true, resume: 'tip' })
 
     expect(gw.methods('session.resume')).toHaveLength(0)
     expect(app.session.ref.live).toBe('new')
@@ -125,7 +126,7 @@ describe('a pane restarted after its program died', () => {
 
   it('starts that new session where the pane launched, not in the other conversation\'s folder', async () => {
     gw.handlers.set('plugin.hermes-tern.viewer.shown', () => ({ shown: true }))
-    await started({ HERMES_TERN_RESTORED: 'root', HERMES_TERN_RESUME: 'tip', HERMES_TERN_SESSION_CWD: '/elsewhere/repo' })
+    await started({ restored: true, resume: 'tip', session_cwd: '/elsewhere/repo' })
 
     expect(gw.methods('session.create').map(c => c.params['cwd'])).toEqual(['/work'])
   })
@@ -133,7 +134,7 @@ describe('a pane restarted after its program died', () => {
   it('leaves a switch the user made while the plugin was answering alone', async () => {
     let answer: (shown: { shown: boolean }) => void = () => undefined
     gw.handlers.set('plugin.hermes-tern.viewer.shown', () => new Promise(resolve => (answer = resolve)))
-    const { app } = await started({ HERMES_TERN_RESTORED: 'root', HERMES_TERN_RESUME: 'tip' })
+    const { app } = await started({ restored: true, resume: 'tip' })
 
     await app.stores.life.newSession()
     answer({ shown: true })
@@ -145,7 +146,7 @@ describe('a pane restarted after its program died', () => {
   })
 
   it('says nothing for a plain --resume', async () => {
-    const { app } = await started({ HERMES_TERN_RESUME: 'tip' })
+    const { app } = await started({ resume: 'tip' })
 
     expect(app.session.ref.stored).toBe('tip')
     expect(notices(app)).toEqual([])
