@@ -6,11 +6,43 @@ import types
 
 import pytest
 
-from hermes_tern_plugin import pull_requests, sessions
+from hermes_tern_plugin.backend.gateway import pull_requests
+from hermes_tern_plugin.backend.shared import sessions
+
+
+class FakeCtx:
+    """What register() gets from Hermes, recorded: the tools and the RPC method by name, the plugin
+    settings ``get_config`` reads, and every ``emit_to_session``."""
+
+    def __init__(self):
+        self.tools, self.rpc, self.settings, self.told = {}, {}, {}, []
+        self.viewed = lambda session_id: True
+
+    def register_tool(self, name, handler, **_):
+        self.tools[name] = handler
+
+    def register_rpc(self, name, handler):
+        self.rpc[name] = handler
+
+    def register_system_prompt_section(self, *_):
+        pass
+
+    def get_config(self, key, default=None):
+        return self.settings.get(key, default)
+
+    def emit_to_session(self, session_id, event, payload):
+        self.told.append((session_id, event, payload))
+        return self.viewed(session_id)
 
 
 @pytest.fixture()
-def prs(tmp_path, monkeypatch):
+def ctx():
+    return FakeCtx()
+
+
+@pytest.fixture()
+def prs(tmp_path, monkeypatch, ctx):
+    """The module, with each tool replaced by the handler register() gave Hermes for it."""
     registry = types.ModuleType("tools.registry")
     registry.tool_error = lambda message, **extra: json.dumps({"error": message, **extra})
     registry.tool_result = lambda data=None, **kw: json.dumps(data if data is not None else kw)
@@ -21,7 +53,9 @@ def prs(tmp_path, monkeypatch):
     monkeypatch.setattr(pull_requests, "data_file", lambda: tmp_path / "pull-requests.json")
     monkeypatch.setattr(sessions, "lineage", lambda sid: lineages.get(sid, [sid]))
     monkeypatch.setattr(pull_requests, "_cwd", lambda: "/work")
-    return pull_requests
+    pull_requests.register(ctx)
+    module = {k: getattr(pull_requests, k) for k in dir(pull_requests) if not k.startswith("__")}
+    return types.SimpleNamespace(**{**module, **ctx.tools, "linked": ctx.rpc[pull_requests.LINKED_METHOD]})
 
 
 def test_parse_target_reads_urls_and_repository_number(prs):
@@ -105,9 +139,7 @@ def test_the_rpc_method_reads_the_calling_sessions_conversation(prs):
         prs.linked({}, session_id=None)
 
 
-def test_a_review_guide_links_its_pr_is_capped_and_goes_with_an_unlink(prs, monkeypatch):
-    told = []
-    monkeypatch.setattr(prs, "_tell_viewers", lambda data, root: told.append(root))
+def test_a_review_guide_links_its_pr_is_capped_and_goes_with_an_unlink(prs, ctx):
     stop = {"title": "  The shim  ", "notes": "n", "files": ["a.py:4", "", *[f"f{i}" for i in range(30)]],
             "questions": [f"q{i}" for i in range(9)]}
     out = json.loads(prs.write_review_guide({"url": "https://github.com/A/B/pull/7", "head_sha": "ABC1234",
@@ -117,7 +149,7 @@ def test_a_review_guide_links_its_pr_is_capped_and_goes_with_an_unlink(prs, monk
     guide = prs.linked({}, session_id="root")["guides"]["a/b#7"]
     assert (guide["head_sha"], guide["summary"], guide["stops"][0]["title"]) == ("abc1234", "s", "The shim")
     assert (len(guide["stops"][0]["files"]), len(guide["stops"][0]["questions"])) == (prs.MAX_FILES, prs.MAX_QUESTIONS)
-    assert told == ["root"]
+    assert [sid for sid, _, _ in ctx.told] == ["root"]
     for bad in ({"stops": []}, {"stops": [{"notes": "no title"}]}, {"stops": [stop], "head_sha": "main"},
                 {"stops": [stop] * (prs.MAX_STOPS + 1)}):
         assert "error" in json.loads(prs.write_review_guide({"url": "https://github.com/a/b/pull/7", "summary": "", **bad},
@@ -127,14 +159,9 @@ def test_a_review_guide_links_its_pr_is_capped_and_goes_with_an_unlink(prs, monk
     assert prs.linked({}, session_id="tip") == {"linked": [], "guides": {}}
 
 
-def test_a_change_tells_the_panes_of_the_conversation_once(prs, monkeypatch):
-    told = []
-
-    def emit(session_id, event, payload):
-        told.append((session_id, event, payload))
-        return session_id == "tip"  # the pane holds the conversation under its newer id
-
-    monkeypatch.setattr(prs, "_ctx", types.SimpleNamespace(emit_to_session=emit, get_config=lambda *a: None), raising=False)
+def test_a_change_tells_the_panes_of_the_conversation_once(prs, ctx):
+    told = ctx.told
+    ctx.viewed = lambda session_id: session_id == "tip"  # the pane holds the conversation under its newer id
 
     prs.link_pull_request({"url": "https://github.com/a/b/pull/1"}, session_id="tip")
     assert told == [("root", "pull_requests.changed", {}), ("tip", "pull_requests.changed", {})]
@@ -151,12 +178,6 @@ def test_a_change_tells_the_panes_of_the_conversation_once(prs, monkeypatch):
 # ── Which hosts a link may name (the enterprise token goes only to a host the user listed) ─────
 
 KEY = "plugins.entries.hermes-tern.settings.enterprise_hosts"
-
-
-def configure(prs, monkeypatch, **settings):
-    """The plugin's settings as ``ctx.get_config`` reads them."""
-    ctx = types.SimpleNamespace(get_config=lambda key, default=None: settings.get(key, default))
-    monkeypatch.setattr(prs, "_ctx", ctx, raising=False)
 
 
 @pytest.mark.parametrize("args", [
@@ -199,27 +220,21 @@ def test_hosts_are_normalised_before_they_are_compared(prs):
     assert prs.parse_target({"repository": "a/b", "number": 1, "host": "GITHUB.com."})["host"] == "github.com"
 
 
-def test_a_listed_enterprise_host_links(prs, monkeypatch):
-    configure(prs, monkeypatch, enterprise_hosts=["GHE.Corp.Example.", "git.corp.example:8443", "user@x.example", "10.0.0.1"])
+def test_a_listed_enterprise_host_links(prs, ctx):
+    ctx.settings["enterprise_hosts"] = ["GHE.Corp.Example.", "git.corp.example:8443", "user@x.example", "10.0.0.1"]
+    link = lambda url: json.loads(prs.link_pull_request({"url": url}, session_id="s1"))
 
-    assert prs.enterprise_hosts() == ["ghe.corp.example", "git.corp.example:8443"]
-    assert prs.parse_target({"url": "https://ghe.corp.example/a/b/pull/1"})["host"] == "ghe.corp.example"
-    assert prs.parse_target({"url": "https://git.corp.example:8443/a/b/pull/2"})["url"] == "https://git.corp.example:8443/a/b/pull/2"
+    assert link("https://ghe.corp.example/a/b/pull/1")["host"] == "ghe.corp.example"
+    assert link("https://git.corp.example:8443/a/b/pull/2")["url"] == "https://git.corp.example:8443/a/b/pull/2"
     for refused in ("https://git.corp.example/a/b/pull/2", "https://ghe.corp.example:8443/a/b/pull/1",
                     "https://evil.ghe.corp.example/a/b/pull/1"):
-        with pytest.raises(prs.TargetError):
-            prs.parse_target({"url": refused})
+        assert "error" in link(refused)
 
 
-def test_the_setting_may_be_one_string_and_never_retargets_github(prs, monkeypatch):
-    configure(prs, monkeypatch, enterprise_hosts="ghe.corp.example, github.com")
-    assert prs.enterprise_hosts() == ["ghe.corp.example"]
-
-    configure(prs, monkeypatch, enterprise_hosts={"not": "a list"})
-    assert prs.enterprise_hosts() == []
-
-    monkeypatch.setattr(prs, "_ctx", None, raising=False)
-    assert prs.enterprise_hosts() == []
+def test_the_setting_may_be_one_string_and_never_retargets_github(prs):
+    assert prs.enterprise_hosts("ghe.corp.example, github.com") == ["ghe.corp.example"]
+    assert prs.enterprise_hosts({"not": "a list"}) == []
+    assert prs.enterprise_hosts(None) == []
 
 
 def test_a_legacy_link_to_an_unlisted_host_can_still_be_unlinked(prs):

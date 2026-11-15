@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from hermes_tern_plugin import launcher
+from hermes_tern_plugin.backend.launch import launcher
 
 
 def parse(argv, **top):
@@ -66,7 +66,7 @@ def launched(monkeypatch, tmp_path, hermes):
             runs.append((argv, env))
             hermes.calls.append(("frontend", os.getcwd()))
             if shows:
-                Path(env["HERMES_TERN_SESSION_FILE"]).write_text(json.dumps({"session_id": shows}))
+                Path(spec(env)["session_file"]).write_text(json.dumps({"session_id": shows}))
             return code if len(runs) == 1 else 0
 
         monkeypatch.setattr(launcher.subprocess, "call", call)
@@ -91,17 +91,22 @@ def test_the_launch_policy_rides_session_create():
         "yolo": True, "ignore_rules": True}
 
 
-def test_the_frontend_gets_its_own_variables(launched, monkeypatch, tmp_path):
-    monkeypatch.setenv("HERMES_TERN_RESUME", "stale")
+def spec(env):
+    """The LaunchSpec the frontend was handed."""
+    return json.loads(env["HERMES_TERN_LAUNCH"])
+
+
+def test_the_frontend_gets_one_launch_spec(launched, monkeypatch, tmp_path):
+    monkeypatch.setenv("HERMES_TERN_LAUNCH", json.dumps({"resume": "stale"}))
     code, [(argv, env)] = launched(parse(["-q", "hi", "-m", "x", "-v"]))
     assert code == 0
     assert argv == ["/bin/node", "--expose-gc", str(tmp_path / "dist" / "entry.js")]
-    assert "HERMES_TERN_RESUME" not in env
-    assert env["HERMES_TERN_QUERY"] == "hi" and env["HERMES_TERN_TOOL_PROGRESS"] == "verbose"
-    # Hermes' shell_client_env() and hermes_command(), unchanged.
-    assert json.loads(env["HERMES_TERN_CREATE"]) == {"model": "x", "client_env": {"PATH": "/bin", "NODE_SESSION_AFFINITY": "lab"}}
-    assert json.loads(env["HERMES_TERN_HERMES"]) == ["/hermes"]
-    assert env["HERMES_TERN_CWD"] == env["HERMES_TERN_SESSION_CWD"] == env["HERMES_TERN_LAUNCH_CWD"] == str(tmp_path)
+    here = str(tmp_path)
+    assert spec(env) == {
+        # Hermes' hermes_command() and shell_client_env(), unchanged.
+        "hermes": ["/hermes"], "create": {"model": "x", "client_env": {"PATH": "/bin", "NODE_SESSION_AFFINITY": "lab"}},
+        "session_file": spec(env)["session_file"], "cwd": here, "pane_cwd": here, "session_cwd": here,
+        "resume": "", "restored": False, "query": "hi", "image": "", "tool_progress": "verbose"}
     assert env["HERMES_HOME"] == str(tmp_path / "home")
     assert "--max-old-space-size=8192" in env["NODE_OPTIONS"]
 
@@ -109,10 +114,10 @@ def test_the_frontend_gets_its_own_variables(launched, monkeypatch, tmp_path):
 def test_resume_and_continue_pick_the_session(launched, monkeypatch):
     monkeypatch.setattr(launcher, "resolve_session", lambda name: {"my chat": "tip-1"}.get(name))
     monkeypatch.setattr(launcher, "latest_session", lambda: "last-1")
-    assert launched(parse(["-r", "my chat"]))[1][0][1]["HERMES_TERN_RESUME"] == "tip-1"
+    assert spec(launched(parse(["-r", "my chat"]))[1][0][1])["resume"] == "tip-1"
     # An id nothing knows is kept: the frontend says the session is not found.
-    assert launched(parse(["-r", "nope"]))[1][0][1]["HERMES_TERN_RESUME"] == "nope"
-    assert launched(parse(["-c"]))[1][0][1]["HERMES_TERN_RESUME"] == "last-1"
+    assert spec(launched(parse(["-r", "nope"]))[1][0][1])["resume"] == "nope"
+    assert spec(launched(parse(["-c"]))[1][0][1])["resume"] == "last-1"
     assert launched(parse(["-c", "nope"]))[0] == 1
 
 
@@ -120,7 +125,7 @@ def test_a_restored_pane_tells_the_frontend(launched, monkeypatch):
     asked = []
     monkeypatch.setattr(launcher.panes, "plan", lambda **how: asked.append(how) or "root")
     _, [(_, env)] = launched(parse(["-m", "x"]))
-    assert env["HERMES_TERN_RESUME"] == env["HERMES_TERN_RESTORED"] == "root"
+    assert (spec(env)["resume"], spec(env)["restored"]) == ("root", True)
     assert asked == [{"fresh": False, "explicit": False}]
 
 
@@ -149,7 +154,7 @@ def test_the_summary_names_the_session_the_pane_ended_on_after_a_quit_only(launc
 
 def test_the_session_file_is_removed_after_the_frontend_exits(launched):
     _, [(_, env)] = launched(parse([]), shows="s-1")
-    assert not Path(env["HERMES_TERN_SESSION_FILE"]).exists()
+    assert not Path(spec(env)["session_file"]).exists()
 
 
 def test_a_quit_without_a_session_prints_no_summary(launched, hermes):
@@ -164,7 +169,7 @@ def test_worktree_is_made_before_the_frontend_and_finished_after_it(launched, he
     assert [c[0] for c in hermes.calls if c[0] != "summary"] == ["create", "frontend", "finish"]
     assert hermes.calls[0] == ("create", str(tmp_path))  # made from the launch folder
     assert hermes.calls[1] == ("frontend", os.path.realpath(tree))  # the frontend runs in the tree
-    assert env["HERMES_TERN_SESSION_CWD"] == os.path.realpath(tree)
+    assert spec(env)["session_cwd"] == os.path.realpath(tree)
     assert hermes.calls[-1] == ("finish", tree, "s-1", ask)
 
 

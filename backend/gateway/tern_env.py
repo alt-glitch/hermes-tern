@@ -21,7 +21,8 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from . import sessions, viewers
+from ..shared import sessions
+from . import viewers
 
 logger = logging.getLogger(__name__)
 

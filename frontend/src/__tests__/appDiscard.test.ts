@@ -9,8 +9,7 @@ import { given, key, must, topNodes } from './fakes.js'
 vi.mock('@hermes/shared/prompt-history', () => ({ append: () => undefined, load: () => [] }))
 
 beforeEach(() => {
-  delete process.env['HERMES_TERN_QUERY']
-  delete process.env['HERMES_TERN_IMAGE']
+  delete process.env['HERMES_TERN_LAUNCH']
 })
 
 const lost = { admission_id: 'u1', execution_generation: 3, input_id: 'in-u1', status: 'unknown', user: 'slow' }

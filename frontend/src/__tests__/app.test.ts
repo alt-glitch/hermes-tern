@@ -6,8 +6,7 @@ import { given, key, stubOverlay } from './fakes.js'
 vi.mock('@hermes/shared/prompt-history', () => ({ append: () => undefined, load: () => [] }))
 
 beforeEach(() => {
-  delete process.env['HERMES_TERN_QUERY']
-  delete process.env['HERMES_TERN_IMAGE']
+  delete process.env['HERMES_TERN_LAUNCH']
 })
 
 afterEach(() => {

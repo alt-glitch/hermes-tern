@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from 'vitest'
 
-import { AttachError, attachGateway, type Ran, readHermesCommand, terminalAttachFailure } from '../hermes/connect.js'
+import { AttachError, attachGateway, type Ran, terminalAttachFailure } from '../hermes/connect.js'
 import { skinColors } from '../hermes/theme.js'
 
 const HERMES = ['/py', '-I', '-c', 'boot'] as const
@@ -65,17 +65,6 @@ describe('attachGateway', () => {
 
     const garbled = attachGateway(HERMES, runner({ stdout: 'not json' }).run)
     await expect(garbled(true, false)).rejects.toThrow('hermes gateway attach exited 0')
-  })
-})
-
-describe('readHermesCommand', () => {
-  it('reads the launcher command, and nothing from a missing or broken one', () => {
-    expect(readHermesCommand(JSON.stringify(HERMES))).toEqual(['/py', '-I', '-c', 'boot'])
-    expect(readHermesCommand('["/hermes"]')).toEqual(['/hermes'])
-    expect(readHermesCommand(undefined)).toBeUndefined()
-    expect(readHermesCommand('[]')).toBeUndefined()
-    expect(readHermesCommand('{"argv":["/py"]}')).toBeUndefined()
-    expect(readHermesCommand('nope')).toBeUndefined()
   })
 })
 

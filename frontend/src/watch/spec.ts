@@ -6,8 +6,8 @@
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 
+import { readLaunchEnv } from '../config/env.js'
 import type { LiveSessionId } from '../core/ids.js'
-import { readHermesCommand } from '../hermes/connect.js'
 import type { Subagent } from '../model.js'
 import { readWatchSpecText } from '../wire/files.js'
 
@@ -46,7 +46,7 @@ let sidebar: string | undefined
 function hermesSplit(env: NodeJS.ProcessEnv, vars: readonly string[], args: readonly string[]) {
   const pane = env['TERN_PANE']
   // The launcher's command for this Hermes (Hermes' own `hermes_command()`).
-  const hermes = readHermesCommand(env['HERMES_TERN_HERMES'])
+  const hermes = readLaunchEnv(env).hermes
 
   if (!pane || !hermes) {
     return undefined

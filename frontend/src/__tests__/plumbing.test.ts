@@ -128,21 +128,23 @@ describe('Disposables', () => {
 })
 
 describe('readLaunchEnv', () => {
-  it('reads every launch variable, trimming the ones the launcher passes through', () => {
+  it("reads the launcher's spec, trimming the strings a user typed", () => {
     const env = readLaunchEnv(
       {
-        HERMES_TERN_CREATE: '{"model":"m","yolo":true}',
-        HERMES_TERN_CWD: '/work',
         HERMES_TERN_EVENT_LOG: '/tmp/events.jsonl',
-        HERMES_TERN_HERMES: '["/hermes"]',
-        HERMES_TERN_IMAGE: ' /tmp/shot.png\n',
-        HERMES_TERN_LAUNCH_CWD: '/home/me/project',
-        HERMES_TERN_QUERY: '  what is this?  ',
-        HERMES_TERN_RESTORED: 'root-1',
-        HERMES_TERN_RESUME: ' 20260101_abc ',
-        HERMES_TERN_SESSION_CWD: ' /work/tree ',
-        HERMES_TERN_SESSION_FILE: '/tmp/hermes-tern-session-1.json',
-        HERMES_TERN_TOOL_PROGRESS: 'verbose',
+        HERMES_TERN_LAUNCH: JSON.stringify({
+          create: { model: 'm', yolo: true },
+          cwd: '/work',
+          hermes: ['/hermes'],
+          image: ' /tmp/shot.png\n',
+          pane_cwd: '/home/me/project',
+          query: '  what is this?  ',
+          restored: true,
+          resume: ' 20260101_abc ',
+          session_cwd: ' /work/tree ',
+          session_file: '/tmp/hermes-tern-session-1.json',
+          tool_progress: 'verbose'
+        }),
         HOME: '/home/me',
         TERN_PANE: ' 34505767256143 '
       },
@@ -168,7 +170,7 @@ describe('readLaunchEnv', () => {
     expect(Object.isFrozen(env)).toBe(true)
   })
 
-  it('gives empty values for unset or unreadable variables, the process folder for the cwd, and HOME as set', () => {
+  it('gives empty values for a missing spec or field, or one of the wrong type, the process folder for the cwd, and HOME as set', () => {
     expect(readLaunchEnv({}, '/elsewhere')).toEqual({
       create: {},
       cwd: '/elsewhere',
@@ -185,9 +187,16 @@ describe('readLaunchEnv', () => {
       sessionFile: '',
       toolProgress: ''
     })
-    expect(readLaunchEnv({ HERMES_TERN_CREATE: '[1]', HERMES_TERN_HERMES: '[]' }, '/x')).toMatchObject({ create: {}, hermes: undefined })
-    // An empty HERMES_TERN_CWD is no folder; an empty HOME stays as set.
-    expect(readLaunchEnv({ HERMES_TERN_CWD: '', HOME: '' }, '/elsewhere')).toMatchObject({ cwd: '/elsewhere', home: '' })
+    const launch = (spec: unknown) => ({ HERMES_TERN_LAUNCH: JSON.stringify(spec) })
+
+    for (const hermes of [[], { argv: ['/py'] }, [1], '/hermes']) {
+      expect(readLaunchEnv(launch({ create: [1], hermes, query: 'q' }), '/x')).toMatchObject({ create: {}, hermes: undefined, query: 'q' })
+    }
+
+    expect(readLaunchEnv({ HERMES_TERN_LAUNCH: 'nope' }, '/x')).toMatchObject({ cwd: '/x', resume: '' })
+    expect(readLaunchEnv(launch(['/hermes']), '/x')).toMatchObject({ hermes: undefined })
+    // An empty cwd is no folder; an empty HOME stays as set.
+    expect(readLaunchEnv({ ...launch({ cwd: '' }), HOME: '' }, '/elsewhere')).toMatchObject({ cwd: '/elsewhere', home: '' })
   })
 
   it('reads the process environment once', () => {

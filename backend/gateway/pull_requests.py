@@ -38,10 +38,12 @@ import os
 import re
 import tempfile
 import time
+from collections.abc import Callable, Collection
+from functools import partial
 from pathlib import Path
 from typing import Any
 
-from . import sessions
+from ..shared import sessions
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +58,10 @@ GITHUB = "github.com"
 # The plugin setting that lists the GitHub Enterprise hosts whose PRs the agent may link.
 CONFIG_KEY = "enterprise_hosts"
 CONFIG_PATH = f"plugins.entries.{PLUGIN}.settings.{CONFIG_KEY}"
+# What register() hands the tools from the gateway: the enterprise hosts the user lists now, and a
+# send of CHANGED_EVENT to one session (True when a pane got it).
+Hosts = Callable[[], Collection[str]]
+Tell = Callable[[str], bool]
 
 # T3 Code's parseChangeRequestUrl (packages/shared/src/changeRequestUrl.ts) for GitHub.
 _PATH = re.compile(r"^/([^/]+/[^/]+)/pull/(\d+)(?:/|$)")
@@ -65,9 +71,6 @@ _LABEL = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?")
 _PORT = re.compile(r"[1-9][0-9]{0,4}")
 # A last label that a URL parser reads as an IPv4 number (WHATWG's "ends in a number").
 _NUMERIC = re.compile(r"[0-9]+|0x[0-9a-f]*")
-
-# The plugin context register() was given: ctx.get_config reads the user's plugin settings.
-_ctx: Any = None
 
 PROMPT = """<pull_request_linking>
 Use link_pull_request to register every pull request you create or work on in this session. Call it with the full PR URL right after you create a PR or start work on an existing PR. For a stack, call it for every layer, not only the current branch or the top PR. This applies when you create or update PRs through gh, gh stack, another CLI, or the API: those operations do not register the PR. Linking an already-linked PR is safe. The linked PRs show beside the chat in hermes tern. Before you finish PR work, call list_pull_requests and link any PR from your work that is missing. Do not link unrelated PRs that are mentioned only as background. If a link call fails, report the failure instead of saying the PR is linked.
@@ -175,13 +178,10 @@ def normalize_host(raw: Any) -> str | None:
     return f"{name}:{port}" if colon else name
 
 
-def enterprise_hosts() -> list[str]:
-    """The GitHub Enterprise hosts the user listed in the plugin's ``enterprise_hosts`` setting (a
-    list, or one comma-separated string), normalised. An entry that is not a plain host is dropped,
-    and so is github.com, which is always allowed."""
-    raw: Any = None
-    with contextlib.suppress(Exception):
-        raw = _ctx.get_config(CONFIG_KEY) if _ctx is not None else None
+def enterprise_hosts(raw: Any) -> list[str]:
+    """The GitHub Enterprise hosts in ``raw``, the plugin's ``enterprise_hosts`` setting (a list, or
+    one comma-separated string), normalised. An entry that is not a plain host is dropped, and so is
+    github.com, which is always allowed."""
     if isinstance(raw, str):
         raw = [part for part in re.split(r"[,\s]+", raw) if part]
     if not isinstance(raw, (list, tuple)):
@@ -207,10 +207,10 @@ def _plain_repository(repository: str) -> bool:
     return bool(_REPO.match(repository)) and not {".", ".."} & set(repository.split("/"))
 
 
-def parse_target(args: dict[str, Any], *, trusted_only: bool = True) -> dict[str, Any]:
+def parse_target(args: dict[str, Any], trusted: Collection[str] | None = ()) -> dict[str, Any]:
     """``{host, repository, number, url}`` from a PR URL, or from repository + number (+ host).
-    The host must be github.com or a listed enterprise host. ``trusted_only=False`` (unlink) takes
-    any plain host, so a link stored before hosts were checked can still be removed."""
+    The host must be github.com or one of the ``trusted`` enterprise hosts. ``trusted=None`` (unlink)
+    takes any plain host, so a link stored before hosts were checked can still be removed."""
     url = str(args.get("url") or "").strip()
     if url:
         from urllib.parse import urlsplit
@@ -235,7 +235,7 @@ def parse_target(args: dict[str, Any], *, trusted_only: bool = True) -> dict[str
         host = normalize_host(raw_host)
         if not host:
             raise TargetError(f"host must be a plain host name such as github.com, not {raw_host!r}.")
-    if trusted_only and host != GITHUB and host not in enterprise_hosts():
+    if trusted is not None and host != GITHUB and host not in trusted:
         raise _untrusted(host)
     return {"host": host, "repository": repository, "number": number,
             "url": f"https://{host}/{repository}/pull/{number}"}
@@ -395,15 +395,15 @@ def _linked(session_id: str) -> dict[str, Any]:
         return _state(data, _conversation(data, session_id))
 
 
-def _tell_viewers(data: dict[str, Any], root: str) -> None:
+def _tell_viewers(tell: Tell, data: dict[str, Any], root: str) -> None:
     """Tells the panes that show conversation ``root`` that its links changed. The live session is
     one of the conversation's ids (the root, or a later id compression gave it), so each is tried,
     the root first, until one has viewers."""
-    if _ctx is None or not root:
+    if not root:
         return
     for sid in [root, *(i for i, r in data["aliases"].items() if r == root and i != root)]:
         try:
-            if _ctx.emit_to_session(sid, CHANGED_EVENT, {}):
+            if tell(sid):
                 return
         except Exception:  # noqa: BLE001 - the links are saved; a pane that misses this reads them on its next adopt
             logger.debug("hermes-tern: links of %s changed, not told to %s", root, sid, exc_info=True)
@@ -417,11 +417,11 @@ def _session(session_id: str | None) -> str:
     return str(session_id or "")
 
 
-def link_pull_request(args: dict[str, Any], session_id: str | None = None) -> str:
+def link_pull_request(args: dict[str, Any], session_id: str | None = None, *, hosts: Hosts, tell: Tell) -> str:
     from tools.registry import tool_error, tool_result
 
     try:
-        target = parse_target(args or {})
+        target = parse_target(args or {}, hosts())
     except TargetError as error:
         return tool_error(str(error))
     sid = _session(session_id)
@@ -437,15 +437,15 @@ def link_pull_request(args: dict[str, Any], session_id: str | None = None) -> st
             links.append({**target, "linked_at": time.time(), "session_id": sid, "cwd": _cwd()})
         _write(path, data)
     if not already:
-        _tell_viewers(data, root)
+        _tell_viewers(tell, data, root)
     return tool_result({**target, "already_linked": already, **_state(data, root)})
 
 
-def unlink_pull_request(args: dict[str, Any], session_id: str | None = None) -> str:
+def unlink_pull_request(args: dict[str, Any], session_id: str | None = None, *, tell: Tell) -> str:
     from tools.registry import tool_error, tool_result
 
     try:
-        target = parse_target(args or {}, trusted_only=False)
+        target = parse_target(args or {}, None)
     except TargetError as error:
         return tool_error(str(error))
     sid = _session(session_id)
@@ -461,7 +461,7 @@ def unlink_pull_request(args: dict[str, Any], session_id: str | None = None) -> 
             data["guides"].get(root, {}).pop(guide_key(target), None)
         _write(path, data)
     if was:
-        _tell_viewers(data, root)
+        _tell_viewers(tell, data, root)
     return tool_result({**target, "was_linked": was, **_state(data, root)})
 
 
@@ -471,11 +471,11 @@ def list_pull_requests(_args: dict[str, Any], session_id: str | None = None) -> 
     return tool_result(_linked(_session(session_id)))
 
 
-def write_review_guide(args: dict[str, Any], session_id: str | None = None) -> str:
+def write_review_guide(args: dict[str, Any], session_id: str | None = None, *, hosts: Hosts, tell: Tell) -> str:
     from tools.registry import tool_error, tool_result
 
     try:
-        target = parse_target(args or {})
+        target = parse_target(args or {}, hosts())
         guide = parse_guide(args or {})
     except TargetError as error:
         return tool_error(str(error))
@@ -491,7 +491,7 @@ def write_review_guide(args: dict[str, Any], session_id: str | None = None) -> s
             links.append({**target, "linked_at": time.time(), "session_id": sid, "cwd": _cwd()})
         data["guides"].setdefault(root, {})[guide_key(target)] = guide
         _write(path, data)
-    _tell_viewers(data, root)
+    _tell_viewers(tell, data, root)
     return tool_result({**target, "written": guide_key(target), "stops": len(guide["stops"]), **_state(data, root)})
 
 
@@ -503,13 +503,20 @@ def linked(_params: dict, *, session_id: str | None = None, **_: Any) -> dict[st
 
 
 def register(ctx) -> None:
-    global _ctx
-    _ctx = ctx
+    def hosts() -> list[str]:
+        """Read on each call, so a changed setting applies to the next link."""
+        with contextlib.suppress(Exception):
+            return enterprise_hosts(ctx.get_config(CONFIG_KEY))
+        return []
+
+    def tell(session_id: str) -> bool:
+        return bool(ctx.emit_to_session(session_id, CHANGED_EVENT, {}))
+
     for name, schema, handler in (
-        ("link_pull_request", LINK_SCHEMA, link_pull_request),
-        ("unlink_pull_request", UNLINK_SCHEMA, unlink_pull_request),
+        ("link_pull_request", LINK_SCHEMA, partial(link_pull_request, hosts=hosts, tell=tell)),
+        ("unlink_pull_request", UNLINK_SCHEMA, partial(unlink_pull_request, tell=tell)),
         ("list_pull_requests", LIST_SCHEMA, list_pull_requests),
-        ("write_review_guide", GUIDE_SCHEMA, write_review_guide),
+        ("write_review_guide", GUIDE_SCHEMA, partial(write_review_guide, hosts=hosts, tell=tell)),
     ):
         ctx.register_tool(name=name, toolset=TOOLSET, schema=schema, handler=handler, emoji="🔗",
                           description=schema["description"])

@@ -14,7 +14,7 @@ vi.mock('node:child_process', () => ({
 
 const env = {
   HERMES_HOME: '/h',
-  HERMES_TERN_HERMES: JSON.stringify(['/venv/python', '-I', '-c', 'boot']),
+  HERMES_TERN_LAUNCH: JSON.stringify({ hermes: ['/venv/python', '-I', '-c', 'boot'] }),
   TERN_PANE: 'b3'
 }
 
@@ -46,7 +46,7 @@ describe('openHermesSplit', () => {
     vi.mocked(execFile).mockClear()
 
     expect(await openHermesSplit(['update'], '/repo', { ...env, TERN_PANE: undefined })).toBe(false)
-    expect(await openHermesSplit(['update'], '/repo', { ...env, HERMES_TERN_HERMES: undefined })).toBe(false)
+    expect(await openHermesSplit(['update'], '/repo', { ...env, HERMES_TERN_LAUNCH: undefined })).toBe(false)
     expect(execFile).not.toHaveBeenCalled()
   })
 })

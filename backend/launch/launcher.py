@@ -1,12 +1,11 @@
 """``hermes tern [flags]``: tern's own launcher.
 
 It parses its flags, picks the session (``-r``, ``-c``, or the pane's own after a crash, ``panes.py``),
-and runs ``node frontend/dist/entry.js`` as a child with the terminal inherited. The frontend dials
-the profile's gateway itself (``hermes gateway attach --json``, frontend/src/hermes/connect.ts) with
-the command it is handed in ``HERMES_TERN_HERMES``, so it uses this install and this profile.
-
-What the frontend needs goes in ``HERMES_TERN_*`` variables. The launch policy (model, provider,
-toolsets, skills, yolo, …) goes in ``HERMES_TERN_CREATE`` as the fields of the gateway's public
+and runs ``node frontend/dist/entry.js`` as a child with the terminal inherited. What the frontend
+needs is one :class:`LaunchSpec`, as JSON in :data:`LAUNCH_ENV`. The frontend dials the profile's
+gateway itself (``hermes gateway attach --json``, frontend/src/hermes/connect.ts) with the spec's
+``hermes`` command, so it uses this install and this profile. The launch policy (model, provider,
+toolsets, skills, yolo, …) is the spec's ``create``: the fields of the gateway's public
 ``session.create``.
 
 When the terminal does not answer the Tern Surface Protocol handshake, the frontend exits
@@ -14,8 +13,8 @@ When the terminal does not answer the Tern Surface Protocol handshake, the front
 
 Around the frontend it does what Hermes' own chat launcher does, through Hermes' published
 functions (:func:`hermes_api`): the ``-w`` worktree before and after, and the "resume with" summary
-after a quit. The frontend writes the session it shows to the file named in
-``HERMES_TERN_SESSION_FILE``, because the pane's own record (``panes.py``) is removed on a quit.
+after a quit. The frontend writes the session it shows to the spec's ``session_file``, because the
+pane's own record (``panes.py``) is removed on a quit.
 """
 
 from __future__ import annotations
@@ -28,13 +27,15 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Optional
 
-from . import panes, sessions
+from ..shared import sessions
+from . import panes
 
-FRONTEND = Path(__file__).resolve().parent / "frontend"
+FRONTEND = Path(__file__).resolve().parents[2] / "frontend"
 
 # frontend/src/entry.ts NO_TSP: the terminal never answered the TSP handshake.
 NO_TSP_EXIT = 75
@@ -44,10 +45,8 @@ HEAP_MB = 8192
 # source `local`, created by `tui`), then a classic CLI session.
 CONTINUE_SOURCES = ({"source": ["tui", "local"], "local_created_sources": ["tui"]},
                     {"source": ["cli", "local"], "local_created_sources": ["cli"]})
-# The launch variables of an outer `hermes tern`; this launch sets its own.
-OWN_ENV = ("HERMES_TERN_HERMES", "HERMES_TERN_SESSION_FILE", "HERMES_TERN_RESUME", "HERMES_TERN_QUERY",
-           "HERMES_TERN_IMAGE", "HERMES_TERN_CWD", "HERMES_TERN_SESSION_CWD", "HERMES_TERN_CREATE", "HERMES_TERN_TOOL_PROGRESS",
-           panes.RESTORED_ENV, panes.LAUNCH_CWD_ENV)
+# The variable the frontend reads its LaunchSpec from (frontend/src/config/env.ts).
+LAUNCH_ENV = "HERMES_TERN_LAUNCH"
 # Exit codes of a quit (`/quit`, Ctrl+C): the summary is printed and a dirty `-w` tree is asked about.
 QUIT_CODES = (0, 130)
 TOO_OLD = "hermes tern: this Hermes is older than hermes tern needs. Run `hermes update`."
@@ -230,34 +229,59 @@ def node_binary() -> Optional[str]:
     return shutil.which("node")
 
 
-def frontend_env(args: argparse.Namespace, resume: Optional[str], restored: Optional[str], launch_cwd: str,
-                 hermes: SimpleNamespace, session_file: str) -> dict[str, str]:
+def launch_spec(args: argparse.Namespace, resume: Optional[str], restored: Optional[str], launch_cwd: str,
+                hermes: SimpleNamespace, session_file: str) -> LaunchSpec:
+    cwd = os.getcwd()
+    return LaunchSpec(
+        hermes=list(hermes.hermes_command()), session_file=session_file, cwd=cwd, pane_cwd=launch_cwd,
+        create=create_options(args, hermes.shell_client_env()), session_cwd=cwd if _local_terminal() else "",
+        resume=resume or "", restored=bool(restored), query=_opt(args, "query") or "", image=_opt(args, "image") or "",
+        tool_progress="verbose" if _opt(args, "verbose") else "off" if _opt(args, "quiet") else "")
+
+
+def frontend_env(spec: LaunchSpec) -> dict[str, str]:
+    """This process's environment for the frontend, with the spec in LAUNCH_ENV (replacing an outer launch's)."""
     from hermes_constants import get_hermes_home
 
-    env = {k: v for k, v in os.environ.items() if k not in OWN_ENV}
-    cwd = os.getcwd()
+    env = dict(os.environ)
     env.update({
         "HERMES_HOME": str(get_hermes_home()),
-        "HERMES_TERN_HERMES": json.dumps(hermes.hermes_command()),
-        "HERMES_TERN_SESSION_FILE": session_file,
-        "HERMES_TERN_CWD": cwd,
-        "HERMES_TERN_CREATE": json.dumps(create_options(args, hermes.shell_client_env())),
-        panes.LAUNCH_CWD_ENV: launch_cwd,
+        LAUNCH_ENV: json.dumps(asdict(spec)),
         "NODE_ENV": env.get("NODE_ENV") or "production",
     })
-    if _local_terminal():
-        env["HERMES_TERN_SESSION_CWD"] = cwd
-    for key, value in (("HERMES_TERN_RESUME", resume), ("HERMES_TERN_QUERY", _opt(args, "query")),
-                       ("HERMES_TERN_IMAGE", _opt(args, "image")), (panes.RESTORED_ENV, restored),
-                       ("HERMES_TERN_TOOL_PROGRESS",
-                        "verbose" if _opt(args, "verbose") else "off" if _opt(args, "quiet") else None)):
-        if value:
-            env[key] = str(value)
     tokens = env.get("NODE_OPTIONS", "").split()
     if not any(t.startswith("--max-old-space-size=") for t in tokens):
         tokens.append(f"--max-old-space-size={HEAP_MB}")
     env["NODE_OPTIONS"] = " ".join(tokens)
     return env
+
+
+@dataclass(frozen=True)
+class LaunchSpec:
+    """What the frontend starts with. Field names are the JSON keys env.ts reads."""
+
+    hermes: list[str]
+    """Hermes' ``hermes_command()``: how to run this Hermes (the gateway attach, a sidebar)."""
+    session_file: str
+    """Where the frontend writes the session it shows, for the quit summary."""
+    cwd: str
+    """The folder the frontend runs in: a resume has moved to the session's."""
+    pane_cwd: str
+    """Where ``hermes tern`` started, before a resume moved: the pane file records it."""
+    create: dict[str, Any]
+    """The launch flags as ``session.create`` fields."""
+    session_cwd: str = ""
+    """The folder new sessions start in; "" lets the gateway choose (a remote terminal backend)."""
+    resume: str = ""
+    """The session to open first; "" starts a new one."""
+    restored: bool = False
+    """``resume`` is the pane's own conversation, resumed after its program died (the frontend says so)."""
+    query: str = ""
+    """``-q``: the first prompt."""
+    image: str = ""
+    """``--image``: an absolute path, attached to the first prompt."""
+    tool_progress: str = ""
+    """``verbose`` (``-v``) or ``off`` (``-Q``), pinned on each new session; "" keeps the profile's."""
 
 
 def _shown_session(session_file: str) -> Optional[str]:
@@ -302,7 +326,7 @@ def run(args: argparse.Namespace) -> None:
     try:
         fd, session_file = tempfile.mkstemp(prefix="hermes-tern-session-", suffix=".json")
         os.close(fd)
-        env = frontend_env(args, resume, restored, launch_cwd, hermes, session_file)
+        env = frontend_env(launch_spec(args, resume, restored, launch_cwd, hermes, session_file))
         try:
             code = subprocess.call([node, "--expose-gc", str(bundle)], env=env)
         except KeyboardInterrupt:
