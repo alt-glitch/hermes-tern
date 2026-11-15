@@ -29,7 +29,7 @@ function kinds(turn: TurnEntry): Block['kind'][] {
 }
 
 describe('Transcript', () => {
-  it('keeps streaming into the live turn after a notice lands mid-turn', () => {
+  it('puts a notice from mid-turn in that turn, where it happened, and streams on after it', () => {
     const t = new Transcript()
     t.messageStart(0)
     t.text('Working on it.', 1)
@@ -37,12 +37,31 @@ describe('Transcript', () => {
     t.text(' Still here.', 2)
     t.complete({ status: 'complete', text: 'Working on it. Still here.' }, 3)
 
-    const turns = t.entries.filter(e => e.kind === 'turn')
-    expect(turns).toHaveLength(1)
-    expect(texts(turnOf(t.entries))).toEqual(['Working on it. Still here.'])
+    // After the turn, it would sit under the reply while the reply kept growing above it.
+    expect(t.entries.map(e => e.kind)).toEqual(['turn'])
+    expect(kinds(turnOf(t.entries))).toEqual(['text', 'event', 'text'])
+    expect(turnOf(t.entries).blocks[1]).toMatchObject({ text: 'Wait for the current turn to finish.', tone: 'warning' })
     expect(turnOf(t.entries).end.status).toBe('done')
-    expect(t.entries.at(-1)?.kind).toBe('notice')
     expect(t.live).toBeUndefined()
+  })
+
+  it('keeps a reply whole when a notice lands while it streams: the notice follows it', () => {
+    const t = new Transcript()
+    t.messageStart(0)
+    t.text('Agreed: keep the merge its own ste', 1, { offset: 0, segment: 0, turn_id: 'r1' })
+    t.notice('Opened #7 on GitHub.')
+    t.text('p.', 2, { offset: 34, segment: 0, turn_id: 'r1' })
+
+    // Hermes stamps the rest of the same model call with the same segment, so it is more of that reply.
+    expect(kinds(turnOf(t.entries))).toEqual(['text', 'event'])
+    expect(texts(turnOf(t.entries))).toEqual(['Agreed: keep the merge its own step.'])
+  })
+
+  it('puts a notice between turns when none runs', () => {
+    const t = new Transcript()
+    t.notice('Opened #7 on GitHub.')
+
+    expect(t.entries).toMatchObject([{ kind: 'notice', text: 'Opened #7 on GitHub.', tone: 'info' }])
   })
 
   it('hydrates a resumed session’s running turn so its stream continues in place', () => {

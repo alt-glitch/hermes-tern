@@ -64,7 +64,9 @@ function setup(replies: Record<string, Reply> = {}) {
     await settle(gw)
   }
 
-  const notices = () => app.transcript.entries.flatMap(e => (e.kind === 'notice' ? [e.text] : []))
+  // A notice during a turn is a line in that turn.
+  const notices = () =>
+    app.transcript.entries.flatMap(e => (e.kind === 'notice' ? [e.text] : e.kind === 'turn' ? e.blocks.flatMap(b => (b.kind === 'event' ? [b.text] : [])) : []))
 
   return { app, emit, enter, gw, notices, press, type }
 }

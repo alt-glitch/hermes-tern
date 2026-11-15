@@ -2043,7 +2043,11 @@
           "k": "text",
           "p": {
            "grow": 1,
-           "text": "use tabs",
+           "spans": [
+            {
+             "t": "use tabs"
+            }
+           ],
            "truncate": "end",
            "wrap": "none",
            "key": "text"
@@ -2646,7 +2650,11 @@
           "k": "text",
           "p": {
            "grow": 1,
-           "text": "use tabs",
+           "spans": [
+            {
+             "t": "use tabs"
+            }
+           ],
            "truncate": "end",
            "wrap": "none",
            "key": "text"
@@ -3249,7 +3257,11 @@
           "k": "text",
           "p": {
            "grow": 1,
-           "text": "use tabs",
+           "spans": [
+            {
+             "t": "use tabs"
+            }
+           ],
            "truncate": "end",
            "wrap": "none",
            "key": "text"
@@ -5019,7 +5031,11 @@
           "k": "text",
           "p": {
            "grow": 1,
-           "text": "then the docs",
+           "spans": [
+            {
+             "t": "then the docs"
+            }
+           ],
            "truncate": "end",
            "wrap": "none",
            "key": "text"
@@ -5706,7 +5722,11 @@
           "k": "text",
           "p": {
            "grow": 1,
-           "text": "then the docs",
+           "spans": [
+            {
+             "t": "then the docs"
+            }
+           ],
            "truncate": "end",
            "wrap": "none",
            "key": "text"

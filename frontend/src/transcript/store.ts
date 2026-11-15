@@ -182,14 +182,17 @@ export class Transcript {
   }
 
   /**
-   * Background work that ended now (a subagent, a background process): a line in the live turn,
-   * where it happened, else between the turns.
+   * Something that happened now (background work that ended, a refused action, a hint): a line in
+   * the live turn, where it happened, else between the turns. After a live turn it would stay under
+   * the reply while the reply grew above it, until the turn ended.
    */
   event(text: string, tone: NoticeEntry['tone'] = 'info', at = Date.now()) {
     const turn = this.live
 
     if (!turn) {
-      return this.notice(text, tone)
+      this.push({ id: this.id('n'), kind: 'notice', text, tone })
+
+      return
     }
 
     turn.blocks.push({ at, id: this.id('e'), kind: 'event', text, tone })
@@ -197,7 +200,7 @@ export class Transcript {
   }
 
   notice(text: string, tone: NoticeEntry['tone'] = 'info') {
-    this.push({ id: this.id('n'), kind: 'notice', text, tone })
+    this.event(text, tone)
   }
 
   panel(title: string, text: string) {
@@ -293,7 +296,7 @@ export class Transcript {
     endThinking(turn, at)
     const segment = stamp.turn_id && typeof stamp.segment === 'number' ? `${stamp.turn_id}/${stamp.segment}` : undefined
     const last = turn.blocks.at(-1)
-    let block = last?.kind === 'text' ? last : this.#steeredReply(turn, segment, stamp.offset)
+    let block = last?.kind === 'text' ? last : this.#continuedReply(turn, segment, stamp.offset)
 
     if (block) {
       block.text += text
@@ -307,13 +310,13 @@ export class Transcript {
   }
 
   /**
-   * The reply a steer was sent during, when the delta in `segment` at `offset` is more of it.
-   * Hermes does not stop the model call for a steer, so the rest of the reply comes in the same
-   * segment, at an offset above 0. It joins the text before the steer, so the reply reads whole
-   * and the steer stays after it. A new model call comes after a tool, a seal (a new segment) or
-   * in a new run of the agent (a new `turn_id`).
+   * The reply a steer or a line (an event, a notice) landed during, when the delta in `segment` at
+   * `offset` is more of it. Hermes does not stop the model call for either, so the rest of the reply
+   * comes in the same segment, at an offset above 0. It joins the text before them, so the reply
+   * reads whole and they stay after it. A new model call comes after a tool, a seal (a new segment)
+   * or in a new run of the agent (a new `turn_id`).
    */
-  #steeredReply(turn: TurnEntry, segment: string | undefined, offset: number | null | undefined) {
+  #continuedReply(turn: TurnEntry, segment: string | undefined, offset: number | null | undefined) {
     const reply = this.#reply
 
     if (!reply || !segment || reply.segment !== segment || !offset) {
@@ -322,7 +325,7 @@ export class Transcript {
 
     const i = turn.blocks.indexOf(reply.block)
 
-    return i >= 0 && turn.blocks.slice(i + 1).every(b => b.kind === 'steer') ? reply.block : undefined
+    return i >= 0 && turn.blocks.slice(i + 1).every(b => b.kind === 'steer' || b.kind === 'event') ? reply.block : undefined
   }
 
   /** Interim commentary: seals the streamed text so the next delta starts a new block. */

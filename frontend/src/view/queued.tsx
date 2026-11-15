@@ -24,10 +24,16 @@ export function queuedNode(queued: readonly QueuedRow[], on: QueuedActions): JSX
       {queued.map((q, i) => (
         <row align="center" gap="sm" key={`q${i}`} role="omp.queue.item" title={queuedTitle(q)}>
           <icon key="icon" name={q.kind === 'sending' ? 'clock' : 'corner-down-right'} />
-          <text grow={1} key="text" text={q.text.replace(/\s*\r?\n\s*/g, ' ↵ ')} truncate="end" wrap="none" />
+          {/* One text: a row gives each text node an equal share, which left the note floating mid-row. */}
+          <text
+            grow={1}
+            key="text"
+            spans={[{ t: q.text.replace(/\s*\r?\n\s*/g, ' ↵ ') }, ...(q.why ? [{ s: 'muted', t: `  ·  ${q.why}` }] : [])]}
+            truncate="end"
+            wrap="none"
+          />
           {i === 0 && queued.length > 1 ? <badge key="count" role="omp.queue.count" text={`${queued.length}`} /> : null}
           {q.kind === 'foreign' && q.note === 'unknown' ? <badge key="note" text="unknown" tone="warning" /> : null}
-          {q.why ? <text key="why" role="omp.queue.note" spans={[{ s: 'muted', t: q.why }]} wrap="none" /> : null}
           {on.steer && editable(q) && q.steer ? (
             <row
               align="center"

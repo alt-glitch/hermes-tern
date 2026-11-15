@@ -331,14 +331,14 @@ describe('a queued row that cannot steer says why', () => {
     expect(app.transcript.entries.at(-1)).toMatchObject({ kind: 'notice', text: expect.stringContaining('Images cannot join a running turn') })
   })
 
-  it("Hermes' own row (subagents finished) starts when the turn ends", async () => {
+  it("Hermes' own row (subagents finished) says Hermes picks it up after the turn", async () => {
     const { app, emit, queuedRows } = setup()
     given.busy(app.stores, { ...busy })
     const row = { admission_id: 'auto1', status: 'queued', user: '[ASYNC DELEGATION BATCH COMPLETE — deleg_1]\nA background…' }
     emit('event', ev('session.info', { pending_submissions: [row] }))
     await settle()
 
-    expect(queuedRows()).toEqual([{ actions: [], note: 'starts when this turn ends', text: 'Subagents finished' }])
+    expect(queuedRows()).toEqual([{ actions: [], note: 'Hermes picks it up after this turn', text: 'Subagents finished' }])
   })
 })
 

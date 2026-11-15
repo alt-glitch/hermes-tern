@@ -91,7 +91,7 @@ describe('PromptQueue', () => {
     t.queue.server.update([{ ...row('x', 'queued'), user: `[IMPORTANT: Background process proc_1 exited (exit code 0).${footer}` }])
 
     expect(t.queue.rows()).toEqual([
-      { kind: 'foreign', note: 'elsewhere', text: 'Background command exited', why: 'starts when this turn ends' },
+      { kind: 'foreign', note: 'elsewhere', text: 'Background command exited', why: 'Hermes picks it up after this turn' },
       { kind: 'mine', steer: false, text: 'look\n\n📎 1 image', why: 'has images: waits for this turn' }
     ])
   })
