@@ -20445,10 +20445,18 @@ ${composer2.text}` : text6 || composer2.text, {
 function queuedNode(queued, on) {
   return /* @__PURE__ */ jsx("col", { gap: "xs", role: "omp.queue", children: queued.map((q, i) => /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "omp.queue.item", title: queuedTitle(q), children: [
     /* @__PURE__ */ jsx("icon", { name: q.kind === "sending" ? "clock" : "corner-down-right" }, "icon"),
-    /* @__PURE__ */ jsx("text", { grow: 1, text: q.text.replace(/\s*\r?\n\s*/g, " \u21B5 "), truncate: "end", wrap: "none" }, "text"),
+    /* @__PURE__ */ jsx(
+      "text",
+      {
+        grow: 1,
+        spans: [{ t: q.text.replace(/\s*\r?\n\s*/g, " \u21B5 ") }, ...q.why ? [{ s: "muted", t: `  \xB7  ${q.why}` }] : []],
+        truncate: "end",
+        wrap: "none"
+      },
+      "text"
+    ),
     i === 0 && queued.length > 1 ? /* @__PURE__ */ jsx("badge", { role: "omp.queue.count", text: `${queued.length}` }, "count") : null,
     q.kind === "foreign" && q.note === "unknown" ? /* @__PURE__ */ jsx("badge", { text: "unknown", tone: "warning" }, "note") : null,
-    q.why ? /* @__PURE__ */ jsx("text", { role: "omp.queue.note", spans: [{ s: "muted", t: q.why }], wrap: "none" }, "why") : null,
     on.steer && editable(q) && q.steer ? /* @__PURE__ */ jsxs(
       "row",
       {
@@ -24903,19 +24911,21 @@ var Transcript = class {
     this.user({ at, attachments, text: text6 });
   }
   /**
-   * Background work that ended now (a subagent, a background process): a line in the live turn,
-   * where it happened, else between the turns.
+   * Something that happened now (background work that ended, a refused action, a hint): a line in
+   * the live turn, where it happened, else between the turns. After a live turn it would stay under
+   * the reply while the reply grew above it, until the turn ended.
    */
   event(text6, tone = "info", at = Date.now()) {
     const turn = this.live;
     if (!turn) {
-      return this.notice(text6, tone);
+      this.push({ id: this.id("n"), kind: "notice", text: text6, tone });
+      return;
     }
     turn.blocks.push({ at, id: this.id("e"), kind: "event", text: text6, tone });
     turn.rev++;
   }
   notice(text6, tone = "info") {
-    this.push({ id: this.id("n"), kind: "notice", text: text6, tone });
+    this.event(text6, tone);
   }
   panel(title, text6) {
     this.push({ id: this.id("p"), kind: "panel", text: text6, title });
@@ -24995,7 +25005,7 @@ var Transcript = class {
     endThinking(turn, at);
     const segment = stamp.turn_id && typeof stamp.segment === "number" ? `${stamp.turn_id}/${stamp.segment}` : void 0;
     const last = turn.blocks.at(-1);
-    let block = last?.kind === "text" ? last : this.#steeredReply(turn, segment, stamp.offset);
+    let block = last?.kind === "text" ? last : this.#continuedReply(turn, segment, stamp.offset);
     if (block) {
       block.text += text6;
     } else {
@@ -25006,19 +25016,19 @@ var Transcript = class {
     turn.rev++;
   }
   /**
-   * The reply a steer was sent during, when the delta in `segment` at `offset` is more of it.
-   * Hermes does not stop the model call for a steer, so the rest of the reply comes in the same
-   * segment, at an offset above 0. It joins the text before the steer, so the reply reads whole
-   * and the steer stays after it. A new model call comes after a tool, a seal (a new segment) or
-   * in a new run of the agent (a new `turn_id`).
+   * The reply a steer or a line (an event, a notice) landed during, when the delta in `segment` at
+   * `offset` is more of it. Hermes does not stop the model call for either, so the rest of the reply
+   * comes in the same segment, at an offset above 0. It joins the text before them, so the reply
+   * reads whole and they stay after it. A new model call comes after a tool, a seal (a new segment)
+   * or in a new run of the agent (a new `turn_id`).
    */
-  #steeredReply(turn, segment, offset) {
+  #continuedReply(turn, segment, offset) {
     const reply2 = this.#reply;
     if (!reply2 || !segment || reply2.segment !== segment || !offset) {
       return void 0;
     }
     const i = turn.blocks.indexOf(reply2.block);
-    return i >= 0 && turn.blocks.slice(i + 1).every((b) => b.kind === "steer") ? reply2.block : void 0;
+    return i >= 0 && turn.blocks.slice(i + 1).every((b) => b.kind === "steer" || b.kind === "event") ? reply2.block : void 0;
   }
   /** Interim commentary: seals the streamed text so the next delta starts a new block. */
   interim(text6, { alreadyStreamed }, at = Date.now()) {
@@ -25345,7 +25355,7 @@ var PromptQueue = class {
         switch (q.kind) {
           case "theirs": {
             const notice = internalNotice(q.text);
-            const why = notice ? busy ? "starts when this turn ends" : "starts next" : void 0;
+            const why = notice ? busy ? "Hermes picks it up after this turn" : "Hermes picks it up next" : void 0;
             return { kind: "foreign", note: q.row.status === "unknown" ? "unknown" : "elsewhere", text: notice ?? q.text, why };
           }
           // Withdrawing it needs the gateway's id for it: until prompt.submit answers it is on its way.
