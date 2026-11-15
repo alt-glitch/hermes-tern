@@ -42,6 +42,8 @@ the user's prompt, so one home covers every flow:
                    the auxiliary model wrote for it in lab/chartbench.ts): real charts in the lab
     "ternenv"   -> (at the start) prints the TERN_* variables from a command, a background command and a Python cell's command
     "pr [URL…]" -> (at the start) links the PR URLs given, else a real public PR (link_pull_request)
+    "guide"     -> (at the start) a three-stop review guide for NousResearch/hermes-agent#153155
+                   (write_review_guide): the pane opens it on the prs plugin's Guide tab
     "sublink [URL]" -> (at the start) one subagent that links the PR URL given, else a real public PR:
                    the parent's transcript gets no link result, so its pane learns of the link
                    from the plugin's event alone
@@ -262,6 +264,21 @@ ERRANDS = [
 
 PR_URL = r"https://[^\s/]+/[^\s/]+/[^\s/]+/pull/\d+"
 DEFAULT_PR = "https://github.com/alt-glitch/hermes-tern/pull/22"
+# A guide for a real public PR (layer 5 of a 13-layer stack), with real paths and its head at the time.
+GUIDE = {
+    "url": "https://github.com/NousResearch/hermes-agent/pull/153155",
+    "head_sha": "1c52ab31cdbff74637aed58a9ebd65b480175564",
+    "summary": "Moves `tui_gateway/` under `hermes_agent/`. Most files are renames; read the few one-line import fixes.",
+    "stops": [
+        {"title": "The import fixes in agent/", "notes": "Each file changes one import to the new path.",
+         "files": ["agent/runtime_scope.py", "agent/secret_scope.py", "agent/title_generator.py"],
+         "questions": ["Does any import still name the old `tui_gateway` path?"]},
+        {"title": "Docs and security notes", "notes": "The paths in prose follow the move.",
+         "files": ["AGENTS.md", "SECURITY.md"], "questions": []},
+        {"title": "Attributes", "notes": "`.gitattributes` gains one line for the moved tree.",
+         "files": [".gitattributes", "not/in/this/pr.py"], "questions": ["Is the new pattern anchored?"]},
+    ],
+}
 # The goal the "sublink" prompt gives its subagent; the subagent's first move reads the URL from it.
 SUBLINK_GOAL = "Link the pull request "
 
@@ -333,6 +350,8 @@ def _calls(prompt: str, target: Path) -> list[dict] | None:
     if words.lstrip().startswith("sublink"):
         url = re.search(PR_URL, prompt)
         return [_call("delegate_task", {"goal": SUBLINK_GOAL + (url.group(0) if url else DEFAULT_PR)})]
+    if words.lstrip().startswith("guide"):
+        return [_call("tool_call", {"name": "write_review_guide", "arguments": GUIDE}, "call-guide")]
     if words.lstrip().startswith("pr"):
         # A real public PR, linked the way an agent links one it opened (through the tool_call bridge
         # in case Tool Search defers the plugin's tools).

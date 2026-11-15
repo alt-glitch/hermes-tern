@@ -57,7 +57,7 @@ A pane remembers its conversation. If `hermes tern` dies in a pane (a crash, a k
 | | |
 | --- | --- |
 | `hermes tern` | The chat in this plugin's Tern frontend. It runs in a Tern pane only |
-| `link_pull_request`, `unlink_pull_request`, `list_pull_requests` | Tools: the PRs a conversation works on, shown above the composer |
+| `link_pull_request`, `unlink_pull_request`, `list_pull_requests`, `write_review_guide` | Tools: the PRs a conversation works on, shown above the composer, and a review guide for one of them |
 | Plugin RPC methods (`ctx.register_rpc`) | The pane's own calls to the plugin: which session it shows, a conversation's linked PRs, a chart's rules, a check of a reply's figures |
 | Per-session environment (`ctx.register_session_env`) | The agent's shell commands run with the chat's `TERN_PANE`, so `tern open` works beside the chat |
 | `tern_charts` auxiliary task | Writes the rules behind a background process's live chart (`auxiliary.tern_charts` picks its model) |
@@ -160,7 +160,13 @@ tern plugin install github.com/alt-glitch/tern-plugins/prs
 
 It reads GitHub with the GitHub CLI (`gh`) on the machine that runs your panes, so `gh auth login` there is all the setup. Its **This session** tab lists the PRs this conversation linked and the PR of the session's branch; a PR's page has the conversation, checks, diffs, reviews and the merge. Without the plugin, the pill opens the newest PR on GitHub and says how to install it.
 
-The pane keeps its linked PRs in `$HERMES_HOME/plugin-data/hermes-tern/panes/<pane>.prs.json`, which the plugin reads (the format is in the plugin's README), and removes the file when you quit. The links themselves are kept for each conversation in `$HERMES_HOME/plugin-data/hermes-tern/pull-requests.json`, so they survive compression and resume.
+Ask the agent to guide you through a PR ("walk me through #22") and it reads the PR, then writes a review guide with the `write_review_guide` tool: a summary, then stops in reading order, each with notes, the files it is about and questions to consider. The PR's page opens beside the chat on its **Guide** tab. Asking again replaces the guide, and the tab says when the branch has moved past the commit the guide was written for.
+
+<p align="center"><img alt="The chat after asking for a guide, beside the prs block on the Guide tab of NousResearch/hermes-agent#153155: a summary and three numbered stops with notes, files and questions" src="docs/images/prs-guide.png" width="760"></p>
+
+The pane keeps its linked PRs and their guides in `$HERMES_HOME/plugin-data/hermes-tern/panes/<pane>.prs.json`, which the plugin reads (the format is in the plugin's README), and removes the file when you quit.
+
+The links and guides themselves are kept for each conversation in `$HERMES_HOME/plugin-data/hermes-tern/pull-requests.json`, so they survive compression and resume.
 
 The agent may link PRs from github.com, and from a GitHub Enterprise Server only when you list its host, because a link's host comes from the agent:
 

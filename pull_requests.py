@@ -1,5 +1,5 @@
-"""The session's pull requests: ``link_pull_request``, ``unlink_pull_request`` and
-``list_pull_requests``, after T3 Code's tools of the same purpose.
+"""The session's pull requests: ``link_pull_request``, ``unlink_pull_request``,
+``list_pull_requests`` and ``write_review_guide``, after T3 Code's tools of the same purpose.
 
 The agent links each PR it opens or works on; ``hermes tern`` counts them on its PR pill and hands them
 to Tern's ``prs`` plugin (github.com/alt-glitch/tern-plugins), which shows them beside the chat. Links live
@@ -9,7 +9,12 @@ session of its own; its links go to the conversation that delegated it:
 
     {"version": 1,
      "conversations": {ROOT: [{"host", "repository", "number", "url", "linked_at", "session_id", "cwd"}]},
+     "guides": {ROOT: {"owner/repo#N": {"head_sha"?, "written_at", "summary", "stops": [...]}}},
      "aliases": {SESSION_ID: ROOT}}
+
+A review guide is the agent's tour of one PR (``write_review_guide``): a summary, then stops with notes,
+files and questions. The pane writes the conversation's guides into its list file, where the ``prs``
+plugin shows a Guide tab; the format is that plugin's (``prs/README.md`` § List files).
 
 Nothing here or in the frontend calls GitHub: a link is the URL's host, repository and number.
 
@@ -66,6 +71,7 @@ _ctx: Any = None
 
 PROMPT = """<pull_request_linking>
 Use link_pull_request to register every pull request you create or work on in this session. Call it with the full PR URL right after you create a PR or start work on an existing PR. For a stack, call it for every layer, not only the current branch or the top PR. This applies when you create or update PRs through gh, gh stack, another CLI, or the API: those operations do not register the PR. Linking an already-linked PR is safe. The linked PRs show beside the chat in hermes tern. Before you finish PR work, call list_pull_requests and link any PR from your work that is missing. Do not link unrelated PRs that are mentioned only as background. If a link call fails, report the failure instead of saying the PR is linked.
+When the user asks you to guide them through a pull request, read it first (gh pr view, gh pr diff), then call write_review_guide with its head commit and the stops in reading order. The guide opens in the PR's Guide tab beside the chat; do not repeat it in your reply.
 </pull_request_linking>"""
 
 _TARGET = {
@@ -94,6 +100,48 @@ UNLINK_SCHEMA = {
     "name": "unlink_pull_request",
     "description": "Remove a pull request linked by mistake from this session's list. Pass the URL, or repository plus number.",
     "parameters": {"type": "object", "properties": _TARGET, "additionalProperties": False},
+}
+
+# What a guide may hold; the plugin draws every stop, so the model cannot flood the pane.
+MAX_STOPS, MAX_FILES, MAX_QUESTIONS = 20, 20, 5
+MAX_TITLE, MAX_TEXT, MAX_LINE = 200, 8000, 500
+_SHA = re.compile(r"^[0-9a-f]{7,40}$")
+
+GUIDE_SCHEMA = {
+    "name": "write_review_guide",
+    "description": (
+        "Write a review guide for a GitHub pull request: a short summary, then stops in reading order, each "
+        "with notes, the files it is about and questions for the reviewer. hermes tern opens it in the PR's "
+        "Guide tab beside the chat and links the PR. Read the PR first (gh pr view, gh pr diff). Writing again "
+        "replaces the PR's guide."),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            **_TARGET,
+            "head_sha": {"type": "string", "description": "The PR's head commit you read (gh pr view --json headRefOid); "
+                                                          "the tab says when the branch has moved past it."},
+            "summary": {"type": "string", "description": "What the PR does and where to look first, in Markdown. A few sentences."},
+            "stops": {
+                "type": "array", "minItems": 1, "maxItems": MAX_STOPS,
+                "description": "The tour, in reading order.",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "title": {"type": "string", "description": "One line."},
+                        "notes": {"type": "string", "description": "What changed here and why it matters, in Markdown."},
+                        "files": {"type": "array", "maxItems": MAX_FILES, "items": {"type": "string"},
+                                  "description": "Repository paths this stop is about, each optionally path:line."},
+                        "questions": {"type": "array", "maxItems": MAX_QUESTIONS, "items": {"type": "string"},
+                                      "description": "Questions for the reviewer to consider."},
+                    },
+                    "required": ["title", "notes"],
+                    "additionalProperties": False,
+                },
+            },
+        },
+        "required": ["summary", "stops"],
+        "additionalProperties": False,
+    },
 }
 
 LIST_SCHEMA = {
@@ -202,6 +250,55 @@ def _key(link: dict[str, Any]) -> str:
 # ── Storage ────────────────────────────────────────────────────────────────────────────────────
 
 
+def guide_key(link: dict[str, Any]) -> str:
+    """``owner/repo#N`` in lower case: the key the list file's ``guides`` and ``selected`` use."""
+    return f"{str(link['repository']).lower()}#{link['number']}"
+
+
+def _text(value: Any, limit: int, what: str, *, required: bool = False) -> str:
+    if not isinstance(value, str):
+        raise TargetError(f"{what} must be a string.")
+    text = value.strip()
+    if required and not text:
+        raise TargetError(f"{what} is empty.")
+    return text[:limit]
+
+
+def _lines(value: Any, limit: int, what: str) -> list[str]:
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise TargetError(f"{what} must be a list of strings.")
+    return [line for line in (_text(v, MAX_LINE, what) for v in value) if line][:limit]
+
+
+def parse_guide(args: dict[str, Any]) -> dict[str, Any]:
+    """The guide ``write_review_guide`` stores, from its arguments: trimmed, capped, typed."""
+    stops = args.get("stops")
+    if not isinstance(stops, list) or not stops:
+        raise TargetError("stops must be a non-empty list.")
+    if len(stops) > MAX_STOPS:
+        raise TargetError(f"A guide has at most {MAX_STOPS} stops.")
+    parsed = []
+    for i, stop in enumerate(stops, 1):
+        if not isinstance(stop, dict):
+            raise TargetError(f"stop {i} must be an object.")
+        parsed.append({
+            "title": _text(stop.get("title"), MAX_TITLE, f"stop {i} title", required=True),
+            "notes": _text(stop.get("notes", ""), MAX_TEXT, f"stop {i} notes"),
+            "files": _lines(stop.get("files"), MAX_FILES, f"stop {i} files"),
+            "questions": _lines(stop.get("questions"), MAX_QUESTIONS, f"stop {i} questions"),
+        })
+    guide: dict[str, Any] = {"written_at": int(time.time()), "summary": _text(args.get("summary", ""), MAX_TEXT, "summary"),
+                             "stops": parsed}
+    sha = str(args.get("head_sha") or "").strip().lower()
+    if sha:
+        if not _SHA.match(sha):
+            raise TargetError("head_sha must be a commit hash (7 to 40 hex characters).")
+        guide["head_sha"] = sha
+    return guide
+
+
 def data_file() -> Path:
     from plugins.plugin_storage import plugin_data_dir
 
@@ -242,6 +339,7 @@ def _read(path: Path) -> dict[str, Any]:
         data = {}
     data.setdefault("version", 1)
     data.setdefault("conversations", {})
+    data.setdefault("guides", {})
     data.setdefault("aliases", {})
     return data
 
@@ -282,14 +380,19 @@ def _public(links: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [{k: link[k] for k in ("url", "repository", "number", "host")} for link in links]
 
 
-def _linked(session_id: str) -> list[dict[str, Any]]:
-    """The links of session ``session_id``'s conversation, oldest first."""
+def _state(data: dict[str, Any], root: str) -> dict[str, Any]:
+    """What every link tool and the RPC answer: the conversation's links, oldest first, and its guides."""
+    return {"linked": _public(data["conversations"].get(root, [])), "guides": data["guides"].get(root, {})}
+
+
+def _linked(session_id: str) -> dict[str, Any]:
+    """Session ``session_id``'s conversation's links and guides."""
     if not session_id:
-        return []
+        return {"linked": [], "guides": {}}
     path = data_file()
     with _locked(path):
         data = _read(path)
-        return _public(data["conversations"].get(_conversation(data, session_id), []))
+        return _state(data, _conversation(data, session_id))
 
 
 def _tell_viewers(data: dict[str, Any], root: str) -> None:
@@ -335,7 +438,7 @@ def link_pull_request(args: dict[str, Any], session_id: str | None = None) -> st
         _write(path, data)
     if not already:
         _tell_viewers(data, root)
-    return tool_result({**target, "already_linked": already, "linked": _public(links)})
+    return tool_result({**target, "already_linked": already, **_state(data, root)})
 
 
 def unlink_pull_request(args: dict[str, Any], session_id: str | None = None) -> str:
@@ -355,23 +458,48 @@ def unlink_pull_request(args: dict[str, Any], session_id: str | None = None) -> 
         was = len(kept) != len(links)
         if was:
             data["conversations"][root] = kept
+            data["guides"].get(root, {}).pop(guide_key(target), None)
         _write(path, data)
     if was:
         _tell_viewers(data, root)
-    return tool_result({**target, "was_linked": was, "linked": _public(kept)})
+    return tool_result({**target, "was_linked": was, **_state(data, root)})
 
 
 def list_pull_requests(_args: dict[str, Any], session_id: str | None = None) -> str:
     from tools.registry import tool_result
 
-    return tool_result({"linked": _linked(_session(session_id))})
+    return tool_result(_linked(_session(session_id)))
+
+
+def write_review_guide(args: dict[str, Any], session_id: str | None = None) -> str:
+    from tools.registry import tool_error, tool_result
+
+    try:
+        target = parse_target(args or {})
+        guide = parse_guide(args or {})
+    except TargetError as error:
+        return tool_error(str(error))
+    sid = _session(session_id)
+    if not sid:
+        return tool_error("No session to write the guide for.")
+    path = data_file()
+    with _locked(path):
+        data = _read(path)
+        root = _conversation(data, sid)
+        links = data["conversations"].setdefault(root, [])
+        if not any(_key(link) == _key(target) for link in links):
+            links.append({**target, "linked_at": time.time(), "session_id": sid, "cwd": _cwd()})
+        data["guides"].setdefault(root, {})[guide_key(target)] = guide
+        _write(path, data)
+    _tell_viewers(data, root)
+    return tool_result({**target, "written": guide_key(target), "stops": len(guide["stops"]), **_state(data, root)})
 
 
 def linked(_params: dict, *, session_id: str | None = None, **_: Any) -> dict[str, Any]:
-    """The plugin RPC method: the links of the calling session's conversation."""
+    """The plugin RPC method: the links and guides of the calling session's conversation."""
     if not session_id:
         raise ValueError("pull_requests.linked needs the session_id whose links it reads")
-    return {"linked": _linked(session_id)}
+    return _linked(session_id)
 
 
 def register(ctx) -> None:
@@ -381,6 +509,7 @@ def register(ctx) -> None:
         ("link_pull_request", LINK_SCHEMA, link_pull_request),
         ("unlink_pull_request", UNLINK_SCHEMA, unlink_pull_request),
         ("list_pull_requests", LIST_SCHEMA, list_pull_requests),
+        ("write_review_guide", GUIDE_SCHEMA, write_review_guide),
     ):
         ctx.register_tool(name=name, toolset=TOOLSET, schema=schema, handler=handler, emoji="🔗",
                           description=schema["description"])

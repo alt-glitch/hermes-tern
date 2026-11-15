@@ -123,10 +123,11 @@ export function chatStores(chat: ChatPorts, { act, gw, launch, settings, surface
   const hud = new Hud({ changed, open: pill => act().openPill(pill) })
   /** The conversation's linked PRs, kept in the pane's list file for Tern's `prs` plugin (prs/listFile.ts). */
   const prs = new LinkedPrs({
-    changed: refs => {
-      writePrList(launch.pane, prList(session.ref.stored ?? '', session.info?.cwd || launch.cwd, refs))
+    changed: linked => {
+      writePrList(launch.pane, prList(session.ref.stored ?? '', session.info?.cwd || launch.cwd, linked))
       changed()
     },
+    guideWritten: ref => act().openPrs(ref, 'guide'),
     links: sid => linkedPullRequests(gw, sid),
     sid: () => session.ref.live
   })

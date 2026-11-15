@@ -38,7 +38,7 @@ import { promptOverlay } from '../overlays/prompts.js'
 import { parsePrompt } from '../prompts/parse.js'
 import type { PromptSheets } from '../prompts/sheets.js'
 import type { PrRef } from '../prs/links.js'
-import { prList, writePrList } from '../prs/listFile.js'
+import { type PrTab, prList, writePrList } from '../prs/listFile.js'
 import { openPrs, openUrl } from '../prs/open.js'
 import { cycleEffort, DEFAULT_EFFORT } from '../session/effort.js'
 import type { SessionLifecycle } from '../session/lifecycle.js'
@@ -554,12 +554,17 @@ export class AppActions {
     this.#cx.sidebar.toggle()
   }
 
-  /** Shows the session's PRs beside the chat in Tern's `prs` plugin, `pick` first; on GitHub without it. */
-  openPrs(pick?: PrRef) {
+  /** Shows the session's PRs beside the chat in Tern's `prs` plugin, `pick` first (on `tab`); on GitHub without it. */
+  openPrs(pick?: PrRef, tab?: PrTab) {
     const { chat, launch, state } = this.#cx
-    const write = (p?: PrRef) => writePrList(launch.pane, prList(state.ref.stored ?? '', state.info?.cwd || launch.cwd, chat.prs.entries(), p))
+    const linked = { guides: chat.prs.guides(), refs: [...chat.prs.entries()] }
+    const write = (p?: PrRef) =>
+      writePrList(launch.pane, prList(state.ref.stored ?? '', state.info?.cwd || launch.cwd, linked, p && { ref: p, ...(tab && { tab }) }))
 
-    void openPrs({ entries: () => chat.prs.entries(), notice: (text, tone) => chat.notice(text, tone), writeList: write }, pick)
+    void openPrs(
+      { entries: () => chat.prs.entries(), notice: (text, tone) => chat.notice(text, tone), purpose: tab === 'guide' ? 'guide' : 'page', writeList: write },
+      pick
+    )
   }
 
   /** Shows subagent `id` beside the chat in a Tern split; its timeline sheet where no split can open. */

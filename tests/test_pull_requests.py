@@ -99,10 +99,32 @@ def test_the_rpc_method_reads_the_calling_sessions_conversation(prs):
     prs.link_pull_request({"url": "https://github.com/a/b/pull/1"}, session_id="root")
 
     assert prs.linked({}, session_id="tip") == {"linked": [
-        {"url": "https://github.com/a/b/pull/1", "repository": "a/b", "number": 1, "host": "github.com"}]}
-    assert prs.linked({}, session_id="other") == {"linked": []}
+        {"url": "https://github.com/a/b/pull/1", "repository": "a/b", "number": 1, "host": "github.com"}], "guides": {}}
+    assert prs.linked({}, session_id="other") == {"linked": [], "guides": {}}
     with pytest.raises(ValueError):
         prs.linked({}, session_id=None)
+
+
+def test_a_review_guide_links_its_pr_is_capped_and_goes_with_an_unlink(prs, monkeypatch):
+    told = []
+    monkeypatch.setattr(prs, "_tell_viewers", lambda data, root: told.append(root))
+    stop = {"title": "  The shim  ", "notes": "n", "files": ["a.py:4", "", *[f"f{i}" for i in range(30)]],
+            "questions": [f"q{i}" for i in range(9)]}
+    out = json.loads(prs.write_review_guide({"url": "https://github.com/A/B/pull/7", "head_sha": "ABC1234",
+                                             "summary": "s", "stops": [stop]}, session_id="tip"))
+
+    assert (out["written"], out["stops"], [p["number"] for p in out["linked"]]) == ("a/b#7", 1, [7])
+    guide = prs.linked({}, session_id="root")["guides"]["a/b#7"]
+    assert (guide["head_sha"], guide["summary"], guide["stops"][0]["title"]) == ("abc1234", "s", "The shim")
+    assert (len(guide["stops"][0]["files"]), len(guide["stops"][0]["questions"])) == (prs.MAX_FILES, prs.MAX_QUESTIONS)
+    assert told == ["root"]
+    for bad in ({"stops": []}, {"stops": [{"notes": "no title"}]}, {"stops": [stop], "head_sha": "main"},
+                {"stops": [stop] * (prs.MAX_STOPS + 1)}):
+        assert "error" in json.loads(prs.write_review_guide({"url": "https://github.com/a/b/pull/7", "summary": "", **bad},
+                                                            session_id="tip"))
+
+    prs.unlink_pull_request({"url": "https://github.com/a/b/pull/7"}, session_id="tip")
+    assert prs.linked({}, session_id="tip") == {"linked": [], "guides": {}}
 
 
 def test_a_change_tells_the_panes_of_the_conversation_once(prs, monkeypatch):
