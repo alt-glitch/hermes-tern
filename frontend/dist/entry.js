@@ -292,17 +292,17 @@ function decodeEvent(raw) {
     case "edit": {
       const from = num(raw, "from");
       const to = num(raw, "to");
-      const text5 = str(raw, "text");
+      const text6 = str(raw, "text");
       const cursor = num(raw, "cursor");
       const len = num(raw, "len");
-      if (sf === void 0 || id === void 0 || from === void 0 || to === void 0 || text5 === void 0 || cursor === void 0 || len === void 0) {
+      if (sf === void 0 || id === void 0 || from === void 0 || to === void 0 || text6 === void 0 || cursor === void 0 || len === void 0) {
         return unknown2();
       }
-      return { ev, sf, id, from, to, text: text5, cursor, len, raw };
+      return { ev, sf, id, from, to, text: text6, cursor, len, raw };
     }
     case "send": {
-      const text5 = str(raw, "text");
-      return sf !== void 0 && id !== void 0 && text5 !== void 0 ? { ev, sf, id, text: text5, raw } : unknown2();
+      const text6 = str(raw, "text");
+      return sf !== void 0 && id !== void 0 && text6 !== void 0 ? { ev, sf, id, text: text6, raw } : unknown2();
     }
     case "error":
       return defined({ ev, msg: str(raw, "msg") ?? "", raw }, { sf, s: num(raw, "s"), op: num(raw, "op"), sheet: str(raw, "sheet"), id });
@@ -623,8 +623,8 @@ function modsOf(param) {
     meta: (bits & 8) !== 0
   };
 }
-function key(name, mods2, text5) {
-  return text5 === void 0 ? { name, ...mods2 } : { name, text: text5, ...mods2 };
+function key(name, mods2, text6) {
+  return text6 === void 0 ? { name, ...mods2 } : { name, text: text6, ...mods2 };
 }
 var LETTER_KEYS = {
   A: "up",
@@ -1198,21 +1198,21 @@ function createNode(kind, input, children2) {
     if (run6.length > 0)
       Object.assign(props, textProps(run6));
   } else if (kind === "el") {
-    let text5 = "";
+    let text6 = "";
     for (const part of parts2) {
       if (part instanceof Span)
         throw new TypeError("el takes no spans; use html.span");
       if (typeof part === "string") {
         if (nodes.length === 0)
-          text5 += part;
+          text6 += part;
         else
           nodes.push(new Node("el", { tag: "span", text: part }));
       } else {
         nodes.push(part);
       }
     }
-    if (text5 !== "")
-      props["text"] = text5;
+    if (text6 !== "")
+      props["text"] = text6;
   } else {
     nodes = containerChildren(parts2);
   }
@@ -1416,11 +1416,11 @@ var View = class _View {
   }
 };
 function diff(old, now, ops) {
-  const text5 = isTextKind(now.kind);
+  const text6 = isTextKind(now.kind);
   const set = {};
   let changed = false;
   for (const key2 in now.props) {
-    if (text5 && key2 === "text")
+    if (text6 && key2 === "text")
       continue;
     const value = now.props[key2];
     if (value === void 0 || jsonEqual(old.props[key2], value))
@@ -1429,14 +1429,14 @@ function diff(old, now, ops) {
     changed = true;
   }
   for (const key2 in old.props) {
-    if (!(text5 && key2 === "text") && !(key2 in now.props)) {
+    if (!(text6 && key2 === "text") && !(key2 in now.props)) {
       set[key2] = null;
       changed = true;
     }
   }
   if (changed)
     ops.push(["set", now.id, set]);
-  if (text5) {
+  if (text6) {
     const before = old.props["text"];
     const after = now.props["text"];
     if (!jsonEqual(before, after)) {
@@ -1787,8 +1787,8 @@ var Session = class {
     this.#input = input;
     this.#output = output;
     this.#options = options;
-    const record2 = options.record ?? (options.env ?? process.env)["TERN_TSP_RECORD"];
-    this.#record = record2 === "" ? void 0 : record2;
+    const record3 = options.record ?? (options.env ?? process.env)["TERN_TSP_RECORD"];
+    this.#record = record3 === "" ? void 0 : record3;
     this.#caps = {
       term: "",
       ver: "",
@@ -2257,10 +2257,10 @@ function sessionHost(cx) {
       return cx.activity.busy !== null;
     },
     // A steer that fell back to the queue: steering carries no images.
-    enqueue: (text5) => cx.router.behind({ images: [], kind: "app", text: text5 }),
+    enqueue: (text6) => cx.router.behind({ images: [], kind: "app", text: text6 }),
     gw: cx.gw,
-    notice: (text5, tone) => {
-      cx.transcript.notice(text5, tone);
+    notice: (text6, tone) => {
+      cx.transcript.notice(text6, tone);
       cx.changed();
     },
     // The shared gateway (the one /branch runs on) answers a resume with one id for both kinds.
@@ -2268,8 +2268,8 @@ function sessionHost(cx) {
       await cx.life.resume(id);
       return durable(cx.state.ref) === id;
     },
-    panel: (title, text5) => {
-      cx.transcript.panel(title, text5);
+    panel: (title, text6) => {
+      cx.transcript.panel(title, text6);
       cx.changed();
     },
     compressing: (state) => {
@@ -2293,20 +2293,17 @@ function sessionHost(cx) {
         await cx.life.reload(sid);
       }
     },
-    send: (text5) => cx.router.send({ images: [], kind: "app", text: text5 }),
+    send: (text6) => cx.router.send({ images: [], kind: "app", text: text6 }),
     sid,
     stale: () => !ticket.isCurrent(),
-    steered: (text5) => {
-      cx.transcript.steer(text5);
+    steered: (text6) => {
+      cx.transcript.steer(text6);
       cx.changed();
     },
     // /queue: behind the turn whatever busy_input_mode says.
-    submit: (text5) => cx.submit(text5)
+    submit: (text6) => cx.submit(text6)
   };
 }
-
-// src/hermes/connect.ts
-import { execFile } from "node:child_process";
 
 // node_modules/zod/v4/core/core.js
 var _a;
@@ -2437,6 +2434,22 @@ var captureStackTrace = "captureStackTrace" in Error ? Error.captureStackTrace :
 };
 function isObject(data) {
   return typeof data === "object" && data !== null && !Array.isArray(data);
+}
+function isPlainObject(o) {
+  if (isObject(o) === false)
+    return false;
+  const ctor = o.constructor;
+  if (ctor === void 0)
+    return true;
+  if (typeof ctor !== "function")
+    return true;
+  const prot = ctor.prototype;
+  if (isObject(prot) === false)
+    return false;
+  if (Object.prototype.hasOwnProperty.call(prot, "isPrototypeOf") === false) {
+    return false;
+  }
+  return true;
 }
 var propertyKeyTypes = /* @__PURE__ */ new Set(["string", "number", "symbol"]);
 function escapeRegex(str6) {
@@ -3154,6 +3167,132 @@ function handleTupleResults(itemResults, final, items, input, optoutStart) {
   }
   return final;
 }
+var $ZodRecord = /* @__PURE__ */ $constructor("$ZodRecord", (inst, def) => {
+  $ZodType.init(inst, def);
+  inst._zod.parse = (payload, ctx) => {
+    const input = payload.value;
+    if (!isPlainObject(input)) {
+      payload.issues.push({
+        expected: "record",
+        code: "invalid_type",
+        input,
+        inst
+      });
+      return payload;
+    }
+    const proms = [];
+    const values = def.keyType._zod.values;
+    if (values) {
+      payload.value = {};
+      const recordKeys = /* @__PURE__ */ new Set();
+      for (const key2 of values) {
+        if (typeof key2 === "string" || typeof key2 === "number" || typeof key2 === "symbol") {
+          recordKeys.add(typeof key2 === "number" ? key2.toString() : key2);
+          const keyResult = def.keyType._zod.run({ value: key2, issues: [] }, ctx);
+          if (keyResult instanceof Promise) {
+            throw new Error("Async schemas not supported in object keys currently");
+          }
+          if (keyResult.issues.length) {
+            payload.issues.push({
+              code: "invalid_key",
+              origin: "record",
+              issues: keyResult.issues.map((iss) => finalizeIssue(iss, ctx, config())),
+              input: key2,
+              path: [key2],
+              inst
+            });
+            continue;
+          }
+          const outKey = keyResult.value;
+          const result = def.valueType._zod.run({ value: input[key2], issues: [] }, ctx);
+          if (result instanceof Promise) {
+            proms.push(result.then((result2) => {
+              if (result2.issues.length) {
+                payload.issues.push(...prefixIssues(key2, result2.issues));
+              }
+              payload.value[outKey] = result2.value;
+            }));
+          } else {
+            if (result.issues.length) {
+              payload.issues.push(...prefixIssues(key2, result.issues));
+            }
+            payload.value[outKey] = result.value;
+          }
+        }
+      }
+      let unrecognized;
+      for (const key2 in input) {
+        if (!recordKeys.has(key2)) {
+          unrecognized = unrecognized ?? [];
+          unrecognized.push(key2);
+        }
+      }
+      if (unrecognized && unrecognized.length > 0) {
+        payload.issues.push({
+          code: "unrecognized_keys",
+          input,
+          inst,
+          keys: unrecognized
+        });
+      }
+    } else {
+      payload.value = {};
+      for (const key2 of Reflect.ownKeys(input)) {
+        if (key2 === "__proto__")
+          continue;
+        if (!Object.prototype.propertyIsEnumerable.call(input, key2))
+          continue;
+        let keyResult = def.keyType._zod.run({ value: key2, issues: [] }, ctx);
+        if (keyResult instanceof Promise) {
+          throw new Error("Async schemas not supported in object keys currently");
+        }
+        const checkNumericKey = typeof key2 === "string" && number.test(key2) && keyResult.issues.length;
+        if (checkNumericKey) {
+          const retryResult = def.keyType._zod.run({ value: Number(key2), issues: [] }, ctx);
+          if (retryResult instanceof Promise) {
+            throw new Error("Async schemas not supported in object keys currently");
+          }
+          if (retryResult.issues.length === 0) {
+            keyResult = retryResult;
+          }
+        }
+        if (keyResult.issues.length) {
+          if (def.mode === "loose") {
+            payload.value[key2] = input[key2];
+          } else {
+            payload.issues.push({
+              code: "invalid_key",
+              origin: "record",
+              issues: keyResult.issues.map((iss) => finalizeIssue(iss, ctx, config())),
+              input: key2,
+              path: [key2],
+              inst
+            });
+          }
+          continue;
+        }
+        const result = def.valueType._zod.run({ value: input[key2], issues: [] }, ctx);
+        if (result instanceof Promise) {
+          proms.push(result.then((result2) => {
+            if (result2.issues.length) {
+              payload.issues.push(...prefixIssues(key2, result2.issues));
+            }
+            payload.value[keyResult.value] = result2.value;
+          }));
+        } else {
+          if (result.issues.length) {
+            payload.issues.push(...prefixIssues(key2, result.issues));
+          }
+          payload.value[keyResult.value] = result.value;
+        }
+      }
+    }
+    if (proms.length) {
+      return Promise.all(proms).then(() => payload);
+    }
+    return payload;
+  };
+});
 var $ZodEnum = /* @__PURE__ */ $constructor("$ZodEnum", (inst, def) => {
   $ZodType.init(inst, def);
   const values = getEnumValues(def.entries);
@@ -3510,6 +3649,27 @@ function tuple(items, _paramsOrRest, _params) {
     ...normalizeParams(params)
   });
 }
+var ZodMiniRecord = /* @__PURE__ */ $constructor("ZodMiniRecord", (inst, def) => {
+  $ZodRecord.init(inst, def);
+  ZodMiniType.init(inst, def);
+});
+// @__NO_SIDE_EFFECTS__
+function record(keyType, valueType, params) {
+  if (!valueType || !valueType._zod) {
+    return new ZodMiniRecord({
+      type: "record",
+      keyType: /* @__PURE__ */ string2(),
+      valueType: keyType,
+      ...normalizeParams(valueType)
+    });
+  }
+  return new ZodMiniRecord({
+    type: "record",
+    keyType,
+    valueType,
+    ...normalizeParams(params)
+  });
+}
 var ZodMiniEnum = /* @__PURE__ */ $constructor("ZodMiniEnum", (inst, def) => {
   $ZodEnum.init(inst, def);
   ZodMiniType.init(inst, def);
@@ -3598,30 +3758,30 @@ function pipe(in_, out) {
   });
 }
 
+// src/hermes/connect.ts
+import { execFile } from "node:child_process";
+
 // src/wire/json.ts
-function record(v) {
+function record2(v) {
   if (typeof v === "string") {
     try {
-      return record(JSON.parse(v));
+      return record2(JSON.parse(v));
     } catch {
       return void 0;
     }
   }
   return v && typeof v === "object" && !Array.isArray(v) ? v : void 0;
 }
-function parseJson(text5) {
+function parseJson(text6) {
   try {
-    return JSON.parse(text5);
+    return JSON.parse(text6);
   } catch {
     return void 0;
   }
 }
 
 // src/hermes/connect.ts
-var command = tuple([string2()], string2());
-function readHermesCommand(raw) {
-  return raw ? command.safeParse(parseJson(raw)).data : void 0;
-}
+var hermesCommand = tuple([string2()], string2());
 var ATTACH_TIMEOUT_MS = 9e4;
 var TERMINAL_CODES = /* @__PURE__ */ new Set([2, 3, 4]);
 var grant = object({
@@ -3643,7 +3803,7 @@ var runFile = (file2, args, env) => new Promise((resolve4) => {
     resolve4({ code: code2, stderr: stderr || (error && !stdout ? error.message : ""), stdout });
   });
 });
-var lastJson = (text5) => text5.split("\n").reverse().map((line) => line.trim()).filter(Boolean).map((line) => parseJson(line)).find((value) => value !== void 0);
+var lastJson = (text6) => text6.split("\n").reverse().map((line) => line.trim()).filter(Boolean).map((line) => parseJson(line)).find((value) => value !== void 0);
 function attachGateway(hermes, run6 = runFile, env = process.env) {
   return async (start, recover) => {
     const [file2, ...args] = hermes;
@@ -3667,28 +3827,41 @@ function terminalAttachFailure(error) {
 }
 
 // src/config/env.ts
+var LAUNCH_ENV = "HERMES_TERN_LAUNCH";
+var text = _catch(string2(), "");
+var launchSpec = object({
+  create: _catch(record(string2(), unknown()), {}),
+  cwd: text,
+  hermes: _catch(optional(hermesCommand), void 0),
+  image: text,
+  pane_cwd: text,
+  query: text,
+  restored: _catch(boolean2(), false),
+  resume: text,
+  session_cwd: text,
+  session_file: text,
+  tool_progress: text
+});
 function readLaunchEnv(env = process.env, cwd = process.cwd()) {
-  const launchCwd = env["HERMES_TERN_CWD"] || cwd;
+  const raw = env[LAUNCH_ENV];
+  const spec = launchSpec.safeParse(raw ? parseJson(raw) : {}).data ?? launchSpec.parse({});
+  const launchCwd = spec.cwd || cwd;
   return Object.freeze({
-    create: Object.freeze(createOptions(env["HERMES_TERN_CREATE"])),
+    create: Object.freeze({ ...spec.create }),
     cwd: launchCwd,
     eventLog: env["HERMES_TERN_EVENT_LOG"] ?? "",
-    hermes: readHermesCommand(env["HERMES_TERN_HERMES"]),
+    hermes: spec.hermes,
     home: env["HOME"],
-    image: env["HERMES_TERN_IMAGE"]?.trim() ?? "",
+    image: spec.image.trim(),
     pane: env["TERN_PANE"]?.trim() ?? "",
-    paneCwd: env["HERMES_TERN_LAUNCH_CWD"] || launchCwd,
-    query: env["HERMES_TERN_QUERY"]?.trim() ?? "",
-    restored: Boolean(env["HERMES_TERN_RESTORED"]?.trim()),
-    resume: env["HERMES_TERN_RESUME"]?.trim() ?? "",
-    sessionCwd: env["HERMES_TERN_SESSION_CWD"]?.trim() ?? "",
-    sessionFile: env["HERMES_TERN_SESSION_FILE"] ?? "",
-    toolProgress: env["HERMES_TERN_TOOL_PROGRESS"]?.trim() ?? ""
+    paneCwd: spec.pane_cwd || launchCwd,
+    query: spec.query.trim(),
+    restored: spec.restored,
+    resume: spec.resume.trim(),
+    sessionCwd: spec.session_cwd.trim(),
+    sessionFile: spec.session_file,
+    toolProgress: spec.tool_progress.trim()
   });
-}
-function createOptions(raw) {
-  const value = raw ? parseJson(raw) : void 0;
-  return typeof value === "object" && value !== null && !Array.isArray(value) ? { ...value } : {};
 }
 var launch;
 function launchEnv() {
@@ -3976,13 +4149,13 @@ var Notices = class {
   #seq = 0;
   /** Adds or replaces the notice; returns it (undefined for an empty one). */
   show(p, now = Date.now()) {
-    const text5 = p.text?.trim();
-    if (!text5) {
+    const text6 = p.text?.trim();
+    if (!text6) {
       return void 0;
     }
     const key2 = p.key || p.id || `n${++this.#seq}`;
     const ttl = p.kind === "ttl" && typeof p.ttl_ms === "number" && p.ttl_ms > 0 ? p.ttl_ms : void 0;
-    const notice = { key: key2, text: text5, tone: TONES[p.level ?? ""] ?? "info", ...ttl ? { expires: now + ttl } : {} };
+    const notice = { key: key2, text: text6, tone: TONES[p.level ?? ""] ?? "info", ...ttl ? { expires: now + ttl } : {} };
     this.#list = [...this.#list.filter((n) => n.key !== key2), notice];
     return notice;
   }
@@ -4088,11 +4261,11 @@ var chromeHandlers = {
   },
   // What the background self-improvement review saved to memory or skills.
   "review.summary": (ev, cx) => {
-    const text5 = String(ev.payload?.text ?? "").trim();
-    if (!text5) {
+    const text6 = String(ev.payload?.text ?? "").trim();
+    if (!text6) {
       return "quiet";
     }
-    cx.transcript.notice(text5);
+    cx.transcript.notice(text6);
     return "render";
   },
   notice: (ev, cx) => {
@@ -4446,7 +4619,7 @@ var APPROVALS = [
 ];
 function approvalOverlay(host, prompt) {
   const { description, req, smartDenied } = prompt;
-  const command2 = prompt.command;
+  const command = prompt.command;
   const choices = APPROVALS.filter((c) => prompt.choices.includes(c.id));
   const key2 = promptKey(req.id);
   const sending = { busy: false, error: "" };
@@ -4468,7 +4641,7 @@ function approvalOverlay(host, prompt) {
           "text"
         )
       ] }, "why") : null,
-      command2 ? /* @__PURE__ */ jsx("code", { lang: "bash", max: { h: "12lines" }, text: command2, wrap: true }, "command") : null,
+      command ? /* @__PURE__ */ jsx("code", { lang: "bash", max: { h: "12lines" }, text: command, wrap: true }, "command") : null,
       sendingLine(sending),
       actionsRow(
         choices.map((c) => ({
@@ -4573,11 +4746,11 @@ var ITALIC_STAR = /(?<![*\\])\*(?=[^\s*])([^\n*]*?[^\s*\\])\*(?!\*)/g;
 var ITALIC_UNDERSCORE = /(?<![\w\\])_(?=[^\s_])([^\n_]*?[^\s_\\])_(?![\w])/g;
 var STRIKE = /~~(?=\S)([^\n]*?\S)~~/g;
 var LINK = /\[(?<label>[^\]\n]+)\]\(([^)\s]+)\)/g;
-function markdownDecor(text5) {
-  if (!text5) {
+function markdownDecor(text6) {
+  if (!text6) {
     return [];
   }
-  const marks = Array.from({ length: text5.length }, () => []);
+  const marks = Array.from({ length: text6.length }, () => []);
   const mark = (from, to, s) => {
     for (const tokens of marks.slice(from, to)) {
       if (!tokens.includes(s)) {
@@ -4587,7 +4760,7 @@ function markdownDecor(text5) {
   };
   let at = 0;
   let fenced = false;
-  for (const line of text5.split("\n")) {
+  for (const line of text6.split("\n")) {
     const end = at + line.length;
     if (FENCE.test(line)) {
       mark(at, end, "dim");
@@ -4681,11 +4854,11 @@ function runs(marks) {
   }
   return out;
 }
-function listNewline(text5, cursor) {
-  const start = text5.lastIndexOf("\n", cursor - 1) + 1;
-  const nl = text5.indexOf("\n", cursor);
-  const end = nl < 0 ? text5.length : nl;
-  const line = text5.slice(start, end);
+function listNewline(text6, cursor) {
+  const start = text6.lastIndexOf("\n", cursor - 1) + 1;
+  const nl = text6.indexOf("\n", cursor);
+  const end = nl < 0 ? text6.length : nl;
+  const line = text6.slice(start, end);
   const m = LIST.exec(line);
   if (!m || cursor - start < m[0].length) {
     return void 0;
@@ -4700,55 +4873,55 @@ function listNewline(text5, cursor) {
 ${indent}${next}${gap}${box ? "[ ] " : ""}`;
   return { cursor: cursor + insert.length, from: cursor, text: insert, to: cursor };
 }
-function toggleMark(text5, from, to, marker) {
+function toggleMark(text6, from, to, marker) {
   const n = marker.length;
   if (from !== to) {
-    if (text5.slice(from - n, from) === marker && text5.slice(to, to + n) === marker && !doubled(text5, from - n, to + n, marker)) {
-      return { anchor: from - n, cursor: to - n, from: from - n, text: text5.slice(from, to), to: to + n };
+    if (text6.slice(from - n, from) === marker && text6.slice(to, to + n) === marker && !doubled(text6, from - n, to + n, marker)) {
+      return { anchor: from - n, cursor: to - n, from: from - n, text: text6.slice(from, to), to: to + n };
     }
-    const inner = text5.slice(from, to);
+    const inner = text6.slice(from, to);
     if (inner.length > 2 * n && inner.startsWith(marker) && inner.endsWith(marker)) {
       return { anchor: from, cursor: to - 2 * n, from, text: inner.slice(n, -n), to };
     }
     return { anchor: from + n, cursor: to + n, from, text: `${marker}${inner}${marker}`, to };
   }
   const at = from;
-  if (text5.slice(at - n, at) === marker && text5.slice(at, at + n) === marker) {
+  if (text6.slice(at - n, at) === marker && text6.slice(at, at + n) === marker) {
     return { cursor: at - n, from: at - n, text: "", to: at + n };
   }
-  const run6 = markedRun(text5, at, marker);
+  const run6 = markedRun(text6, at, marker);
   if (run6 && at === run6.close) {
     return { cursor: at + n, from: at, text: "", to: at };
   }
   if (run6) {
-    const inner = text5.slice(run6.open + n, run6.close);
+    const inner = text6.slice(run6.open + n, run6.close);
     return { cursor: at - n, from: run6.open, text: inner, to: run6.close + n };
   }
-  const word = wordAt(text5, at);
+  const word = wordAt(text6, at);
   if (word) {
-    return { cursor: at + n, from: word.from, text: `${marker}${text5.slice(word.from, word.to)}${marker}`, to: word.to };
+    return { cursor: at + n, from: word.from, text: `${marker}${text6.slice(word.from, word.to)}${marker}`, to: word.to };
   }
   return { cursor: at + n, from: at, text: `${marker}${marker}`, to: at };
 }
 var WORD = /[\p{L}\p{N}'’-]/u;
-function wordAt(text5, at) {
+function wordAt(text6, at) {
   let from = at;
   let to = at;
-  while (from > 0 && WORD.test(text5[from - 1] ?? "")) {
+  while (from > 0 && WORD.test(text6[from - 1] ?? "")) {
     from--;
   }
-  while (to < text5.length && WORD.test(text5[to] ?? "")) {
+  while (to < text6.length && WORD.test(text6[to] ?? "")) {
     to++;
   }
   return from < to ? { from, to } : void 0;
 }
-function doubled(text5, open, close, marker) {
-  return marker.length === 1 && (text5[open - 1] === marker || text5[close] === marker);
+function doubled(text6, open, close, marker) {
+  return marker.length === 1 && (text6[open - 1] === marker || text6[close] === marker);
 }
-function markedRun(text5, at, marker) {
-  const start = text5.lastIndexOf("\n", at - 1) + 1;
-  const nl = text5.indexOf("\n", at);
-  const line = text5.slice(start, nl < 0 ? text5.length : nl);
+function markedRun(text6, at, marker) {
+  const start = text6.lastIndexOf("\n", at - 1) + 1;
+  const nl = text6.indexOf("\n", at);
+  const line = text6.slice(start, nl < 0 ? text6.length : nl);
   const re = marker === "**" ? /\*\*(?=\S)([^\n]*?\S)\*\*/g : /(?<![\w_])_(?=[^\s_])([^\n_]*?[^\s_])_(?![\w_])/g;
   for (const m of line.matchAll(re)) {
     const open = start + m.index;
@@ -4863,23 +5036,23 @@ var Composer = class {
    * last draft held go with it: `pasted` names the ones `text` holds (a prompt back in the
    * composer, with the draft it went in front of).
    */
-  set(text5, { cursor = text5.length, pasted = [] } = {}) {
+  set(text6, { cursor = text6.length, pasted = [] } = {}) {
     this.#record({ merge: false });
-    this.#text = text5;
-    this.#cursor = clamp(cursor, text5.length);
+    this.#text = text6;
+    this.#cursor = clamp(cursor, text6.length);
     this.#pasted = [...pasted];
   }
   /** Clears the draft after a submit, remembering it in the prompt history. */
   take() {
-    const text5 = this.text;
-    append(text5);
+    const text6 = this.text;
+    append(text6);
     this.#pasted = [];
     this.#steps.clear();
     this.#browse = -1;
     this.#text = "";
     this.#cursor = 0;
     this.#anchor = void 0;
-    return text5;
+    return text6;
   }
   /** Types `s` at the caret, over the selection if there is one. */
   insert(s) {
@@ -5086,8 +5259,8 @@ var Composer = class {
     return true;
   }
   /** Applies a Markdown edit as one undo step, with the selection it leaves. */
-  #apply({ anchor, cursor, from, text: text5, to }) {
-    this.#replace({ cursor, from, merge: false, s: text5, to });
+  #apply({ anchor, cursor, from, text: text6, to }) {
+    this.#replace({ cursor, from, merge: false, s: text6, to });
     this.#anchor = anchor !== void 0 && anchor !== this.cursor ? anchor : void 0;
     return true;
   }
@@ -5120,12 +5293,12 @@ var Composer = class {
       return true;
     }
     this.#browse = at;
-    const text5 = at === items.length ? this.#draft : items[at] ?? "";
+    const text6 = at === items.length ? this.#draft : items[at] ?? "";
     if (at === items.length) {
       this.#browse = -1;
     }
-    this.#text = text5;
-    this.#cursor = text5.length;
+    this.#text = text6;
+    this.#cursor = text6.length;
     this.#anchor = void 0;
     return true;
   }
@@ -5165,19 +5338,19 @@ var Composer = class {
 function clamp(n, max) {
   return Math.max(0, Math.min(max, n));
 }
-function lineStart(text5, at) {
-  return at <= 0 ? 0 : text5.lastIndexOf("\n", at - 1) + 1;
+function lineStart(text6, at) {
+  return at <= 0 ? 0 : text6.lastIndexOf("\n", at - 1) + 1;
 }
-function lineEnd(text5, at) {
-  const i = text5.indexOf("\n", at);
-  return i < 0 ? text5.length : i;
+function lineEnd(text6, at) {
+  const i = text6.indexOf("\n", at);
+  return i < 0 ? text6.length : i;
 }
-function boundaryAt(text5, at) {
-  if (at >= text5.length) {
-    return text5.length;
+function boundaryAt(text6, at) {
+  if (at >= text6.length) {
+    return text6.length;
   }
   let floor = 0;
-  for (const { index } of graphemes.segment(text5)) {
+  for (const { index } of graphemes.segment(text6)) {
     if (index > at) {
       break;
     }
@@ -5185,9 +5358,9 @@ function boundaryAt(text5, at) {
   }
   return floor;
 }
-function prevGrapheme(text5, at) {
+function prevGrapheme(text6, at) {
   let prev = 0;
-  for (const { index } of graphemes.segment(text5)) {
+  for (const { index } of graphemes.segment(text6)) {
     if (index >= at) {
       break;
     }
@@ -5195,40 +5368,40 @@ function prevGrapheme(text5, at) {
   }
   return prev;
 }
-function nextGrapheme(text5, at) {
-  for (const { index, segment } of graphemes.segment(text5)) {
+function nextGrapheme(text6, at) {
+  for (const { index, segment } of graphemes.segment(text6)) {
     if (index >= at) {
       return index + segment.length;
     }
   }
-  return text5.length;
+  return text6.length;
 }
-function prevWord(text5, at) {
+function prevWord(text6, at) {
   let i = at;
-  while (i > 0 && !WORD2.test(text5[i - 1] ?? "")) {
+  while (i > 0 && !WORD2.test(text6[i - 1] ?? "")) {
     i--;
   }
-  while (i > 0 && WORD2.test(text5[i - 1] ?? "")) {
+  while (i > 0 && WORD2.test(text6[i - 1] ?? "")) {
     i--;
   }
   return i;
 }
-function nextWord(text5, at) {
+function nextWord(text6, at) {
   let i = at;
-  while (i < text5.length && !WORD2.test(text5[i] ?? "")) {
+  while (i < text6.length && !WORD2.test(text6[i] ?? "")) {
     i++;
   }
-  while (i < text5.length && WORD2.test(text5[i] ?? "")) {
+  while (i < text6.length && WORD2.test(text6[i] ?? "")) {
     i++;
   }
   return i;
 }
-function pastedCommand(text5) {
-  return text5.includes("{!") || text5.trimStart().startsWith("!");
+function pastedCommand(text6) {
+  return text6.includes("{!") || text6.trimStart().startsWith("!");
 }
 
 // src/tools/fields.ts
-function text(v) {
+function text2(v) {
   return typeof v === "string" && v ? v : void 0;
 }
 function num2(v) {
@@ -5238,25 +5411,25 @@ function list(v) {
   return Array.isArray(v) ? v : void 0;
 }
 function records(v) {
-  return Array.isArray(v) ? v.map((i) => record(i)) : [];
+  return Array.isArray(v) ? v.map((i) => record2(i)) : [];
 }
 function objects(v) {
   return records(v).filter((r) => r !== void 0);
 }
 function texts(v) {
-  return Array.isArray(v) ? v.map((i) => text(i)).filter((t) => t !== void 0) : [];
+  return Array.isArray(v) ? v.map((i) => text2(i)).filter((t) => t !== void 0) : [];
 }
 
 // src/tools/ask.ts
 var OUTCOMES = /* @__PURE__ */ new Set(["cancelled", "submitted", "timed_out", "undelivered"]);
 var isOutcome = (v) => v !== void 0 && OUTCOMES.has(v);
 function askDetail({ args, result }) {
-  const asked2 = list(args["questions"]) ?? (text(args["question"]) ? [args] : []);
-  const outcome2 = text(result?.["outcome"]);
+  const asked2 = list(args["questions"]) ?? (text2(args["question"]) ? [args] : []);
+  const outcome2 = text2(result?.["outcome"]);
   return {
     answered: result !== void 0,
     outcome: isOutcome(outcome2) ? outcome2 : void 0,
-    questions: objects(asked2).map((q) => ({ choices: texts(q["choices"]), multi: q["multi_select"] === true, question: text(q["question"]) })),
+    questions: objects(asked2).map((q) => ({ choices: texts(q["choices"]), multi: q["multi_select"] === true, question: text2(q["question"]) })),
     responses: records(result?.["responses"]).map((r) => {
       if (!r) {
         return void 0;
@@ -5730,24 +5903,24 @@ function confirmOverlay(host, ask) {
 // src/tools/files.ts
 function readDetail({ args, result }) {
   return {
-    content: text(result?.["content"]),
-    path: text(args["path"]),
+    content: text2(result?.["content"]),
+    path: text2(args["path"]),
     tool: "read_file",
     totalLines: num2(result?.["total_lines"])
   };
 }
 function editDetail(tool) {
-  return ({ args, result }) => ({ content: text(args["content"]), diff: text(result?.["diff"]), path: text(args["path"]), tool });
+  return ({ args, result }) => ({ content: text2(args["content"]), diff: text2(result?.["diff"]), path: text2(args["path"]), tool });
 }
 
 // src/tools/misc.ts
 function genericFields({ args, result }) {
   return {
-    prompt: text(args["prompt"]),
-    query: text(args["query"]),
-    question: text(args["question"]),
-    said: text(result?.["analysis"]) ?? text(result?.["text_summary"]),
-    url: text(args["url"])
+    prompt: text2(args["prompt"]),
+    query: text2(args["query"]),
+    question: text2(args["question"]),
+    said: text2(result?.["analysis"]) ?? text2(result?.["text_summary"]),
+    url: text2(args["url"])
   };
 }
 function plainDetail(tool) {
@@ -5761,32 +5934,32 @@ function processDetail(raw) {
 }
 function evalDetail({ args, result }) {
   return {
-    code: text(args["code"]),
-    error: text(result?.["error"]) ?? text(result?.["stderr"]),
-    output: text(result?.["output"]) ?? text(result?.["stdout"]),
+    code: text2(args["code"]),
+    error: text2(result?.["error"]) ?? text2(result?.["stderr"]),
+    output: text2(result?.["output"]) ?? text2(result?.["stdout"]),
     tool: "execute_code"
   };
 }
 function memoryDetail({ args, result }) {
-  return { action: text(args["action"]), tool: "memory", usage: text(result?.["usage"]) };
+  return { action: text2(args["action"]), tool: "memory", usage: text2(result?.["usage"]) };
 }
 function skillsDetail({ result }) {
   const skills = list(result?.["skills"]) ?? [];
   return {
-    message: text(result?.["message"]),
-    names: skills.map((s) => text(record(s)?.["name"]) ?? text(s)).filter((n) => n !== void 0),
+    message: text2(result?.["message"]),
+    names: skills.map((s) => text2(record2(s)?.["name"]) ?? text2(s)).filter((n) => n !== void 0),
     tool: "skills_list"
   };
 }
 function skillDetail({ args, result }) {
-  return { content: text(result?.["content"]), name: text(args["name"]), tool: "skill_view" };
+  return { content: text2(result?.["content"]), name: text2(args["name"]), tool: "skill_view" };
 }
 function toolSearchDetail(raw) {
   const { args } = raw;
   const queries = list(args["queries"]);
   return {
     ...genericFields(raw),
-    queries: queries ? queries.filter((q) => typeof q === "string") : texts([text(args["queries"]) ?? text(args["query"])]),
+    queries: queries ? queries.filter((q) => typeof q === "string") : texts([text2(args["queries"]) ?? text2(args["query"])]),
     tool: "tool_search"
   };
 }
@@ -5795,7 +5968,7 @@ function toolDescribeDetail(raw) {
   return { ...genericFields(raw), names: texts(Array.isArray(names) ? names : [names]), tool: "tool_describe" };
 }
 function pullRequestDetail(tool) {
-  return (raw) => ({ ...genericFields(raw), number: num2(raw.args["number"]), repository: text(raw.args["repository"]), tool });
+  return (raw) => ({ ...genericFields(raw), number: num2(raw.args["number"]), repository: text2(raw.args["repository"]), tool });
 }
 
 // src/tools/search.ts
@@ -5806,11 +5979,11 @@ function searchDetail({ args, result }) {
     filesOnly: args["target"] === "files",
     matches: matches2 ? objects(matches2).map((m) => ({
       line: num2(m["line"]) ?? 0,
-      path: text(m["path"]) ?? "",
+      path: text2(m["path"]) ?? "",
       text: typeof m["content"] === "string" ? m["content"] : ""
     })) : void 0,
-    path: text(args["path"]),
-    pattern: text(args["pattern"]),
+    path: text2(args["path"]),
+    pattern: text2(args["pattern"]),
     tool: "search_files",
     total: num2(result?.["total_count"])
   };
@@ -5820,13 +5993,13 @@ function searchDetail({ args, result }) {
 function taskDetail({ args, result }) {
   return {
     background: result?.["mode"] === "background",
-    briefs: records(args["tasks"]).map((t) => text(t?.["context"])),
-    context: text(args["context"]),
+    briefs: records(args["tasks"]).map((t) => text2(t?.["context"])),
+    context: text2(args["context"]),
     dispatched: result?.["status"] === "dispatched",
     failed: Boolean(result?.["error"]),
-    goal: text(args["goal"]),
-    results: records(result?.["results"]).map((r) => r && { error: text(r["error"]), status: text(r["status"]), summary: text(r["summary"]) }),
-    tasks: objects(args["tasks"]).map((t) => ({ context: text(t["context"]), goal: text(t["goal"]) })),
+    goal: text2(args["goal"]),
+    results: records(result?.["results"]).map((r) => r && { error: text2(r["error"]), status: text2(r["status"]), summary: text2(r["summary"]) }),
+    tasks: objects(args["tasks"]).map((t) => ({ context: text2(t["context"]), goal: text2(t["goal"]) })),
     tool: "delegate_task"
   };
 }
@@ -5835,27 +6008,27 @@ function taskDetail({ args, result }) {
 function terminalDetail({ args, result }) {
   return {
     background: args["background"] === true || typeof result?.["session_id"] === "string",
-    command: text(args["command"]),
-    error: text(result?.["error"]),
+    command: text2(args["command"]),
+    error: text2(result?.["error"]),
     exit: num2(result?.["exit_code"]),
-    output: text(result?.["output"]),
+    output: text2(result?.["output"]),
     tool: "terminal"
   };
 }
 
 // src/tools/web.ts
 function source(r) {
-  return { content: text(r["content"]), title: text(r["title"]), url: text(r["url"]) };
+  return { content: text2(r["content"]), title: text2(r["title"]), url: text2(r["url"]) };
 }
 function webSearchDetail({ args, result }) {
-  const web = list(record(result?.["data"])?.["web"]);
-  return { hits: objects(web ?? result?.["results"]).map(source), query: text(args["query"]), tool: "web_search" };
+  const web = list(record2(result?.["data"])?.["web"]);
+  return { hits: objects(web ?? result?.["results"]).map(source), query: text2(args["query"]), tool: "web_search" };
 }
 function fetchDetail({ args, result }) {
   return {
     pages: objects(result?.["results"]).map(source),
     tool: "web_extract",
-    url: text(args["url"]),
+    url: text2(args["url"]),
     urls: (list(args["urls"]) ?? []).filter((u) => typeof u === "string")
   };
 }
@@ -5909,7 +6082,7 @@ function parsedOf(call) {
   if (hit?.name === call.name && hit.args === call.args && hit.result === call.result) {
     return hit;
   }
-  const result = record(call.result);
+  const result = record2(call.result);
   const fresh = { args: call.args, detail: PARSERS[toolKeyOf(call.name)]({ args: call.args, result }), name: call.name, record: result, result: call.result };
   parsed.set(call, fresh);
   return fresh;
@@ -5956,10 +6129,10 @@ function isWatchCall(call) {
   return isProcessTool(call.name) && ["log", "poll", "wait"].includes(String(call.args["action"])) && typeof call.args["session_id"] === "string";
 }
 function isBackgroundCall(call) {
-  return call.name === "terminal" && (call.args["background"] === true || typeof record(call.result)?.["session_id"] === "string");
+  return call.name === "terminal" && (call.args["background"] === true || typeof record2(call.result)?.["session_id"] === "string");
 }
 function isToolError(p) {
-  const r = record(p.result);
+  const r = record2(p.result);
   if (r?.["error"]) {
     return true;
   }
@@ -6106,9 +6279,9 @@ var IMAGE_ONLY_PROMPT = "What do you see in this image?";
 function shownText(prompt) {
   return (prompt.kind === "command" ? prompt.display : void 0) ?? prompt.text;
 }
-function userText(text5, images) {
+function userText(text6, images) {
   const count = images.length ? `\u{1F4CE} ${images.length} image${images.length === 1 ? "" : "s"}` : "";
-  return [text5, count].filter(Boolean).join("\n\n");
+  return [text6, count].filter(Boolean).join("\n\n");
 }
 function userImages(images) {
   return images.map((i) => ({ kind: "image", name: i.name, ...i.preview ? { source: i.preview } : {} }));
@@ -6240,15 +6413,15 @@ function readTranscript(gw2, id, cursor, limit) {
   return rpc(gw2, "session.transcript", { cursor, limit, order: "latest", session_id: id });
 }
 function compactionOf(row) {
-  const { compacted_messages: messages, text: text5, timestamp } = row;
+  const { compacted_messages: messages, text: text6, timestamp } = row;
   if (row.row_kind !== "compaction" || timestamp === null || timestamp === void 0) {
     return void 0;
   }
-  return { at: timestamp * 1e3, ...optional2("summary", text5 || void 0), ...optional2("messages", messages ?? void 0) };
+  return { at: timestamp * 1e3, ...optional2("summary", text6 || void 0), ...optional2("messages", messages ?? void 0) };
 }
 function previewRows(r) {
-  const text5 = (r.text ?? "").trim();
-  const key2 = r.row_id === null || r.row_id === void 0 ? `${r.role}|${r.timestamp ?? ""}|${r.tool_call_id ?? text5}` : `row${r.row_id}`;
+  const text6 = (r.text ?? "").trim();
+  const key2 = r.row_id === null || r.row_id === void 0 ? `${r.role}|${r.timestamp ?? ""}|${r.tool_call_id ?? text6}` : `row${r.row_id}`;
   if (r.row_kind === "compaction") {
     const covered = r.compacted_messages === null || r.compacted_messages === void 0 ? "" : ` (${r.compacted_messages} messages)`;
     return [{ key: key2, kind: "note", text: `Context compacted${covered}: the agent continued from a summary.`, tone: "muted" }];
@@ -6256,26 +6429,26 @@ function previewRows(r) {
   switch (r.role) {
     case "user":
       if (r.display_kind && NOTICE_KINDS.has(r.display_kind)) {
-        return [{ key: key2, kind: "note", text: noticeLine(text5), tone: "muted" }];
+        return [{ key: key2, kind: "note", text: noticeLine(text6), tone: "muted" }];
       }
-      return text5 ? [{ key: key2, kind: "user", steer: r.display_kind === "steer", text: text5 }] : [];
+      return text6 ? [{ key: key2, kind: "user", steer: r.display_kind === "steer", text: text6 }] : [];
     case "assistant":
       if (r.display_kind === "failed_turn") {
-        return [{ key: key2, kind: "note", text: firstLine(text5) || "The turn failed.", tone: "error" }];
+        return [{ key: key2, kind: "note", text: firstLine(text6) || "The turn failed.", tone: "error" }];
       }
-      return text5 ? [{ key: key2, kind: "assistant", text: text5 }] : [];
+      return text6 ? [{ key: key2, kind: "assistant", text: text6 }] : [];
     case "tool":
       return [{ args: r.args ?? {}, key: key2, kind: "tool", name: r.name ?? "tool" }];
     default:
       return [];
   }
 }
-function noticeLine(text5) {
-  const line = firstLine(text5);
+function noticeLine(text6) {
+  const line = firstLine(text6);
   return /^\[[A-Z][A-Z -]*:\s*(?<said>[^\]]*)\]?$/.exec(line)?.groups?.["said"]?.trim() || line;
 }
-function firstLine(text5) {
-  return (text5.split("\n").find((l) => l.trim()) ?? "").trim();
+function firstLine(text6) {
+  return (text6.split("\n").find((l) => l.trim()) ?? "").trim();
 }
 function gatewayTranscripts(gw2) {
   return {
@@ -6312,40 +6485,40 @@ async function allCompactions(gw2, sid, wanted) {
   } while (cursor && calls < WHOLE_PAGES);
   return pages.flat();
 }
-function lineTokens(text5) {
+function lineTokens(text6) {
   const num6 = (s) => Number(s.replace(/,/g, ""));
-  const pair2 = /~(?<before>[\d,]+)\s*→\s*~(?<after>[\d,]+)\s*tok/.exec(text5)?.groups;
+  const pair2 = /~(?<before>[\d,]+)\s*→\s*~(?<after>[\d,]+)\s*tok/.exec(text6)?.groups;
   if (pair2) {
     return { after: num6(pair2["after"] ?? ""), before: num6(pair2["before"] ?? "") };
   }
-  const one = /~(?<before>[\d,]+)\s*tok/.exec(text5)?.groups;
+  const one = /~(?<before>[\d,]+)\s*tok/.exec(text6)?.groups;
   return one ? { before: num6(one["before"] ?? "") } : {};
 }
 
 // src/status.ts
 var COMPACTING_LABEL = "Compacting context\u2026";
 function statusEffect(payload, last) {
-  const text5 = payload?.text?.trim();
+  const text6 = payload?.text?.trim();
   const kind = payload?.kind ?? "";
-  if (!text5) {
+  if (!text6) {
     return kind === "ready" ? { compacting: false } : {};
   }
   if (kind === "goal") {
-    return { notice: { text: text5, tone: text5.startsWith("\u2713") ? "success" : "info" } };
+    return { notice: { text: text6, tone: text6.startsWith("\u2713") ? "success" : "info" } };
   }
   if (kind === "compacting" || kind === "compressing") {
-    return { compacting: true, label: COMPACTING_LABEL, ...counted(text5) };
+    return { compacting: true, label: COMPACTING_LABEL, ...counted(text6) };
   }
   if (kind === "compacted" || kind === "ready") {
-    return { compacting: false, label: text5, ...counted(text5) };
+    return { compacting: false, label: text6, ...counted(text6) };
   }
   if (kind === "warn" || kind === "approval" || kind === "error") {
-    return text5 === last ? {} : { note: text5, notice: { text: text5, tone: kind === "error" ? "error" : "warning" } };
+    return text6 === last ? {} : { note: text6, notice: { text: text6, tone: kind === "error" ? "error" : "warning" } };
   }
-  return { label: text5 };
+  return { label: text6 };
 }
-function counted(text5) {
-  const tokens = lineTokens(text5);
+function counted(text6) {
+  const tokens = lineTokens(text6);
   return tokens.before || tokens.after ? { tokens } : {};
 }
 
@@ -6381,8 +6554,8 @@ function appTitle(slug) {
 }
 function actionPhrase(tool, app2 = "") {
   const prefix = `${app2.replace(/-/g, "_").toUpperCase()}_`;
-  const text5 = app2 && tool.toUpperCase().startsWith(prefix) ? tool.slice(prefix.length) : tool;
-  return text5.split(/[-_\s]+/).filter(Boolean).join(" ").toLowerCase();
+  const text6 = app2 && tool.toUpperCase().startsWith(prefix) ? tool.slice(prefix.length) : tool;
+  return text6.split(/[-_\s]+/).filter(Boolean).join(" ").toLowerCase();
 }
 function appOf(name, args) {
   const [prefix, connector, ...tool] = name.split("__");
@@ -6396,9 +6569,9 @@ function appOf(name, args) {
 function entriesOf(args) {
   const list3 = Array.isArray(args["calls"]) ? args["calls"] : [args];
   return list3.flatMap((e) => {
-    const r = record(e);
+    const r = record2(e);
     const name = r?.["name"];
-    return typeof name === "string" && name ? [{ args: record(r?.["arguments"]) ?? {}, name }] : [];
+    return typeof name === "string" && name ? [{ args: record2(r?.["arguments"]) ?? {}, name }] : [];
   });
 }
 function unwrap(name, args) {
@@ -6421,14 +6594,14 @@ function batchOf(call) {
   return call.via.kind === "batch" ? call.via.entries : void 0;
 }
 function batchResults(result) {
-  const results = record(result)?.["results"];
+  const results = record2(result)?.["results"];
   if (!Array.isArray(results)) {
     return void 0;
   }
   return results.map((e) => {
-    const r = record(e) ?? {};
+    const r = record2(e) ?? {};
     const err = r["error"];
-    return err === void 0 || err === null ? { result: r["response"] } : { error: typeof err === "string" ? err : String(record(err)?.["message"] ?? "") || JSON.stringify(err) };
+    return err === void 0 || err === null ? { result: r["response"] } : { error: typeof err === "string" ? err : String(record2(err)?.["message"] ?? "") || JSON.stringify(err) };
   });
 }
 function settleBridge(call) {
@@ -6471,41 +6644,41 @@ var CONNECT_TOOL = "manage_connections";
 var POLL_MS = 2e3;
 function parseTargets(targets) {
   return targets.flatMap((t) => {
-    const r = record(t);
+    const r = record2(t);
     const name = typeof r?.["name"] === "string" ? r["name"].trim() : "";
     const fields = Array.isArray(r?.["required_env"]) ? r["required_env"].flatMap((f) => envField(f)) : [];
     const env = Object.fromEntries(fields.flatMap((f) => f.default ? [[f.name, f.default]] : []));
     const needs = fields.filter((f) => f.required && !f.default).map((f) => f.name);
     return name ? [
       {
-        alias: text2(r?.["alias"]),
-        detail: text2(r?.["detail"]),
+        alias: text3(r?.["alias"]),
+        detail: text3(r?.["detail"]),
         env: Object.keys(env).length ? env : void 0,
-        kind: text2(r?.["kind"]),
+        kind: text3(r?.["kind"]),
         launch: launchOf(r?.["launch"]),
         name,
         needs: needs.length ? needs : void 0,
         state: typeof r?.["state"] === "string" ? r["state"] : "pending",
         title: appTitle(name),
-        url: text2(r?.["connect_url"])
+        url: text3(r?.["connect_url"])
       }
     ] : [];
   });
 }
 function launchOf(raw) {
-  const r = record(raw);
+  const r = record2(raw);
   const kind = r?.["kind"];
-  const target2 = text2(r?.["target"]);
+  const target2 = text3(r?.["target"]);
   if (kind !== "remote" && kind !== "stdio" || !target2) {
     return void 0;
   }
   const env = Array.isArray(r?.["env"]) ? r["env"].filter((k) => typeof k === "string" && k !== "") : [];
-  return { cwd: text2(r?.["cwd"]), env: env.length ? env : void 0, kind, target: target2 };
+  return { cwd: text3(r?.["cwd"]), env: env.length ? env : void 0, kind, target: target2 };
 }
-var text2 = (v) => typeof v === "string" && v ? v : void 0;
+var text3 = (v) => typeof v === "string" && v ? v : void 0;
 function envField(raw) {
-  const r = record(raw);
-  const name = text2(r?.["name"]);
+  const r = record2(raw);
+  const name = text3(r?.["name"]);
   return name ? [{ default: typeof r?.["default"] === "string" ? r["default"] : "", name, required: r?.["required"] === true }] : [];
 }
 var waiting = (t) => t.state === "initiated" || t.state === "pending";
@@ -6531,7 +6704,7 @@ function settleReason(r) {
   }
 }
 function resultCard(call) {
-  const r = call.name === CONNECT_TOOL ? record(call.result) : void 0;
+  const r = call.name === CONNECT_TOOL ? record2(call.result) : void 0;
   const settled2 = r && r["status"] === "settled" && typeof r["op_id"] === "string" ? settleReason(r) : void 0;
   const targets = settled2 && Array.isArray(r?.["targets"]) ? parseTargets(r["targets"]) : [];
   return targets.length ? { opened: [], settled: settled2, targets } : void 0;
@@ -6547,22 +6720,22 @@ var LINK_TOOLS = /* @__PURE__ */ new Set(["link_pull_request", "list_pull_reques
 var LINKED_METHOD = "plugin.hermes-tern.pull_requests.linked";
 var LINKS_CHANGED = "plugin.hermes-tern.pull_requests.changed";
 function refOf(v) {
-  const r = record(v);
+  const r = record2(v);
   const host = typeof r?.["host"] === "string" ? r["host"] : "";
   const repository = typeof r?.["repository"] === "string" ? r["repository"] : "";
   const number3 = typeof r?.["number"] === "number" ? r["number"] : 0;
   return host && repository && number3 > 0 ? { host, number: number3, repository, url: typeof r?.["url"] === "string" ? r["url"] : `https://${host}/${repository}/pull/${number3}` } : void 0;
 }
 function linkedOf(v) {
-  const r = record(v);
+  const r = record2(v);
   const linked = r?.["linked"];
-  return Array.isArray(linked) ? { guides: record(r?.["guides"]) ?? {}, refs: linked.map(refOf).filter((x) => Boolean(x)) } : void 0;
+  return Array.isArray(linked) ? { guides: record2(r?.["guides"]) ?? {}, refs: linked.map(refOf).filter((x) => Boolean(x)) } : void 0;
 }
 function linkedFromResult(call) {
   return LINK_TOOLS.has(call.name) && call.outcome.kind === "done" ? linkedOf(call.result) : void 0;
 }
 function guideWritten(call) {
-  const written = call.name === GUIDE_TOOL && call.outcome.kind === "done" ? record(call.result)?.["written"] : void 0;
+  const written = call.name === GUIDE_TOOL && call.outcome.kind === "done" ? record2(call.result)?.["written"] : void 0;
   return typeof written === "string" ? written : void 0;
 }
 var guideKey = (ref) => `${ref.repository.toLowerCase()}#${ref.number}`;
@@ -6618,8 +6791,8 @@ function moaReferenceLabel(label, index, count) {
 }
 
 // src/gateway/handlers/turn.ts
-function kaomojiLabel(text5) {
-  const word = text5.match(/([A-Za-z][A-Za-z ]*[A-Za-z])\.{2,}\s*$/)?.[1];
+function kaomojiLabel(text6) {
+  const word = text6.match(/([A-Za-z][A-Za-z ]*[A-Za-z])\.{2,}\s*$/)?.[1];
   return word ? `${word.charAt(0).toUpperCase()}${word.slice(1)}\u2026` : "";
 }
 function moaStep(ev, cx) {
@@ -6845,13 +7018,13 @@ function forgetPrList(pane, dir2 = dataDir()) {
 
 // src/clipboard.ts
 import { spawn } from "node:child_process";
-function copyToClipboard(text5, env = process.env) {
-  process.stdout.write(`\x1B]52;c;${Buffer.from(text5).toString("base64")}\x07`);
+function copyToClipboard(text6, env = process.env) {
+  process.stdout.write(`\x1B]52;c;${Buffer.from(text6).toString("base64")}\x07`);
   if (process.platform === "darwin" && !env["SSH_CONNECTION"] && !env["SSH_TTY"]) {
     const child = spawn("pbcopy", [], { stdio: ["pipe", "ignore", "ignore"] });
     child.on("error", () => {
     });
-    child.stdin.end(text5);
+    child.stdin.end(text6);
   }
 }
 
@@ -6906,7 +7079,7 @@ function ownersOf(calls) {
 }
 var byTask = (x, y) => x.index - y.index || (x.depth ?? 0) - (y.depth ?? 0);
 function dispatchOf(result) {
-  const { delegation_id: delegationId, goals, status, subagent_ids: ids } = record(result) ?? {};
+  const { delegation_id: delegationId, goals, status, subagent_ids: ids } = record2(result) ?? {};
   if (status !== "dispatched" || typeof delegationId !== "string") {
     return void 0;
   }
@@ -7026,21 +7199,21 @@ function endUnseen(a) {
   a.duration = Date.now() - a.startedAt;
   a.tool = void 0;
 }
-function completionOutcomes(text5) {
-  const head2 = /^\[ASYNC DELEGATION (BATCH COMPLETE|COMPLETE|TASK FAILED) — ([^\],]+)(?:, task (\d+)\/\d+)?\]/.exec(text5.trim());
+function completionOutcomes(text6) {
+  const head2 = /^\[ASYNC DELEGATION (BATCH COMPLETE|COMPLETE|TASK FAILED) — ([^\],]+)(?:, task (\d+)\/\d+)?\]/.exec(text6.trim());
   if (!head2) {
     return void 0;
   }
   const [, kind, delegationId = "", task] = head2;
   const outcomes = /* @__PURE__ */ new Map();
   if (kind === "BATCH COMPLETE") {
-    for (const [, n, status] of text5.matchAll(/^--- \S+ TASK (\d+)\/\d+.*\(status=([^,)\s]+)/gm)) {
+    for (const [, n, status] of text6.matchAll(/^--- \S+ TASK (\d+)\/\d+.*\(status=([^,)\s]+)/gm)) {
       if (status) {
         outcomes.set(Number(n) - 1, status);
       }
     }
   } else {
-    const status = /^Status: (\S+)/m.exec(text5)?.[1];
+    const status = /^Status: (\S+)/m.exec(text6)?.[1];
     if (status) {
       outcomes.set(kind === "TASK FAILED" ? Number(task) - 1 : 0, status);
     }
@@ -7129,7 +7302,7 @@ function taskGoals(call) {
   const tasks = typeof raw === "string" ? parseJson(raw) : raw;
   if (Array.isArray(tasks) && tasks.length) {
     return tasks.map((t) => {
-      const { goal: task } = record(t) ?? {};
+      const { goal: task } = record2(t) ?? {};
       return typeof task === "string" ? task.trim() : "";
     });
   }
@@ -7211,13 +7384,13 @@ function rank(items, query, textOf, { scattered = true } = {}) {
   }
   const scored = [];
   items.forEach((item3, index) => {
-    const text5 = textOf(item3).toLowerCase();
+    const text6 = textOf(item3).toLowerCase();
     const positions = /* @__PURE__ */ new Set();
     let score = 0;
     for (const word of words3) {
-      const at = text5.indexOf(word);
+      const at = text6.indexOf(word);
       if (at >= 0) {
-        const boundary = at === 0 || /[\s/_.:-]/.test(text5[at - 1] ?? "");
+        const boundary = at === 0 || /[\s/_.:-]/.test(text6[at - 1] ?? "");
         score += 100 - Math.min(at, 50) + (boundary ? 25 : 0);
         for (let i = at; i < at + word.length; i++) {
           positions.add(i);
@@ -7229,7 +7402,7 @@ function rank(items, query, textOf, { scattered = true } = {}) {
       }
       let from = 0;
       for (const ch of word) {
-        const i = text5.indexOf(ch, from);
+        const i = text6.indexOf(ch, from);
         if (i < 0) {
           return;
         }
@@ -7526,10 +7699,10 @@ var JsonRpcRequestChannel = class {
    * on it too (mirror it, record seq, …) or `null` when the text was not
    * JSON or not a JSON object (`null`, a scalar).
    */
-  handleFrame(text5) {
+  handleFrame(text6) {
     let frame;
     try {
-      frame = JSON.parse(text5);
+      frame = JSON.parse(text6);
     } catch {
       return null;
     }
@@ -7731,20 +7904,20 @@ function stepsOf(rows) {
   const steps = [];
   for (const row of rows) {
     const at = ms(row.timestamp);
-    const text5 = row.text?.trim() ?? "";
+    const text6 = row.text?.trim() ?? "";
     if (row.row_kind === "message" && row.role === "tool") {
       steps.push({ args: row.context ?? "", at, kind: "tool", name: row.name ?? "tool", running: false });
     } else if (row.row_kind === "message" && row.role === "assistant") {
       if (row.reasoning?.trim()) {
         steps.push({ at, kind: "think", text: row.reasoning.trim() });
       }
-      if (text5) {
-        steps.push({ at, kind: "assistant", text: text5 });
+      if (text6) {
+        steps.push({ at, kind: "assistant", text: text6 });
       }
     } else if (row.row_kind === "message" && row.role === "user" && !steps.some((s) => s.kind === "kickoff")) {
-      steps.push({ at, kind: "kickoff", text: text5 });
-    } else if (text5) {
-      steps.push({ at, kind: "note", text: text5 });
+      steps.push({ at, kind: "kickoff", text: text6 });
+    } else if (text6) {
+      steps.push({ at, kind: "note", text: text6 });
     }
   }
   return steps;
@@ -7812,9 +7985,9 @@ function reduceHub(state, action, agents2) {
     case "steerCancel":
       return { state: state.ask.kind === "steering" ? { ...state, ask: NONE } : state };
     case "steerSend": {
-      const text5 = state.ask.kind === "steering" ? state.ask.text.trim() : "";
+      const text6 = state.ask.kind === "steering" ? state.ask.text.trim() : "";
       const next = { ...state, ask: state.ask.kind === "steering" ? NONE : state.ask };
-      return a && text5 ? { effect: { agent: a, kind: "steer", text: text5 }, state: next } : { state: next };
+      return a && text6 ? { effect: { agent: a, kind: "steer", text: text6 }, state: next } : { state: next };
     }
     case "stop":
       return running(a) ? { state: { ...state, ask: { kind: "confirmStop" } } } : { state };
@@ -7835,8 +8008,8 @@ function hubKey(state, k, agents2) {
     if (k.name === "enter") {
       return { type: "steerSend" };
     }
-    const text5 = editQuery(k, ask.text);
-    return text5 === void 0 ? void 0 : { text: text5, type: "steerEdit" };
+    const text6 = editQuery(k, ask.text);
+    return text6 === void 0 ? void 0 : { text: text6, type: "steerEdit" };
   }
   if (ask.kind === "confirmStop") {
     return k.name === "enter" || k.name === "y" ? { type: "stopConfirm" } : k.name === "escape" || k.name === "n" ? { type: "stopCancel" } : void 0;
@@ -7894,8 +8067,8 @@ var HUB_CLICKS = {
 function nonEmpty(v) {
   return typeof v === "string" && v ? v : void 0;
 }
-function flat(text5) {
-  return text5.replace(/\s+/g, " ").trim();
+function flat(text6) {
+  return text6.replace(/\s+/g, " ").trim();
 }
 function duration2(ms2) {
   if (ms2 < 1e3) {
@@ -7976,16 +8149,16 @@ function relativePath(path, o) {
 function plural(n, one, many = `${one}s`) {
   return `${n} ${n === 1 ? one : many}`;
 }
-function clip(text5, o) {
-  if (text5.length <= o.max) {
-    return text5;
+function clip(text6, o) {
+  if (text6.length <= o.max) {
+    return text6;
   }
-  return o.mark === "line" ? `${text5.slice(0, o.max)}
-\u2026` : `${text5.slice(0, o.max - 1)}\u2026`;
+  return o.mark === "line" ? `${text6.slice(0, o.max)}
+\u2026` : `${text6.slice(0, o.max - 1)}\u2026`;
 }
 var ESCAPES = /\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[@-_]/g;
-function withoutEscapes(text5) {
-  return text5.replace(ESCAPES, "");
+function withoutEscapes(text6) {
+  return text6.replace(ESCAPES, "");
 }
 
 // src/view/tools/steps.ts
@@ -8089,8 +8262,8 @@ function briefOf(call, index) {
   const d = detailOf(call);
   return d.tool === "delegate_task" ? d.briefs[index] ?? d.context : void 0;
 }
-function briefNode(head2, text5) {
-  return /* @__PURE__ */ jsx("section", { collapsed: true, collapsible: true, head: head2, role: "hermes.task.brief", children: /* @__PURE__ */ jsx("md", { children: text5 }, "md") }, "brief");
+function briefNode(head2, text6) {
+  return /* @__PURE__ */ jsx("section", { collapsed: true, collapsible: true, head: head2, role: "hermes.task.brief", children: /* @__PURE__ */ jsx("md", { children: text6 }, "md") }, "brief");
 }
 
 // src/media.ts
@@ -8184,7 +8357,7 @@ function shownImage(call) {
   if (call.outcome.kind === "error" || call.outcome.kind === "cancelled") {
     return void 0;
   }
-  const r = record(call.result);
+  const r = record2(call.result);
   if (r?.["success"] === false) {
     return void 0;
   }
@@ -8193,7 +8366,7 @@ function shownImage(call) {
   }
   if (call.name.startsWith("browser")) {
     const summary4 = call.resultText ?? str2(r?.["text_summary"]) ?? "";
-    return str2(record(r?.["meta"])?.["screenshot_path"]) ?? str2(r?.["screenshot_path"]) ?? /Screenshot path: (\S+)/.exec(summary4)?.[1];
+    return str2(record2(r?.["meta"])?.["screenshot_path"]) ?? str2(r?.["screenshot_path"]) ?? /Screenshot path: (\S+)/.exec(summary4)?.[1];
   }
   return void 0;
 }
@@ -8313,7 +8486,7 @@ function toneStyle(tone) {
   }
 }
 var sp = (t, s) => s ? { s, t } : { t };
-var plain = (text5) => text5.replace(/\s+/g, " ").trim();
+var plain = (text6) => text6.replace(/\s+/g, " ").trim();
 var fraction = (value, max) => !(max > 0) || !Number.isFinite(value) ? 0 : Math.min(1, Math.max(0, value / max));
 function glance(view) {
   const h = view.headline;
@@ -8733,8 +8906,8 @@ var CMDLETS = {
   "start-process": "start a process",
   "stop-process": "stop a process"
 };
-function powershellScript(text5) {
-  const used = [...new Set([...text5.matchAll(/\b([A-Z][a-z]+-[A-Z][A-Za-z]+)\b/g)].flatMap((m) => m[1]?.toLowerCase() ?? []))];
+function powershellScript(text6) {
+  const used = [...new Set([...text6.matchAll(/\b([A-Z][a-z]+-[A-Z][A-Za-z]+)\b/g)].flatMap((m) => m[1]?.toLowerCase() ?? []))];
   const said = [...new Set(used.map((c) => CMDLETS[c] ?? (c.startsWith("get-") ? `read ${c.slice(4)}` : void 0)).filter(Boolean))];
   return said.length ? said.slice(0, 2).join(" and ") : void 0;
 }
@@ -8790,13 +8963,13 @@ function segments(line) {
 }
 var SETUP = /* @__PURE__ */ new Set(["cd", "export", "set", "source", ".", "true", "clear", "pushd", "popd"]);
 var FILTERS = /* @__PURE__ */ new Set(["head", "tail", "grep", "sort", "uniq", "wc", "cut", "tr", "awk", "jq", "tee", "column", "less", "cat", "xargs", "sed"]);
-function describeCommand(command2) {
-  const text5 = command2.trim();
-  if (!text5) {
+function describeCommand(command) {
+  const text6 = command.trim();
+  if (!text6) {
     return "Run a command";
   }
   const docs = [];
-  const line = text5.replace(/<<-?\s*['"]?(\w+)['"]?([^\n]*)\n([\s\S]*?)\n\s*\1\s*(?=\n|$)/g, (_m, _tag, rest, body) => {
+  const line = text6.replace(/<<-?\s*['"]?(\w+)['"]?([^\n]*)\n([\s\S]*?)\n\s*\1\s*(?=\n|$)/g, (_m, _tag, rest, body) => {
     docs.push(body);
     return rest;
   });
@@ -8824,12 +8997,12 @@ function describeCommand(command2) {
   }
   return clip(title.charAt(0).toUpperCase() + title.slice(1), { max: MAX2 });
 }
-function commandLine(command2, n = 96) {
-  const flat2 = command2.replace(/<<-?\s*['"]?(\w+)['"]?[\s\S]*?\n\s*\1\s*(?=\n|$)/g, "<<'$1' \u2026").replace(/\s+/g, " ").trim();
+function commandLine(command, n = 96) {
+  const flat2 = command.replace(/<<-?\s*['"]?(\w+)['"]?[\s\S]*?\n\s*\1\s*(?=\n|$)/g, "<<'$1' \u2026").replace(/\s+/g, " ").trim();
   return clip(flat2, { max: n });
 }
-function oneLine(text5) {
-  return text5.replace(/\s+/g, " ").trim();
+function oneLine(text6) {
+  return text6.replace(/\s+/g, " ").trim();
 }
 
 // src/view/tools/cards/image.tsx
@@ -8935,11 +9108,11 @@ function genericCard(call, d, look2) {
   };
 }
 function genericBody(call) {
-  const text5 = call.resultText ?? (call.result === void 0 ? void 0 : pretty(call.result));
-  if (!text5 || call.outcome.kind === "running") {
+  const text6 = call.resultText ?? (call.result === void 0 ? void 0 : pretty(call.result));
+  if (!text6 || call.outcome.kind === "running") {
     return [];
   }
-  return [/* @__PURE__ */ jsx("code", { lang: /^\s*[[{]/.test(text5) ? "json" : "text", text: clip(text5, { mark: "line", max: 4e3 }) }, "out")];
+  return [/* @__PURE__ */ jsx("code", { lang: /^\s*[[{]/.test(text6) ? "json" : "text", text: clip(text6, { mark: "line", max: 4e3 }) }, "out")];
 }
 function fallbackView(call) {
   return {
@@ -8955,7 +9128,7 @@ function errorOf(call) {
   return errorIn(call, resultOf(call));
 }
 function plainErrorOf(call) {
-  return errorIn(call, record(call.result));
+  return errorIn(call, record2(call.result));
 }
 function errorIn(call, result) {
   return nonEmpty(result?.["error"]) ?? nonEmpty(call.outcome.kind === "running" ? void 0 : call.outcome.summary) ?? (typeof call.result === "string" && !result ? call.result : void 0);
@@ -9075,17 +9248,17 @@ function noAnswer(r, d) {
   }
   return "No answer";
 }
-function choiceRow(key2, text5, picked) {
+function choiceRow(key2, text6, picked) {
   return /* @__PURE__ */ jsxs("row", { align: "start", gap: "sm", role: picked ? "hermes.ask.choice.on" : "hermes.ask.choice", children: [
     picked ? /* @__PURE__ */ jsx("icon", { name: "check", tone: "success" }, "mark") : /* @__PURE__ */ jsx("text", { spans: [{ s: "dim", t: "\xB7" }] }, "mark"),
-    /* @__PURE__ */ jsx("text", { spans: [picked ? { t: text5 } : { s: "muted", t: text5 }], wrap: "word" }, "t")
+    /* @__PURE__ */ jsx("text", { spans: [picked ? { t: text6 } : { s: "muted", t: text6 }], wrap: "word" }, "t")
   ] }, key2);
 }
 
 // src/connections/live.ts
 var num4 = (v) => typeof v === "number" && Number.isFinite(v) ? v : void 0;
 function liveCard(payload, session2) {
-  const r = record(payload);
+  const r = record2(payload);
   const id = typeof r?.["op_id"] === "string" ? r["op_id"] : "";
   const seq = num4(r?.["seq"]);
   const deadlineAt = num4(r?.["deadline_at"]);
@@ -9098,7 +9271,7 @@ function liveCard(payload, session2) {
   return { callId, card: { op, opened: [], settled: settleReason(r), targets } };
 }
 function applyFrame(card, frame) {
-  const r = record(frame);
+  const r = record2(frame);
   const op = card.op;
   const seq = num4(r?.["seq"]);
   if (!r || !op || card.settled || r["op_id"] !== op.id || seq === void 0 || seq <= op.seq) {
@@ -9333,12 +9506,12 @@ function editCard(call, d) {
     title: write ? "Write" : "Edit"
   };
   if (write && content && (!diff2 || diff2.startsWith("@@ -0,0 "))) {
-    const text5 = content.replace(/\n$/, "");
-    const lines = text5.split("\n").length;
+    const text6 = content.replace(/\n$/, "");
+    const lines = text6.split("\n").length;
     return {
       ...head2,
       badges: diff2 ? [{ text: "new file", tone: "success" }] : void 0,
-      body: [/* @__PURE__ */ jsx("code", { lang: lang ?? "text", numbers: true, text: text5 }, "code")],
+      body: [/* @__PURE__ */ jsx("code", { lang: lang ?? "text", numbers: true, text: text6 }, "code")],
       folded: true,
       meta: [plural(lines, "line")],
       preview: { lines: 8 }
@@ -9385,8 +9558,8 @@ function evalCard(call, d) {
     title: firstLine2(code2)?.startsWith("#") ? firstLine2(code2)?.replace(/^#+\s*/, "") ?? "Eval" : "Eval"
   };
 }
-function firstLine2(text5) {
-  return text5?.split("\n").find((l) => l.trim())?.trim();
+function firstLine2(text6) {
+  return text6?.split("\n").find((l) => l.trim())?.trim();
 }
 
 // src/transcript/todos.ts
@@ -9421,7 +9594,7 @@ function todosOf({ merge, todos: todos2 }, current) {
 function mergeTodos(current, patch) {
   const out = current.map((t) => ({ ...t }));
   for (const item3 of patch) {
-    const r = record(item3);
+    const r = record2(item3);
     const id = String(r?.["id"] ?? "").trim();
     if (!r || !id) {
       continue;
@@ -10092,11 +10265,11 @@ function expand(path, env) {
   const out = unquote(path).replace(/^~(?=\/|$)/, env["HOME"] || homedir6()).replace(/\$\{?(HOME|TMPDIR|USER)\}?/g, (_, name) => env[name]?.replace(/\/$/, "") ?? `$${name}`);
   return out.includes("$") ? void 0 : out;
 }
-function outputFiles(command2, env = process.env) {
-  const cd = CD.exec(command2)?.[1];
+function outputFiles(command, env = process.env) {
+  const cd = CD.exec(command)?.[1];
   const base2 = cd ? expand(cd, env) : void 0;
   const files = [];
-  for (const m of command2.matchAll(TARGET)) {
+  for (const m of command.matchAll(TARGET)) {
     const raw = m[1] ?? m[2];
     if (!raw || SKIP.test(raw)) {
       continue;
@@ -10168,8 +10341,8 @@ var FileTap = class {
     const start = Math.min(Math.max(from, this.#start), end);
     return { end, open: this.#open, start, text: this.#text.slice(start - this.#start) };
   }
-  #append(text5) {
-    this.#text += text5;
+  #append(text6) {
+    this.#text += text6;
     const excess = this.#text.length - CAPACITY;
     if (excess > CAPACITY / 4) {
       this.#text = this.#text.slice(excess);
@@ -10216,26 +10389,26 @@ function formatNumber(value, unit, digits) {
   }
   const scaled = unitStep(value, unit);
   if (scaled) {
-    const text6 = formatNumber(value / scaled.step, scaled.unit, digits ?? (Math.abs(value / scaled.step) >= 100 ? 0 : 1));
-    return digits === void 0 ? text6.replace(/\.0(?= )/, "") : text6;
+    const text7 = formatNumber(value / scaled.step, scaled.unit, digits ?? (Math.abs(value / scaled.step) >= 100 ? 0 : 1));
+    return digits === void 0 ? text7.replace(/\.0(?= )/, "") : text7;
   }
   const magnitude = Math.abs(value);
-  let text5;
+  let text6;
   if (magnitude >= COMPACT_FROM) {
     for (const [step, suffix] of COMPACT_STEPS) {
       if (magnitude < step) {
         continue;
       }
       const scaled2 = value / step;
-      text5 = `${scaled2.toFixed(digits ?? (Math.abs(scaled2) >= 100 ? 0 : 1))}${suffix}`;
+      text6 = `${scaled2.toFixed(digits ?? (Math.abs(scaled2) >= 100 ? 0 : 1))}${suffix}`;
       break;
     }
   }
-  text5 ??= Number.isInteger(value) && digits === void 0 ? String(value) : value.toFixed(digits ?? (magnitude >= 100 ? 0 : magnitude >= 10 ? 1 : 2));
+  text6 ??= Number.isInteger(value) && digits === void 0 ? String(value) : value.toFixed(digits ?? (magnitude >= 100 ? 0 : magnitude >= 10 ? 1 : 2));
   if (!unit) {
-    return text5;
+    return text6;
   }
-  return unit === "%" ? `${text5}%` : `${text5} ${unit}`;
+  return unit === "%" ? `${text6}%` : `${text6} ${unit}`;
 }
 function formatTrend(first, last, better, unit) {
   const delta = last - first;
@@ -10266,7 +10439,7 @@ import { setFlagsFromString } from "node:v8";
 
 // src/processes/widgets/check.ts
 var FIELD_NAME = /^[a-z][a-z0-9_]{0,23}$/;
-var cut = (text5, max) => text5.length > max ? `${text5.slice(0, max - 1)}\u2026` : text5;
+var cut = (text6, max) => text6.length > max ? `${text6.slice(0, max - 1)}\u2026` : text6;
 function list2(value, where, errors, min, max) {
   if (!Array.isArray(value)) {
     errors.push(`${where}: expected an array`);
@@ -10303,8 +10476,8 @@ function str3(value, where, errors, o = {}) {
   return o.cut === void 0 ? trimmed : cut(unescape(trimmed), o.cut);
 }
 var ENTITIES = { "&#39;": "'", "&amp;": "&", "&gt;": ">", "&lt;": "<", "&quot;": '"' };
-function unescape(text5) {
-  return text5.replace(/&(?:amp|lt|gt|quot|#39);/g, (e) => ENTITIES[e] ?? e);
+function unescape(text6) {
+  return text6.replace(/&(?:amp|lt|gt|quot|#39);/g, (e) => ENTITIES[e] ?? e);
 }
 function num5(value, where, errors) {
   if (value === void 0 || value === null) {
@@ -10431,9 +10604,9 @@ var LineMatcher = class {
   /** Every hit: the line's index, the pattern's index and its captures by group position. */
   matchLines(lines) {
     const hits = [];
-    lines.forEach((text5, line) => {
+    lines.forEach((text6, line) => {
       this.#patterns.forEach((re, pattern) => {
-        const m = re.exec(text5);
+        const m = re.exec(text6);
         if (m) {
           hits.push({ captures: (this.#names[pattern] ?? []).map((name) => m.groups?.[name]), line, pattern });
         }
@@ -10472,15 +10645,15 @@ function aggNeedsValue(agg) {
 }
 var NUMBER_PREFIX = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?/;
 var SUFFIX_SCALE = { G: 1e9, K: 1e3, M: 1e6, k: 1e3 };
-function parseValue(text5) {
-  const first = text5.charCodeAt(0);
-  if (first >= 48 && first <= 57 && !/[xXbBoO]/.test(text5.charAt(1))) {
-    const plain4 = Number(text5);
+function parseValue(text6) {
+  const first = text6.charCodeAt(0);
+  if (first >= 48 && first <= 57 && !/[xXbBoO]/.test(text6.charAt(1))) {
+    const plain4 = Number(text6);
     if (Number.isFinite(plain4)) {
       return plain4;
     }
   }
-  const compact2 = text5.trim().replace(/[,_]/g, "");
+  const compact2 = text6.trim().replace(/[,_]/g, "");
   const match = NUMBER_PREFIX.exec(compact2);
   if (!match) {
     return Number.NaN;
@@ -10511,8 +10684,8 @@ function validateSpec(value, samples, brief) {
 var WRITTEN_NUMBER = /\d[\d,_]*(?:\.\d+)?[kKMG]?/g;
 function checkStatedNumbers(spec, samples, brief, errors) {
   const stated = /* @__PURE__ */ new Set();
-  const collect = (text5) => {
-    for (const m of text5.matchAll(WRITTEN_NUMBER)) {
+  const collect = (text6) => {
+    for (const m of text6.matchAll(WRITTEN_NUMBER)) {
       stated.add(parseValue(m[0]));
     }
   };
@@ -10572,10 +10745,10 @@ function dryRun(spec, matcher, samples, numeric, errors) {
 function fieldFeeds(spec) {
   const fields = /* @__PURE__ */ new Map();
   for (const rule of spec.rules) {
-    for (const { count, field, text: text5 } of ruleFields(rule)) {
+    for (const { count, field, text: text6 } of ruleFields(rule)) {
       const feed = fields.get(field) ?? { keyGroups: /* @__PURE__ */ new Set(), text: false, value: false };
-      feed.value ||= !text5 && !count;
-      feed.text ||= text5;
+      feed.value ||= !text6 && !count;
+      feed.text ||= text6;
       if (rule.key !== void 0) {
         feed.keyGroups.add(rule.key);
       }
@@ -10687,19 +10860,19 @@ function parseRule(value, where, errors) {
     return raw;
   };
   const key2 = group("key");
-  const text5 = group("text");
+  const text6 = group("text");
   const count = value["count"] === void 0 ? void 0 : fieldName(value["count"], `${where}.count`, errors);
   const scale = num5(value["scale"], `${where}.scale`, errors);
   if (from === void 0 || match === void 0) {
     return void 0;
   }
   const groups = patternGroupNames(match);
-  const wrap = text5 !== void 0 && FIELD_NAME.test(text5) && groups.size === 0;
+  const wrap = text6 !== void 0 && FIELD_NAME.test(text6) && groups.size === 0;
   const keyGroup = key2 !== void 0 && groups.has(key2) ? key2 : void 0;
-  const textGroup = text5 !== void 0 && (wrap || groups.has(text5)) ? text5 : void 0;
+  const textGroup = text6 !== void 0 && (wrap || groups.has(text6)) ? text6 : void 0;
   return {
     from,
-    match: wrap ? `(?P<${text5}>${match})` : match,
+    match: wrap ? `(?P<${text6}>${match})` : match,
     ...keyGroup !== void 0 ? { key: keyGroup } : {},
     ...textGroup !== void 0 ? { text: textGroup } : {},
     ...count !== void 0 ? { count } : {},
@@ -10849,7 +11022,7 @@ var MAX_STAGE_CHARS = 200;
 var MAX_TEXT_CHARS = 200;
 var MAX_BAR_ITEMS = 16;
 var MAX_GRID_ITEMS = 48;
-var cut2 = (text5, max) => text5.length > max ? `${text5.slice(0, max - 1)}\u2026` : text5;
+var cut2 = (text6, max) => text6.length > max ? `${text6.slice(0, max - 1)}\u2026` : text6;
 var CONTROLS = /[\x00-\x08\x0b-\x1f\x7f]/g;
 var clean = (line) => withoutEscapes(line.replace(/\t/g, " ")).replace(CONTROLS, "");
 var SourceLineReader = class {
@@ -10863,22 +11036,22 @@ var SourceLineReader = class {
   /** New complete lines; `flush` also ends the line in progress (the process exited). */
   read(flush) {
     const chunk = this.source.read(this.#cursor);
-    let text5 = chunk.text;
+    let text6 = chunk.text;
     if (chunk.start > this.#cursor) {
       this.#partial = "";
       this.#torn = true;
     }
     this.#cursor = Math.max(this.#cursor, chunk.end);
     if (this.#torn) {
-      const lineEnd2 = text5.search(/[\r\n]/);
+      const lineEnd2 = text6.search(/[\r\n]/);
       if (lineEnd2 === -1) {
-        text5 = "";
+        text6 = "";
       } else {
-        text5 = text5.slice(lineEnd2 + 1);
+        text6 = text6.slice(lineEnd2 + 1);
         this.#torn = false;
       }
     }
-    const raw = (this.#partial + text5).replace(/\r\n?/g, "\n").split("\n");
+    const raw = (this.#partial + text6).replace(/\r\n?/g, "\n").split("\n");
     this.#partial = (raw.pop() ?? "").slice(0, MAX_LINE_CHARS * 2);
     if ((flush || !chunk.open) && this.#partial) {
       raw.push(this.#partial);
@@ -10890,7 +11063,7 @@ var SourceLineReader = class {
 function emptySeries() {
   return { count: 0, first: 0, last: 0, max: -Infinity, min: Infinity, recent: [], ring: [], sum: 0, updatedAt: 0, values: 0 };
 }
-function pushMatch(s, value, text5, line, t) {
+function pushMatch(s, value, text6, line, t) {
   s.count++;
   const bucket = s.recent.at(-1);
   if (bucket?.t === t) {
@@ -10914,8 +11087,8 @@ function pushMatch(s, value, text5, line, t) {
       s.ring.splice(0, s.ring.length - RING_POINTS);
     }
   }
-  if (text5) {
-    s.text = text5;
+  if (text6) {
+    s.text = text6;
   }
   s.line = line;
   s.updatedAt = t;
@@ -11148,7 +11321,7 @@ var ChartRuntime = class {
       }
     }
   }
-  #push(name, key2, value, text5, line, t) {
+  #push(name, key2, value, text6, line, t) {
     let field = this.#fields.get(name);
     if (!field) {
       const all = emptySeries();
@@ -11160,9 +11333,9 @@ var ChartRuntime = class {
       series = emptySeries();
       field.keys.set(key2, series);
     }
-    pushMatch(series, value, text5, line, t);
+    pushMatch(series, value, text6, line, t);
     if (series !== field.all) {
-      pushMatch(field.all, value, text5, line, t);
+      pushMatch(field.all, value, text6, line, t);
     }
   }
   /** First and last lines per source, most active first, for the author and the dry run. */
@@ -11223,8 +11396,8 @@ var ChartRuntime = class {
   }
   #specStage() {
     const field = this.spec?.stage ? this.#fields.get(this.spec.stage) : void 0;
-    const text5 = (field?.all.text ?? field?.all.line)?.trim();
-    return text5 ? cut2(text5, MAX_STAGE_CHARS) : void 0;
+    const text6 = (field?.all.text ?? field?.all.line)?.trim();
+    return text6 ? cut2(text6, MAX_STAGE_CHARS) : void 0;
   }
   /** The last non-empty line of the most recently active source. */
   #lastLine() {
@@ -11247,13 +11420,13 @@ var ChartRuntime = class {
     const series = this.#series(ref.field, ref.key);
     const value = aggregate(series, ref.agg, now, this.startTime);
     const unit = ref.agg === "change" ? "%" : ref.unit;
-    const text5 = value === void 0 ? "\u2014" : formatNumber(value, unit, ref.digits);
+    const text6 = value === void 0 ? "\u2014" : formatNumber(value, unit, ref.digits);
     const trend = ref.better && TREND_AGGS.has(ref.agg) && series.values >= 2 ? formatTrend(series.first, series.last, ref.better, ref.unit) : void 0;
-    return { text: text5, value, ...trend ? { trend } : {} };
+    return { text: text6, value, ...trend ? { trend } : {} };
   }
   #headline(ref, now) {
-    const { text: text5, trend, value } = this.#value(ref, now);
-    return value === void 0 ? void 0 : { text: text5, ...ref.label ? { label: ref.label } : {}, ...trend ? { trend } : {} };
+    const { text: text6, trend, value } = this.#value(ref, now);
+    return value === void 0 ? void 0 : { text: text6, ...ref.label ? { label: ref.label } : {}, ...trend ? { trend } : {} };
   }
   #block(block, now) {
     switch (block.kind) {
@@ -11293,8 +11466,8 @@ var ChartRuntime = class {
       case "stat":
         return {
           items: block.items.map((item3) => {
-            const { text: text5, trend } = this.#value(item3, now);
-            return { label: item3.label, text: text5, ...trend ? { trend } : {} };
+            const { text: text6, trend } = this.#value(item3, now);
+            return { label: item3.label, text: text6, ...trend ? { trend } : {} };
           }),
           kind: "stat"
         };
@@ -11304,8 +11477,8 @@ var ChartRuntime = class {
         const labels = keyLabels(entries.map(([k]) => k));
         return {
           items: entries.map(([k, s], i) => {
-            const text5 = cut2(s.text ?? (s.values ? formatNumber(s.last) : s.line?.trim() ?? ""), MAX_TEXT_CHARS);
-            return { label: labels[i] || k || block.label, text: text5, tone: gridTone(block.tones, text5) };
+            const text6 = cut2(s.text ?? (s.values ? formatNumber(s.last) : s.line?.trim() ?? ""), MAX_TEXT_CHARS);
+            return { label: labels[i] || k || block.label, text: text6, tone: gridTone(block.tones, text6) };
           }),
           kind: "grid",
           label: block.label
@@ -11379,8 +11552,8 @@ function keyLabels(keys) {
   const short = keys.map((k) => k.slice(k.lastIndexOf("/") + 1));
   return short.every(Boolean) && new Set(short).size === short.length ? short : keys.slice();
 }
-function gridTone(tones, text5) {
-  const lower = text5.toLowerCase();
+function gridTone(tones, text6) {
+  const lower = text6.toLowerCase();
   for (const [status, tone] of Object.entries(tones)) {
     if (lower.includes(status.toLowerCase())) {
       return tone;
@@ -11447,8 +11620,8 @@ var OutputTap = class {
     const start = Math.min(Math.max(from, this.#start), end);
     return { end, open: this.#open, start, text: this.#text.slice(start - this.#start) };
   }
-  #append(text5) {
-    this.#text += text5;
+  #append(text6) {
+    this.#text += text6;
     const excess = this.#text.length - TAP_CAPACITY;
     if (excess > TAP_CAPACITY / 4) {
       this.#text = this.#text.slice(excess);
@@ -11721,9 +11894,9 @@ function lastLine(output) {
   const lines = withoutEscapes(output).split("\n");
   for (const line of lines.toReversed()) {
     const draws = line.split("\r");
-    const text5 = (draws.findLast((d) => d.trim()) ?? "").replace(/\s+/g, " ").trim();
-    if (text5) {
-      return text5;
+    const text6 = (draws.findLast((d) => d.trim()) ?? "").replace(/\s+/g, " ").trim();
+    if (text6) {
+      return text6;
     }
   }
   return "";
@@ -11792,7 +11965,7 @@ function processVerdict(p) {
 }
 var strings2 = (v) => Array.isArray(v) ? v.filter((x) => typeof x === "string" && x !== "") : [];
 function watchersOf(call) {
-  const r = record(call.result);
+  const r = record2(call.result);
   if (typeof r?.["session_id"] === "string") {
     return {
       heartbeat: typeof r["heartbeat_seconds"] === "number" ? r["heartbeat_seconds"] : 0,
@@ -11815,7 +11988,7 @@ function watchersOf(call) {
   return { heartbeat: beat, notify, patterns: notify ? [] : patterns };
 }
 function processIdOf(call) {
-  const id = record(call.result)?.["session_id"];
+  const id = record2(call.result)?.["session_id"];
   return typeof id === "string" && id ? id : void 0;
 }
 var Processes = class {
@@ -12051,11 +12224,11 @@ function linkCalls(calls, procs) {
   }
   const free = [...procs].sort((a, b) => a.startedAt - b.startedAt);
   for (const call of calls) {
-    const command2 = typeof call.args["command"] === "string" ? call.args["command"].trim() : "";
-    if (owners.has(call) || processIdOf(call) || !command2 || call.name !== "terminal") {
+    const command = typeof call.args["command"] === "string" ? call.args["command"].trim() : "";
+    if (owners.has(call) || processIdOf(call) || !command || call.name !== "terminal") {
       continue;
     }
-    const p = free.find((x) => !claimed.has(x.id) && x.command && command2.startsWith(x.command));
+    const p = free.find((x) => !claimed.has(x.id) && x.command && command.startsWith(x.command));
     if (p) {
       owners.set(call, p);
       claimed.add(p.id);
@@ -12278,8 +12451,8 @@ var COMMAND_WRAPPER_FLAGS = {
   env: /* @__PURE__ */ new Set(["-0", "--null", "-i", "--ignore-environment", "--debug", "-v"]),
   sudo: /* @__PURE__ */ new Set(["-A", "--askpass", "-b", "--background", "-E", "-H", "-i", "-n", "-S"])
 };
-function tokenizeShellCommand(command2) {
-  const input = command2.trim();
+function tokenizeShellCommand(command) {
+  const input = command.trim();
   const tokens = [];
   let current = "";
   let quote2 = null;
@@ -12394,24 +12567,24 @@ function tokenizeShellCommand(command2) {
   if (tokenStarted) tokens.push(current);
   return tokens;
 }
-function commandWithoutShellComments(command2, end, comments) {
+function commandWithoutShellComments(command, end, comments) {
   let result = "";
   let cursor = 0;
   for (const comment of comments) {
     if (comment.start >= end) break;
-    result += command2.slice(cursor, comment.start);
+    result += command.slice(cursor, comment.start);
     cursor = Math.min(comment.end, end);
   }
-  return result + command2.slice(cursor, end);
+  return result + command.slice(cursor, end);
 }
-function readHeredocDelimiter(command2, start, stripTabs) {
+function readHeredocDelimiter(command, start, stripTabs) {
   let index = start;
-  while (command2[index] === " " || command2[index] === "	") index += 1;
+  while (command[index] === " " || command[index] === "	") index += 1;
   let delimiter = "";
   let quote2 = null;
   let escaping = false;
-  for (; index < command2.length; index += 1) {
-    const character = command2[index];
+  for (; index < command.length; index += 1) {
+    const character = command[index];
     if (escaping) {
       delimiter += character;
       escaping = false;
@@ -12436,16 +12609,16 @@ function readHeredocDelimiter(command2, start, stripTabs) {
   if (!delimiter || quote2 !== null || escaping) return null;
   return { heredoc: { delimiter, stripTabs }, end: index };
 }
-function commandAfterHeredocs(command2, start, heredocs) {
+function commandAfterHeredocs(command, start, heredocs) {
   let cursor = start;
   for (const heredoc of heredocs) {
     let foundDelimiter = false;
-    while (cursor <= command2.length) {
-      const newlineIndex = command2.indexOf("\n", cursor);
-      const lineEnd2 = newlineIndex === -1 ? command2.length : newlineIndex;
-      const line = command2.slice(cursor, lineEnd2).replace(/\r$/u, "");
+    while (cursor <= command.length) {
+      const newlineIndex = command.indexOf("\n", cursor);
+      const lineEnd2 = newlineIndex === -1 ? command.length : newlineIndex;
+      const line = command.slice(cursor, lineEnd2).replace(/\r$/u, "");
       const comparableLine = heredoc.stripTabs ? line.replace(/^\t+/u, "") : line;
-      cursor = newlineIndex === -1 ? command2.length : newlineIndex + 1;
+      cursor = newlineIndex === -1 ? command.length : newlineIndex + 1;
       if (comparableLine === heredoc.delimiter) {
         foundDelimiter = true;
         break;
@@ -12454,9 +12627,9 @@ function commandAfterHeredocs(command2, start, heredocs) {
     }
     if (!foundDelimiter) return null;
   }
-  return command2.slice(cursor).trim() || null;
+  return command.slice(cursor).trim() || null;
 }
-function splitFirstShellCommand(command2) {
+function splitFirstShellCommand(command) {
   let quote2 = null;
   let powerShellHereStringQuote = null;
   let escaping = false;
@@ -12468,10 +12641,10 @@ function splitFirstShellCommand(command2) {
   const comments = [];
   let commentStart = 0;
   let separatorBeforeHeredocs = null;
-  for (let index = 0; index < command2.length; index += 1) {
-    const character = command2[index];
+  for (let index = 0; index < command.length; index += 1) {
+    const character = command[index];
     if (powerShellHereStringQuote !== null) {
-      if (character === powerShellHereStringQuote && command2[index + 1] === "@" && (index === 0 || command2[index - 1] === "\n")) {
+      if (character === powerShellHereStringQuote && command[index + 1] === "@" && (index === 0 || command[index - 1] === "\n")) {
         powerShellHereStringQuote = null;
         index += 1;
       }
@@ -12498,8 +12671,8 @@ function splitFirstShellCommand(command2) {
       if (character === quote2) quote2 = null;
       continue;
     }
-    if (character === "@" && (command2[index + 1] === '"' || command2[index + 1] === "'") && (command2[index + 2] === "\n" || command2[index + 2] === "\r" && command2[index + 3] === "\n")) {
-      powerShellHereStringQuote = command2[index + 1];
+    if (character === "@" && (command[index + 1] === '"' || command[index + 1] === "'") && (command[index + 2] === "\n" || command[index + 2] === "\r" && command[index + 3] === "\n")) {
+      powerShellHereStringQuote = command[index + 1];
       index += 1;
       continue;
     }
@@ -12511,12 +12684,12 @@ function splitFirstShellCommand(command2) {
       inBackticks = true;
       continue;
     }
-    if (character === "#" && (index === 0 || /\s/u.test(command2[index - 1]) || ";&|(".includes(command2[index - 1]))) {
+    if (character === "#" && (index === 0 || /\s/u.test(command[index - 1]) || ";&|(".includes(command[index - 1]))) {
       inComment = true;
       commentStart = index;
       continue;
     }
-    if (character === "$" && command2[index + 1] === "{") {
+    if (character === "$" && command[index + 1] === "{") {
       parameterExpansionDepth += 1;
       index += 1;
       continue;
@@ -12538,33 +12711,33 @@ function splitFirstShellCommand(command2) {
       continue;
     }
     if (substitutionDepth > 0 || parameterExpansionDepth > 0) continue;
-    if (character === "<" && command2[index + 1] === "<" && command2[index + 2] !== "<") {
-      const stripTabs = command2[index + 2] === "-";
-      const delimiter = readHeredocDelimiter(command2, index + (stripTabs ? 3 : 2), stripTabs);
+    if (character === "<" && command[index + 1] === "<" && command[index + 2] !== "<") {
+      const stripTabs = command[index + 2] === "-";
+      const delimiter = readHeredocDelimiter(command, index + (stripTabs ? 3 : 2), stripTabs);
       if (delimiter === null) {
-        return { firstCommand: command2.trim(), remainingCommand: null, separator: null };
+        return { firstCommand: command.trim(), remainingCommand: null, separator: null };
       }
       heredocs.push(delimiter.heredoc);
       index = delimiter.end - 1;
       continue;
     }
-    const isDoubleOperator = character === "&" && command2[index + 1] === "&" || character === "|" && (command2[index + 1] === "|" || command2[index + 1] === "&");
-    const isRedirectionAmpersand = character === "&" && (command2[index - 1] === ">" || command2[index - 1] === "<" || command2[index + 1] === ">");
+    const isDoubleOperator = character === "&" && command[index + 1] === "&" || character === "|" && (command[index + 1] === "|" || command[index + 1] === "&");
+    const isRedirectionAmpersand = character === "&" && (command[index - 1] === ">" || command[index - 1] === "<" || command[index + 1] === ">");
     if (!isDoubleOperator && !";&|\n".includes(character) || isRedirectionAmpersand) continue;
     if (character === "\n" && heredocs.length > 0) {
       const separator = separatorBeforeHeredocs;
       const firstCommand2 = commandWithoutShellComments(
-        command2,
+        command,
         separator?.index ?? index,
         comments
       ).trimStart();
-      const commandBeforeHeredocs = separator ? command2.slice(separator.index + separator.length, index).trim() : "";
-      const commandFollowingHeredocs = commandAfterHeredocs(command2, index + 1, heredocs);
+      const commandBeforeHeredocs = separator ? command.slice(separator.index + separator.length, index).trim() : "";
+      const commandFollowingHeredocs = commandAfterHeredocs(command, index + 1, heredocs);
       const remainingCommand = [commandBeforeHeredocs, commandFollowingHeredocs].filter((part) => Boolean(part)).join("\n");
       return {
         firstCommand: firstCommand2,
         remainingCommand: remainingCommand || null,
-        separator: separator ? command2.slice(separator.index, separator.index + separator.length) : "\n"
+        separator: separator ? command.slice(separator.index, separator.index + separator.length) : "\n"
       };
     }
     if (heredocs.length > 0) {
@@ -12575,25 +12748,25 @@ function splitFirstShellCommand(command2) {
       if (isDoubleOperator) index += 1;
       continue;
     }
-    const firstCommand = commandWithoutShellComments(command2, index, comments).trimStart();
+    const firstCommand = commandWithoutShellComments(command, index, comments).trimStart();
     let nextCommandIndex = index + (isDoubleOperator ? 2 : 1);
-    while (/\s/u.test(command2[nextCommandIndex] ?? "")) nextCommandIndex += 1;
-    const nextCommand = command2.slice(nextCommandIndex).trim();
+    while (/\s/u.test(command[nextCommandIndex] ?? "")) nextCommandIndex += 1;
+    const nextCommand = command.slice(nextCommandIndex).trim();
     return {
       firstCommand,
       remainingCommand: nextCommand || null,
-      separator: isDoubleOperator ? command2.slice(index, index + 2) : character
+      separator: isDoubleOperator ? command.slice(index, index + 2) : character
     };
   }
-  if (inComment) comments.push({ start: commentStart, end: command2.length });
+  if (inComment) comments.push({ start: commentStart, end: command.length });
   return {
-    firstCommand: commandWithoutShellComments(command2, command2.length, comments).trim(),
+    firstCommand: commandWithoutShellComments(command, command.length, comments).trim(),
     remainingCommand: null,
     separator: null
   };
 }
-function commandWithoutLeadingShellComments(command2) {
-  let remainingCommand = command2.trimStart();
+function commandWithoutLeadingShellComments(command) {
+  let remainingCommand = command.trimStart();
   while (remainingCommand.startsWith("#")) {
     const newlineIndex = remainingCommand.indexOf("\n");
     if (newlineIndex === -1) return null;
@@ -12601,23 +12774,23 @@ function commandWithoutLeadingShellComments(command2) {
   }
   return remainingCommand || null;
 }
-function withoutShellLineContinuations(command2) {
+function withoutShellLineContinuations(command) {
   let normalizedCommand = "";
   let quote2 = null;
   let escaping = false;
-  for (let index = 0; index < command2.length; index += 1) {
-    const character = command2[index];
+  for (let index = 0; index < command.length; index += 1) {
+    const character = command[index];
     if (escaping) {
       normalizedCommand += character;
       escaping = false;
       continue;
     }
     if (character === "\\" && quote2 !== "'") {
-      if (command2[index + 1] === "\n") {
+      if (command[index + 1] === "\n") {
         index += 1;
         continue;
       }
-      if (command2[index + 1] === "\r" && command2[index + 2] === "\n") {
+      if (command[index + 1] === "\r" && command[index + 2] === "\n") {
         index += 2;
         continue;
       }
@@ -12680,8 +12853,8 @@ function staticProgramName(value) {
   }
   return program;
 }
-function leadingPowerShellLiteral(command2) {
-  const input = command2.trimStart();
+function leadingPowerShellLiteral(command) {
+  const input = command.trimStart();
   const quote2 = input[0];
   if (quote2 !== '"' && quote2 !== "'") return staticProgramName(input.match(/^\S+/u)?.[0] ?? "");
   let value = "";
@@ -12704,12 +12877,12 @@ function leadingPowerShellLiteral(command2) {
   }
   return null;
 }
-function powerShellCallOperatorProgramName(command2) {
-  const match = command2.match(/^\s*&\s+([\s\S]*)$/u);
+function powerShellCallOperatorProgramName(command) {
+  const match = command.match(/^\s*&\s+([\s\S]*)$/u);
   return match ? leadingPowerShellLiteral(match[1]) : void 0;
 }
-function powerShellAssignmentProgramName(command2, depth, remainingCommand, segmentsRemaining) {
-  const assignment = command2.match(
+function powerShellAssignmentProgramName(command, depth, remainingCommand, segmentsRemaining) {
+  const assignment = command.match(
     /^\s*\$(?:(env|global|local|script):)?[A-Za-z_][A-Za-z0-9_]*\s*=\s*([\s\S]*)$/iu
   );
   if (!assignment) return { matched: false, program: null };
@@ -12738,8 +12911,8 @@ function powerShellAssignmentProgramName(command2, depth, remainingCommand, segm
 function windowsShellPayloadProgramName(shell, tokens, start, depth, remainingCommand, separator, segmentsRemaining) {
   const parsePayload = (payload) => {
     if (!payload) return null;
-    const command2 = remainingCommand && separator ? `${payload} ${separator} ${remainingCommand}` : payload;
-    return commandProgramNameInternal(command2, depth + 1, "shell", segmentsRemaining);
+    const command = remainingCommand && separator ? `${payload} ${separator} ${remainingCommand}` : payload;
+    return commandProgramNameInternal(command, depth + 1, "shell", segmentsRemaining);
   };
   if (shell === "cmd" || shell === "cmd.exe") {
     for (let index = start; index < tokens.length; index += 1) {
@@ -12815,9 +12988,9 @@ function referencedCommandAlias(token) {
   );
   return reference?.[1] ?? reference?.[2] ?? null;
 }
-function literalCommandAliasProgramName(command2) {
+function literalCommandAliasProgramName(command) {
   const aliases = /* @__PURE__ */ new Map();
-  let remainingCommand = command2;
+  let remainingCommand = command;
   let controlFlowDepth = 0;
   for (let segmentCount = 0; remainingCommand && segmentCount < 64; segmentCount += 1) {
     const commandWithoutComments = commandWithoutLeadingShellComments(remainingCommand);
@@ -12921,9 +13094,9 @@ function wrappedShellCommandProgramName(wrapper, tokens, start, depth, remaining
   }
   return null;
 }
-function parseCommandProgramName(command2, depth, context, segmentsRemaining) {
+function parseCommandProgramName(command, depth, context, segmentsRemaining) {
   if (depth >= 8 || segmentsRemaining <= 0) return null;
-  const commandWithoutComments = commandWithoutLeadingShellComments(command2);
+  const commandWithoutComments = commandWithoutLeadingShellComments(command);
   if (commandWithoutComments === null) return null;
   if (/^(?:catch|finally|for|foreach|function|if|param|switch|try|while)\s*[{(]/iu.test(
     commandWithoutComments
@@ -13141,27 +13314,27 @@ function parseCommandProgramName(command2, depth, context, segmentsRemaining) {
   }
   return null;
 }
-function commandProgramNameInternal(command2, depth, context, segmentsRemaining = MAX_COMMAND_SEGMENTS) {
+function commandProgramNameInternal(command, depth, context, segmentsRemaining = MAX_COMMAND_SEGMENTS) {
   if (segmentsRemaining <= 0) return null;
-  const calledProgram = powerShellCallOperatorProgramName(command2);
+  const calledProgram = powerShellCallOperatorProgramName(command);
   if (calledProgram !== void 0) return calledProgram;
-  return parseCommandProgramName(command2, depth, context, segmentsRemaining) ?? (context === "shell" ? literalCommandAliasProgramName(command2) : null);
+  return parseCommandProgramName(command, depth, context, segmentsRemaining) ?? (context === "shell" ? literalCommandAliasProgramName(command) : null);
 }
-function commandProgramName(command2, depth = 0) {
-  return commandProgramNameInternal(command2, depth, "shell", MAX_COMMAND_SEGMENTS);
+function commandProgramName(command, depth = 0) {
+  return commandProgramNameInternal(command, depth, "shell", MAX_COMMAND_SEGMENTS);
 }
 var CONTROL_CHARACTERS = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/gu;
-function commandDisplayText(command2) {
-  return withVisibleControlCharacters(withoutShellWrapper(command2));
+function commandDisplayText(command) {
+  return withVisibleControlCharacters(withoutShellWrapper(command));
 }
-function withVisibleControlCharacters(text5) {
-  return text5.replace(
+function withVisibleControlCharacters(text6) {
+  return text6.replace(
     CONTROL_CHARACTERS,
     (character) => character === "\x7F" ? "\u2421" : String.fromCharCode(9216 + character.charCodeAt(0))
   );
 }
-function withoutShellWrapper(command2) {
-  const trimmed = command2.trim();
+function withoutShellWrapper(command) {
+  const trimmed = command.trim();
   const split = splitFirstShellCommand(trimmed);
   if (split.remainingCommand !== null) return trimmed;
   const tokens = tokenizeShellCommand(trimmed);
@@ -13182,27 +13355,27 @@ var terminalView = {
   action: "command",
   card: (call, d, now) => d.background ? backgroundCard(call, d, now) : bashCard(call, d),
   detailPrefix: (call, d) => {
-    const command2 = commandOf(call, d);
-    return command2 && command2 === commandLine(command2) ? /* @__PURE__ */ jsx("code", { lang: "bash", max: { h: "12lines" }, role: "omp.tool.command", text: command2 }, "cmd") : void 0;
+    const command = commandOf(call, d);
+    return command && command === commandLine(command) ? /* @__PURE__ */ jsx("code", { lang: "bash", max: { h: "12lines" }, role: "omp.tool.command", text: command }, "cmd") : void 0;
   },
   exit: (d) => d.background ? void 0 : d.exit,
   hubIcon: "bash",
   // The command as its text, without an `sh -c` wrapper.
   step: (call, d) => {
-    const command2 = d.command ?? call.context;
-    return command2 ? flat(commandDisplayText(command2)) : "Command";
+    const command = d.command ?? call.context;
+    return command ? flat(commandDisplayText(command)) : "Command";
   }
 };
 var commandOf = (call, d) => (d.command ?? call.context ?? "").trim();
 function bashCard(call, d, instead) {
   const output = (d.output ?? call.resultText)?.replace(/\s*\[Command interrupted\]\s*$/, "");
   const error = d.error;
-  const command2 = commandOf(call, d);
-  const line = commandLine(command2);
+  const command = commandOf(call, d);
+  const line = commandLine(command);
   const running2 = call.outcome.kind === "running";
   return {
     body: [
-      ...command2 && command2 !== line ? [/* @__PURE__ */ jsx("code", { lang: "bash", max: { h: "12lines" }, role: "omp.tool.command", text: command2 }, "cmd")] : [],
+      ...command && command !== line ? [/* @__PURE__ */ jsx("code", { lang: "bash", max: { h: "12lines" }, role: "omp.tool.command", text: command }, "cmd")] : [],
       ...instead ? [instead] : output ? [/* @__PURE__ */ jsx("ansi", { follow: true, max: { h: "20lines" }, text: output }, "out")] : [],
       ...error ? [/* @__PURE__ */ jsx("text", { role: "omp.tool.error", spans: [{ s: "error", t: error }], wrap: "word" }, "err")] : []
     ],
@@ -13211,9 +13384,9 @@ function bashCard(call, d, instead) {
     name: "bash",
     preview: { tail: running2 ? 4 : 3 },
     // A short command is the head's target; a longer one shows whole in the body instead.
-    target: command2 === line ? line || void 0 : void 0,
+    target: command === line ? line || void 0 : void 0,
     targetKind: "command",
-    title: describeCommand(command2)
+    title: describeCommand(command)
   };
 }
 function backgroundCard(call, d, now) {
@@ -13482,9 +13655,9 @@ function openAgents(host, focus) {
   let state = initialHub(agents2(), focus?.id);
   const stopTicking = tickWhileOpen(host, TICK_MS);
   const close = () => host.close(overlay2);
-  const sendSteer = async (a, text5) => {
+  const sendSteer = async (a, text6) => {
     await reportError(host.transcript, async () => {
-      const queued = await host.agents.steer(a, text5);
+      const queued = await host.agents.steer(a, text6);
       host.transcript.notice(
         queued ? `Steering queued for ${agentName(a)}.` : `${agentName(a)} is not taking steering now.`,
         queued ? "info" : "warning"
@@ -13755,7 +13928,7 @@ function stepItem(e, id, a) {
 function stepPreview(e, a, brief) {
   if (e.kind !== "tool") {
     const head2 = { assistant: "Answer", kickoff: "Task", note: "Note", think: "Thinking" }[e.kind];
-    const text5 = e.kind === "kickoff" && a.goal ? brief ? `${a.goal}
+    const text6 = e.kind === "kickoff" && a.goal ? brief ? `${a.goal}
 
 ---
 
@@ -13763,7 +13936,7 @@ ${brief}` : a.goal : e.text;
     return [
       /* @__PURE__ */ jsx("text", { role: "omp.hub.title", text: head2 }, "title"),
       /* @__PURE__ */ jsx("text", { spans: [{ s: "dim mono", t: clock(e.at) }] }, "at"),
-      /* @__PURE__ */ jsx("md", { text: text5, ...optional2("tone", e.kind === "think" ? "muted" : void 0) }, "body")
+      /* @__PURE__ */ jsx("md", { text: text6, ...optional2("tone", e.kind === "think" ? "muted" : void 0) }, "body")
     ];
   }
   return [
@@ -13803,8 +13976,8 @@ function stepSpans(e) {
 function clock(at) {
   return at === void 0 ? "" : new Date(at).toTimeString().slice(0, 8);
 }
-function oneLine2(text5) {
-  return text5.replace(/\s+/g, " ").trim();
+function oneLine2(text6) {
+  return text6.replace(/\s+/g, " ").trim();
 }
 
 // src/core/flash.ts
@@ -13855,8 +14028,8 @@ function jobTone(job) {
 function ownJobs(calls) {
   const ids = /* @__PURE__ */ new Set();
   for (const c of calls) {
-    const r = record(c.result);
-    const job = record(r?.["job"]);
+    const r = record2(c.result);
+    const job = record2(r?.["job"]);
     const id = r?.["job_id"] ?? job?.["job_id"] ?? job?.["id"];
     if (c.name === "cronjob_manage" && typeof id === "string" && id) {
       ids.add(id);
@@ -14184,8 +14357,8 @@ function openBackground(host, at) {
     await reportError(host.transcript, () => host.cron.act(action, j.job_id));
     host.changed();
   };
-  const copy = (command2, id) => {
-    copyToClipboard(command2);
+  const copy = (command, id) => {
+    copyToClipboard(command);
     copied.set(id);
   };
   const run6 = (effect) => {
@@ -14502,9 +14675,9 @@ async function git(cwd, ...args) {
   return stdout;
 }
 var KIND = { A: "added", C: "copied", D: "deleted", M: "modified", R: "renamed", T: "modified" };
-function parseStatus(text5) {
+function parseStatus(text6) {
   const state = { ahead: 0, behind: 0, files: [] };
-  const records2 = text5.split("\0");
+  const records2 = text6.split("\0");
   for (let i = 0; i < records2.length; i++) {
     const line = records2[i] ?? "";
     if (line.startsWith("# branch.head ")) {
@@ -14531,9 +14704,9 @@ function parseStatus(text5) {
   }
   return state;
 }
-function applyNumstat(files, text5) {
+function applyNumstat(files, text6) {
   const byPath = new Map(files.map((f) => [f.path, f]));
-  const records2 = text5.split("\0");
+  const records2 = text6.split("\0");
   for (let i = 0; i < records2.length; i++) {
     const [add, del, ...rest] = (records2[i] ?? "").split("	");
     let path = rest.join("	");
@@ -14596,8 +14769,8 @@ function openChanges(host, focus) {
       return;
     }
     diffs.set(f.path, null);
-    void fileDiff(state.root, f).then((text5) => {
-      diffs.set(f.path, text5);
+    void fileDiff(state.root, f).then((text6) => {
+      diffs.set(f.path, text6);
       host.changed();
     });
   };
@@ -15874,12 +16047,12 @@ function liveLabel(item3, active = false) {
   const call = item3.call;
   const status = active && call.outcome.kind === "done" ? "running" : call.outcome.kind;
   const d = detailOf(call);
-  const command2 = d.tool === "terminal" ? d.command ?? call.context : void 0;
-  if (!command2) {
+  const command = d.tool === "terminal" ? d.command ?? call.context : void 0;
+  if (!command) {
     return status === "running" ? presentTense(stepLabel(call)) : stepLabel(call);
   }
   const verb = { cancelled: "Stopped", done: "Ran", error: "Failed", running: "Running" }[status];
-  return `${verb} ${commandProgramName(command2) ?? "command"}`;
+  return `${verb} ${commandProgramName(command) ?? "command"}`;
 }
 function busyLabel(call) {
   return isAsk(call) ? "Waiting for your answer\u2026" : `${liveLabel({ call, id: call.id, kind: "tool" }, true)}\u2026`;
@@ -15917,8 +16090,8 @@ function thoughtTitle(item3) {
 import { basename as basename2 } from "node:path";
 var DAY = 864e5;
 var SNIPPET = 160;
-function snippet(text5, max = SNIPPET) {
-  const flat2 = text5.replace(/```[\s\S]*?(```|$)/g, " [code] ").replace(/^@image:\S+/gm, "").replace(/\[The user attached [^\]]*\]/g, "").replace(/\[([^\]\n]+)\]\((?:[^)\s]+)\)/g, "$1").replace(/^\s{0,3}(?:#{1,6}\s+|>\s?|[-*+]\s+|\d+[.)]\s+)/gm, "").replace(/`([^`\n]+)`/g, "$1").replace(/(\*\*|__)(.+?)\1/g, "$2").replace(/\s+/g, " ").trim();
+function snippet(text6, max = SNIPPET) {
+  const flat2 = text6.replace(/```[\s\S]*?(```|$)/g, " [code] ").replace(/^@image:\S+/gm, "").replace(/\[The user attached [^\]]*\]/g, "").replace(/\[([^\]\n]+)\]\((?:[^)\s]+)\)/g, "$1").replace(/^\s{0,3}(?:#{1,6}\s+|>\s?|[-*+]\s+|\d+[.)]\s+)/gm, "").replace(/`([^`\n]+)`/g, "$1").replace(/(\*\*|__)(.+?)\1/g, "$2").replace(/\s+/g, " ").trim();
   return clip(flat2, { max });
 }
 function rowDetail(s) {
@@ -16164,8 +16337,8 @@ var StoredSearch = class {
     return this.#listing;
   }
   /** Searches every stored title and id for `text`, in `workspace` when one is named; '' stops. Repeating the last call does nothing. */
-  set(text5, workspace) {
-    const query = text5.trim();
+  set(text6, workspace) {
+    const query = text6.trim();
     const asked2 = `${workspace ?? ""}
 ${query}`;
     if (asked2 === this.#asked) {
@@ -16725,19 +16898,19 @@ async function interruptTurn(gw2, sid) {
   const execution_generation = await currentGeneration(gw2, sid);
   await rpc(gw2, "session.interrupt", { session_id: sid, execution_generation });
 }
-async function steerTurn(gw2, sid, text5) {
+async function steerTurn(gw2, sid, text6) {
   try {
     const execution_generation = await currentGeneration(gw2, sid);
-    const r = await rpc(gw2, "session.steer", { session_id: sid, execution_generation, text: text5 });
+    const r = await rpc(gw2, "session.steer", { session_id: sid, execution_generation, text: text6 });
     return r && "status" in r && r.status === "queued" ? { ok: true } : { ok: false };
   } catch (e) {
     return errorText(e).includes("stale_generation") ? { ok: false } : { error: errorText(e), ok: false };
   }
 }
-async function redirectTurn(gw2, sid, text5) {
+async function redirectTurn(gw2, sid, text6) {
   try {
     const execution_generation = await currentGeneration(gw2, sid);
-    const r = await rpc(gw2, "session.redirect", { session_id: sid, execution_generation, text: text5 });
+    const r = await rpc(gw2, "session.redirect", { session_id: sid, execution_generation, text: text6 });
     return r && "status" in r && (r.status === "redirected" || r.status === "queued") ? { ok: true } : { ok: false };
   } catch (e) {
     return errorText(e).includes("stale_generation") ? { ok: false } : { error: errorText(e), ok: false };
@@ -16745,30 +16918,30 @@ async function redirectTurn(gw2, sid, text5) {
 }
 
 // src/commands/control.ts
-var preview3 = (text5) => text5.length > 60 ? `${text5.slice(0, 57)}\u2026` : text5;
-async function steer2(host, text5) {
-  if (!text5) {
+var preview3 = (text6) => text6.length > 60 ? `${text6.slice(0, 57)}\u2026` : text6;
+async function steer2(host, text6) {
+  if (!text6) {
     return host.notice("Usage: /steer <guidance for the active turn>", "warning");
   }
   if (!host.busy || !host.sid) {
-    host.enqueue(text5);
-    return host.notice(`No active turn \u2014 queued as next prompt: ${preview3(text5)}`);
+    host.enqueue(text6);
+    return host.notice(`No active turn \u2014 queued as next prompt: ${preview3(text6)}`);
   }
-  const r = await steerTurn(host.gw, host.sid, text5);
+  const r = await steerTurn(host.gw, host.sid, text6);
   if (r.ok) {
-    return host.steered ? host.steered(text5) : host.notice(`Steer queued for the active turn: ${preview3(text5)}`);
+    return host.steered ? host.steered(text6) : host.notice(`Steer queued for the active turn: ${preview3(text6)}`);
   }
   if (r.error) {
     return host.notice(`/steer failed: ${r.error}`, "error");
   }
-  host.enqueue(text5);
+  host.enqueue(text6);
   host.notice("Turn ended before the steer landed \u2014 queued as next prompt", "warning");
 }
-function queue(host, text5) {
-  if (!text5) {
+function queue(host, text6) {
+  if (!text6) {
     return host.notice(`${host.queued} queued message${host.queued === 1 ? "" : "s"}`);
   }
-  host.submit(text5);
+  host.submit(text6);
 }
 async function stop(host) {
   if (!host.sid) {
@@ -16811,8 +16984,8 @@ async function tools(host, arg) {
     host.notice(`/tools failed: ${errorText(e)}`, "error");
   }
 }
-async function side(host, text5, kind) {
-  if (!text5) {
+async function side(host, text6, kind) {
+  if (!text6) {
     return host.notice(kind === "bg" ? "Usage: /bg <prompt>" : "Usage: /btw <question>", "warning");
   }
   if (!host.sid) {
@@ -16821,11 +16994,11 @@ async function side(host, text5, kind) {
   try {
     const r = await rpc(host.gw, kind === "bg" ? "prompt.background" : "prompt.btw", {
       session_id: host.sid,
-      text: text5
+      text: text6
     });
     if (r?.task_id) {
       host.notice(
-        kind === "bg" ? `Background task ${r.task_id} started: ${preview3(text5)}` : `btw ${r.task_id}: answering from a snapshot of this conversation`
+        kind === "bg" ? `Background task ${r.task_id} started: ${preview3(text6)}` : `btw ${r.task_id}: answering from a snapshot of this conversation`
       );
     }
   } catch (e) {
@@ -16855,18 +17028,18 @@ function specOf(a, name, sid) {
 var sidebar;
 function hermesSplit(env, vars, args) {
   const pane = env["TERN_PANE"];
-  const hermes = readHermesCommand(env["HERMES_TERN_HERMES"]);
+  const hermes = readLaunchEnv(env).hermes;
   if (!pane || !hermes) {
     return void 0;
   }
-  const command2 = [
+  const command = [
     "env",
     ...env["HERMES_HOME"] ? [`HERMES_HOME=${env["HERMES_HOME"]}`] : [],
     ...vars,
     ...hermes,
     ...args
   ];
-  return { command: command2, pane };
+  return { command, pane };
 }
 async function openSidebar(spec, cwd, env = process.env) {
   const split = hermesSplit(env, [`${WATCH_ENV}=${JSON.stringify(spec)}`], ["tern"]);
@@ -16914,7 +17087,7 @@ var isBrowserAction = oneOf(["connect", "disconnect", "status"]);
 async function browser(host, arg) {
   const [first = "status", ...rest] = words2(arg);
   const action = first.toLowerCase();
-  const note = (text5, tone) => host.transcript.notice(text5, tone);
+  const note = (text6, tone) => host.transcript.notice(text6, tone);
   if (!isBrowserAction(action)) {
     return note("Usage: /browser [status|connect [url]|disconnect]", "warning");
   }
@@ -17129,23 +17302,23 @@ function lastTurnRewind(snapshot3) {
 var textPart = strictObject({ type: _enum(["input_text", "output_text", "text"]), text: string2() });
 function retryText(content) {
   const parts2 = typeof content === "string" ? [content] : Array.isArray(content) ? content : [null];
-  let text5 = "";
+  let text6 = "";
   for (const part of parts2) {
     const textOf = typeof part === "string" ? part : textPart.safeParse(part).data?.text;
     if (textOf === void 0) {
       return null;
     }
-    text5 += textOf;
+    text6 += textOf;
   }
-  return text5.trim() ? text5 : "";
+  return text6.trim() ? text6 : "";
 }
 function retryTurnRewind(snapshot3) {
   const target2 = lastUserTurn(snapshot3);
-  const text5 = target2 ? retryText(target2.content) : "";
-  if (text5 === null) {
+  const text6 = target2 ? retryText(target2.content) : "";
+  if (text6 === null) {
     throw new Error("/retry: retry does not support media or unknown content parts");
   }
-  return target2 && text5 ? { target_message_id: target2.row_id } : null;
+  return target2 && text6 ? { target_message_id: target2.row_id } : null;
 }
 
 // src/commands/session.ts
@@ -17169,8 +17342,8 @@ async function rewind(host, intent) {
     return host.notice(`Undid ${plural(removed, "message")}.`);
   }
   const target2 = result["target_message"];
-  const text5 = retryText(typeof target2 === "object" && target2 !== null && "content" in target2 ? target2.content : void 0);
-  return text5 ? host.send(text5) : host.notice("Nothing to retry.");
+  const text6 = retryText(typeof target2 === "object" && target2 !== null && "content" in target2 ? target2.content : void 0);
+  return text6 ? host.send(text6) : host.notice("Nothing to retry.");
 }
 function compressReport(summary4) {
   const head2 = summary4?.headline ? `${summary4.noop ? "" : "\u2713 "}${summary4.headline}` : "\u2713 Transcript compressed.";
@@ -17292,8 +17465,8 @@ async function rollback(host, arg) {
       return host.notice("Usage: /rollback diff <checkpoint>", "warning");
     }
     const r2 = await rpc(host.gw, "rollback.diff", { hash: rest[0], session_id: host.sid });
-    const text5 = [r2?.stat?.trim(), r2?.diff?.trim()].filter(Boolean).join("\n\n");
-    return text5 ? host.panel("Rollback diff", text5) : host.notice("No changes since this checkpoint.");
+    const text6 = [r2?.stat?.trim(), r2?.diff?.trim()].filter(Boolean).join("\n\n");
+    return text6 ? host.panel("Rollback diff", text6) : host.notice("No changes since this checkpoint.");
   }
   const file2 = rest.join(" ").trim();
   const r = await rpc(host.gw, "rollback.restore", {
@@ -17515,12 +17688,12 @@ function copyAnswer(host, arg) {
   }
   const answers2 = host.transcript.entries.flatMap((e) => e.kind === "turn" && answerText(e) ? [answerText(e)] : []);
   const at = n === void 0 ? answers2.length : Math.min(n, answers2.length);
-  const text5 = answers2[at - 1];
-  if (!text5) {
+  const text6 = answers2[at - 1];
+  if (!text6) {
     return host.transcript.notice("No answer to copy yet.", "warning");
   }
-  copyToClipboard(text5);
-  host.transcript.notice(`Copied ${n === void 0 ? "the last answer" : `answer ${at}`} (${text5.length} characters).`);
+  copyToClipboard(text6);
+  host.transcript.notice(`Copied ${n === void 0 ? "the last answer" : `answer ${at}`} (${text6.length} characters).`);
 }
 function historyText(entries, arg) {
   const preview4 = Math.max(80, Number.parseInt(arg, 10) || 400);
@@ -17619,7 +17792,7 @@ async function openHelp(host) {
   const own2 = localCommands().flatMap(
     (c) => c.help ? [[[`/${c.name}`, ...(c.aliases ?? []).map((a) => `/${a}`)].join(" \xB7 "), c.help]] : []
   );
-  const runs2 = ([command2 = ""]) => !HIDDEN_COMMANDS.has(command2.replace(/^\//, "").split(/\s/)[0] ?? "");
+  const runs2 = ([command = ""]) => !HIDDEN_COMMANDS.has(command.replace(/^\//, "").split(/\s/)[0] ?? "");
   const categories = [
     { name: "Tern", pairs: own2 },
     ...(catalog.categories?.length ? catalog.categories : [{ name: "Commands", pairs: catalog.pairs ?? [] }]).map((c) => ({ ...c, pairs: (c.pairs ?? []).filter(runs2) })).filter((c) => c.pairs.length)
@@ -17654,11 +17827,11 @@ async function openHelp(host) {
             { grow: 1, head: "Description", id: "action" }
           ],
           role: "omp.hotkeys.table",
-          rows: (c.pairs ?? []).map(([command2 = "", text5 = ""], i) => ({
+          rows: (c.pairs ?? []).map(([command = "", text6 = ""], i) => ({
             // The `(usage: …)` tail is `/help <command>`'s business; the table keeps the summary.
             cells: {
-              action: [{ t: text5.replace(/\s*\(usage: .+\)\s*$/, "") }],
-              command: [{ s: "mono", t: command2 }]
+              action: [{ t: text6.replace(/\s*\(usage: .+\)\s*$/, "") }],
+              command: [{ s: "mono", t: command }]
             },
             id: String(i)
           }))
@@ -17685,10 +17858,10 @@ function markPane(launch3, sid, dir2 = dataDir()) {
   if (!launch3.pane) {
     return;
   }
-  const record2 = { cwd: launch3.paneCwd, pid: process.pid, session_id: sid, updated_at: Date.now() / 1e3 };
+  const record3 = { cwd: launch3.paneCwd, pid: process.pid, session_id: sid, updated_at: Date.now() / 1e3 };
   try {
     mkdirSync4(join6(dir2, "panes"), { recursive: true });
-    writeFileSync3(paneFile(launch3.pane, dir2), JSON.stringify(record2));
+    writeFileSync3(paneFile(launch3.pane, dir2), JSON.stringify(record3));
   } catch {
   }
 }
@@ -18554,7 +18727,7 @@ var STYLES = css`
 
 // node_modules/@hermes/shared/src/slash.ts
 var SLASH_COMMAND_RE = /^\/[^\s/]*(?:\s|$)/;
-var looksLikeSlashCommand = (text5) => SLASH_COMMAND_RE.test(text5);
+var looksLikeSlashCommand = (text6) => SLASH_COMMAND_RE.test(text6);
 var str4 = (value) => typeof value === "string" ? value : void 0;
 function parseCommandDispatch(raw) {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
@@ -18580,17 +18753,17 @@ function parseCommandDispatch(raw) {
 
 // node_modules/@hermes/shared/src/slash-input.ts
 var INLINE_SLASH_RE = /\s\/([a-zA-Z][\w-]*)?$/;
-var inlineSlashTrigger = (text5) => {
-  const match = INLINE_SLASH_RE.exec(text5);
+var inlineSlashTrigger = (text6) => {
+  const match = INLINE_SLASH_RE.exec(text6);
   if (!match) {
     return null;
   }
   const query = match[1] ?? "";
-  return { query, start: text5.length - query.length - 1 };
+  return { query, start: text6.length - query.length - 1 };
 };
 var applyCompletion = (value, rowText2, compReplace) => {
-  const text5 = value[compReplace - 1] === "/" && rowText2.startsWith("/") ? rowText2.slice(1) : rowText2;
-  return value.slice(0, compReplace) + text5;
+  const text6 = value[compReplace - 1] === "/" && rowText2.startsWith("/") ? rowText2.slice(1) : rowText2;
+  return value.slice(0, compReplace) + text6;
 };
 var completionToApplyOnSubmit = (value, rowText2, compReplace, isLocalCommand = () => false) => {
   const typed = value.trim();
@@ -18739,8 +18912,8 @@ function shape(error) {
   };
 }
 function detailLine(raw) {
-  const text5 = raw.replace(/\s+/g, " ").trim();
-  return text5 ? `Details: ${text5.length > DETAIL_LIMIT ? `${text5.slice(0, DETAIL_LIMIT - 1)}\u2026` : text5}` : null;
+  const text6 = raw.replace(/\s+/g, " ").trim();
+  return text6 ? `Details: ${text6.length > DETAIL_LIMIT ? `${text6.slice(0, DETAIL_LIMIT - 1)}\u2026` : text6}` : null;
 }
 var VERSION_SKEW_RE = /Extra inputs are not permitted|^unknown method:/;
 var UNAVAILABLE_METHOD_RE = /^unknown method: (\S+) — not available on this Hermes backend$/;
@@ -18752,61 +18925,61 @@ function isVersionSkew(code2, message) {
 }
 var ROWS = [
   [
-    (code2, text5) => (code2 === RPC_SESSION_NOT_FOUND || code2 === void 0) && /session not found/i.test(text5),
+    (code2, text6) => (code2 === RPC_SESSION_NOT_FOUND || code2 === void 0) && /session not found/i.test(text6),
     () => "This chat is no longer attached to the backend (it was idle or the backend restarted). Your history is saved: type /resume to reopen it."
   ],
   [
-    (_code, text5) => text5 === "session_read_only",
+    (_code, text6) => text6 === "session_read_only",
     () => "This chat is stored history Hermes can show but not continue, so your message was not run. Use /new to start a new chat."
   ],
   [
-    (_code, text5) => text5 === "session_has_children",
+    (_code, text6) => text6 === "session_has_children",
     () => "This chat has child sessions (such as subagent runs) that deleting it would remove too, so it was not deleted."
   ],
   [
-    (_code, text5) => /^gateway not (?:connected|running)\b/.test(text5),
+    (_code, text6) => /^gateway not (?:connected|running)\b/.test(text6),
     () => "Hermes is not connected right now, so that was not sent. It reconnects automatically; wait a moment and try again."
   ],
-  [(_code, text5) => UNAVAILABLE_METHOD_RE.exec(text5), (m) => `This Hermes backend does not provide ${m?.[1] ?? "?"}, so that was not done.`],
+  [(_code, text6) => UNAVAILABLE_METHOD_RE.exec(text6), (m) => `This Hermes backend does not provide ${m?.[1] ?? "?"}, so that was not done.`],
   [
-    (_code, text5) => text5.trim() === "launch_credentials_unavailable",
+    (_code, text6) => text6.trim() === "launch_credentials_unavailable",
     () => "This chat can't use the API key it was started with any more (it changed or was removed), so that was not done. A chat never switches to a different key on its own. Type /new to start a new chat on your current key."
   ],
   [
-    (_code, text5) => /^request timed out after (\d+)s/.exec(text5),
+    (_code, text6) => /^request timed out after (\d+)s/.exec(text6),
     (m) => `Hermes did not answer within ${m?.[1] ?? "?"}s. Try again; if it keeps happening, report the last lines of the gateway log.`
   ]
 ];
 function describeRpcError(error) {
   const { code: code2, message } = shape(error);
-  const text5 = message ?? (typeof error === "string" && error.trim() ? error : "request failed");
-  if (isVersionSkew(code2, text5)) {
+  const text6 = message ?? (typeof error === "string" && error.trim() ? error : "request failed");
+  if (isVersionSkew(code2, text6)) {
     return "Tern and the Hermes backend are out of sync (different versions). Run `hermes update`, then start `hermes tern` again.";
   }
   for (const [match, say] of ROWS) {
-    const m = match(code2, text5);
+    const m = match(code2, text6);
     if (m) {
       return say(m === true ? null : m);
     }
   }
-  return text5;
+  return text6;
 }
 function isUnsupportedCommand(error) {
   return shape(error).data?.reason === "unsupported_command";
 }
-function describeSlashExecError(command2, error) {
+function describeSlashExecError(command, error) {
   const { data, message = "" } = shape(error);
   if (isUnsupportedCommand(error)) {
-    const refusal = `/${command2} is not available on the shared gateway yet`;
+    const refusal = `/${command} is not available on the shared gateway yet`;
     return typeof data?.detail === "string" && data.detail.trim() ? `${refusal}
 ${data.detail.trim()}` : refusal;
   }
   if (/slash worker timed out/.test(message)) {
-    return `/${command2} did not finish: the command helper timed out. Try again.`;
+    return `/${command} did not finish: the command helper timed out. Try again.`;
   }
   if (/slash worker (?:exited|closed pipe|start failed)/.test(message)) {
     const detail = detailLine(message.replace(/^slash worker (?:exited|closed pipe:?|start failed:?)\s*/, ""));
-    return [`/${command2} did not finish: the command helper crashed. Try again.`, detail].filter(Boolean).join("\n");
+    return [`/${command} did not finish: the command helper crashed. Try again.`, detail].filter(Boolean).join("\n");
   }
   return describeRpcError(error);
 }
@@ -18839,8 +19012,8 @@ function commandEnvelope(raw) {
     warning: "warning" in legacy && typeof legacy.warning === "string" ? legacy.warning : void 0
   };
 }
-async function runSlash(text5, cx, resolve4 = true) {
-  const [typed = "", ...rest] = text5.slice(1).split(/\s+/);
+async function runSlash(text6, cx, resolve4 = true) {
+  const [typed = "", ...rest] = text6.slice(1).split(/\s+/);
   const name = typed.toLowerCase();
   const arg = rest.join(" ");
   const local = localCommand(name);
@@ -18879,7 +19052,7 @@ async function runSlash(text5, cx, resolve4 = true) {
   }
   const title = `/${name}${arg ? ` ${arg}` : ""}`;
   try {
-    const r = await rpc(cx.gw, "slash.exec", { command: text5.slice(1), session_id: sid });
+    const r = await rpc(cx.gw, "slash.exec", { command: text6.slice(1), session_id: sid });
     if (stale()) {
       return;
     }
@@ -18947,11 +19120,11 @@ async function dispatched(raw, cx, { arg, title }) {
 import { createHash as createHash2 } from "node:crypto";
 var OPEN = /^ {0,3}(`{3,}|~{3,})\s*([^\s`]*)/;
 var CHECK_TIMEOUT_MS = 15e4;
-function figures(text5) {
+function figures(text6) {
   const out = [];
   const counts = { mermaid: 0, svg: 0 };
   let open;
-  for (const line of text5.split("\n")) {
+  for (const line of text6.split("\n")) {
     if (open) {
       const close = line.trim();
       if (close.length >= open.mark.length && close === open.mark.charAt(0).repeat(close.length)) {
@@ -18986,12 +19159,12 @@ function fixPrompt(failed) {
 var CHECK_METHOD = "plugin.hermes-tern.figures.check";
 var CHECKED_EVENT = "plugin.hermes-tern.figures.checked";
 function checkedFailures(figs, payload) {
-  const results = record(payload)?.["results"];
+  const results = record2(payload)?.["results"];
   if (!Array.isArray(results) || results.length !== figs.length) {
     return void 0;
   }
   return figs.flatMap((f, i) => {
-    const r = record(results[i]);
+    const r = record2(results[i]);
     if (r?.["ok"] !== false) {
       return [];
     }
@@ -19003,13 +19176,13 @@ function checkedFailures(figs, payload) {
 function gatewayFigureCheck(gw2) {
   const waiting5 = /* @__PURE__ */ new Map();
   gw2.on("event", (ev) => {
-    const reply2 = ev.type === CHECKED_EVENT ? record(ev.payload)?.["reply"] : void 0;
+    const reply2 = ev.type === CHECKED_EVENT ? record2(ev.payload)?.["reply"] : void 0;
     if (typeof reply2 === "string") {
       waiting5.get(reply2)?.(ev.payload);
     }
   });
-  return async (sid, text5, figs) => {
-    const reply2 = createHash2("sha256").update(`${sid}\0${text5}`).digest("hex").slice(0, 32);
+  return async (sid, text6, figs) => {
+    const reply2 = createHash2("sha256").update(`${sid}\0${text6}`).digest("hex").slice(0, 32);
     const result = new Promise((resolve4) => {
       const finish = (payload) => {
         clearTimeout(timer);
@@ -19019,7 +19192,7 @@ function gatewayFigureCheck(gw2) {
       const timer = setTimeout(() => finish(void 0), CHECK_TIMEOUT_MS);
       waiting5.set(reply2, finish);
     });
-    const claimed = await gw2.request(CHECK_METHOD, { figures: figs.map((f) => ({ lang: f.lang, source: f.source })), reply: reply2, session_id: sid }).then((r) => record(r)?.["claimed"] === true).catch(() => false);
+    const claimed = await gw2.request(CHECK_METHOD, { figures: figs.map((f) => ({ lang: f.lang, source: f.source })), reply: reply2, session_id: sid }).then((r) => record2(r)?.["claimed"] === true).catch(() => false);
     if (!claimed) {
       waiting5.get(reply2)?.(void 0);
       return void 0;
@@ -19044,13 +19217,13 @@ var FigureAsk = class {
   }
   /** Checks a finished reply's figures; when one would not render, sends the prompt that asks for it again. */
   afterReply(payload) {
-    const text5 = payload.status === "complete" && typeof payload.text === "string" ? payload.text : void 0;
+    const text6 = payload.status === "complete" && typeof payload.text === "string" ? payload.text : void 0;
     const sid = this.#live();
-    const figs = text5 && !this.#asked ? figures(text5) : [];
-    if (!text5 || !sid || !figs.length) {
+    const figs = text6 && !this.#asked ? figures(text6) : [];
+    if (!text6 || !sid || !figs.length) {
       return;
     }
-    void this.#check(sid, text5, figs).then((failed) => {
+    void this.#check(sid, text6, figs).then((failed) => {
       if (!failed?.length || this.#live() !== sid || this.#asked) {
         return;
       }
@@ -19073,11 +19246,11 @@ var REFUSALS = [
   ["command_failed", "the command could not start"]
 ];
 function shellError(error) {
-  const text5 = errorText(error);
-  return REFUSALS.find(([code2]) => text5.includes(code2))?.[1] ?? describeRpcError(error);
+  const text6 = errorText(error);
+  return REFUSALS.find(([code2]) => text6.includes(code2))?.[1] ?? describeRpcError(error);
 }
-async function shellExec(gw2, sid, command2) {
-  const r = await rpc(gw2, "shell.exec", { command: command2, session_id: sid });
+async function shellExec(gw2, sid, command) {
+  const r = await rpc(gw2, "shell.exec", { command, session_id: sid });
   if (!r || typeof r !== "object") {
     throw new Error("invalid response: shell.exec");
   }
@@ -19090,11 +19263,11 @@ function shellLines(r) {
     ...r.code !== 0 || !out ? [{ failed: r.code !== 0, text: `exit ${r.code}` }] : []
   ];
 }
-function typedCommands(text5, pasted = []) {
-  return [...text5.matchAll(new RegExp(INTERPOLATION_RE.source, "g"))].filter((m) => !pasted.some((p) => p.includes(m[0])));
+function typedCommands(text6, pasted = []) {
+  return [...text6.matchAll(new RegExp(INTERPOLATION_RE.source, "g"))].filter((m) => !pasted.some((p) => p.includes(m[0])));
 }
-async function interpolate(gw2, sid, text5, pasted = []) {
-  const matches2 = typedCommands(text5, pasted);
+async function interpolate(gw2, sid, text6, pasted = []) {
+  const matches2 = typedCommands(text6, pasted);
   const results = await Promise.all(
     matches2.map(async (m) => {
       const r = await shellExec(gw2, sid, m[1] ?? "");
@@ -19103,7 +19276,7 @@ async function interpolate(gw2, sid, text5, pasted = []) {
   );
   return matches2.reduceRight(
     (acc, m, i) => acc.slice(0, m.index) + (results[i] ?? "") + acc.slice((m.index ?? 0) + m[0].length),
-    text5
+    text6
   );
 }
 
@@ -19409,7 +19582,7 @@ function serverRequest(req) {
 }
 
 // src/prompts/parse.ts
-var text3 = (v) => typeof v === "string" ? v : "";
+var text4 = (v) => typeof v === "string" ? v : "";
 var strings3 = (v) => Array.isArray(v) ? v.filter((x) => typeof x === "string") : [];
 var APPROVAL_CHOICES = /* @__PURE__ */ new Set(["once", "session", "always", "deny"]);
 var isApprovalChoice = (c) => APPROVAL_CHOICES.has(c);
@@ -19450,8 +19623,8 @@ function approvalOf(req, { params: p }) {
   }
   return {
     choices: [...allowed],
-    command: text3(p.command),
-    description: text3(p.description),
+    command: text4(p.command),
+    description: text4(p.description),
     kind: "approval",
     req,
     requestId: typeof p.request_id === "string" ? p.request_id : void 0,
@@ -19466,8 +19639,8 @@ function questionsOf(raw) {
     if (!q || typeof q !== "object" || !("qid" in q) || !("question" in q)) {
       return [];
     }
-    const question = text3(q.question).trim();
-    return question ? [{ choices: "choices" in q ? strings3(q.choices) : [], multi: "multi_select" in q && q.multi_select === true, qid: text3(q.qid), question }] : [];
+    const question = text4(q.question).trim();
+    return question ? [{ choices: "choices" in q ? strings3(q.choices) : [], multi: "multi_select" in q && q.multi_select === true, qid: text4(q.qid), question }] : [];
   });
 }
 function placeOf(raw) {
@@ -19492,15 +19665,15 @@ function lockedAnswers(preset) {
 }
 function maskedOf(req, method, p) {
   return {
-    command: text3(p.command),
-    envVar: text3(p.env_var),
-    hint: text3(p.hint),
+    command: text4(p.command),
+    envVar: text4(p.env_var),
+    hint: text4(p.hint),
     kind: "masked",
-    manager: text3(p.display_name) || text3(p.backend),
+    manager: text4(p.display_name) || text4(p.backend),
     method,
-    prompt: text3(p.prompt),
+    prompt: text4(p.prompt),
     req,
-    site: text3(p.site) || text3(p.origin)
+    site: text4(p.site) || text4(p.origin)
   };
 }
 
@@ -19516,8 +19689,8 @@ function openUrl(url) {
 async function prsPluginReady() {
   try {
     const { stdout } = await run5("tern", ["plugin", "list", "--json"], { timeout: 5e3 });
-    const plugins2 = record(parseJson(stdout))?.["plugins"];
-    return Array.isArray(plugins2) && plugins2.some((p) => record(p)?.["id"] === "prs" && record(p)?.["status"] === "ready");
+    const plugins2 = record2(parseJson(stdout))?.["plugins"];
+    return Array.isArray(plugins2) && plugins2.some((p) => record2(p)?.["id"] === "prs" && record2(p)?.["status"] === "ready");
   } catch {
     return false;
   }
@@ -19891,7 +20064,7 @@ var AppActions = class {
   host;
   constructor(cx) {
     this.#cx = cx;
-    this.figures = new FigureAsk(gatewayFigureCheck(cx.gw), () => cx.state.ref.live, (text5) => cx.router.route({ images: [], kind: "typed", pasted: [], text: text5 }, "queue"));
+    this.figures = new FigureAsk(gatewayFigureCheck(cx.gw), () => cx.state.ref.live, (text6) => cx.router.route({ images: [], kind: "typed", pasted: [], text: text6 }, "queue"));
     const { attachments, chat, composer: composer2, gw: gw2, life, queue: queue2, transcript } = cx;
     const changed = () => cx.changed();
     this.dock = {
@@ -19982,7 +20155,7 @@ var AppActions = class {
       router: cx.router,
       setCompacting: (on, opts) => this.setCompacting(on, opts),
       state: cx.state,
-      submit: (text5) => this.submit(text5, "queue"),
+      submit: (text6) => this.submit(text6, "queue"),
       transcript
     };
   }
@@ -19991,8 +20164,8 @@ var AppActions = class {
     return this.#copied.value;
   }
   /** A Copy button: `text` to the clipboard, and its button reads Copied for a moment. */
-  copy = (text5, id) => {
-    copyToClipboard(text5);
+  copy = (text6, id) => {
+    copyToClipboard(text6);
     this.#copied.set(id);
   };
   /** Clears the Copied timer. */
@@ -20013,25 +20186,25 @@ var AppActions = class {
    */
   submit(raw, busy = this.#cx.state.busyMode, pasted = []) {
     const { attachments, composer: composer2, transcript } = this.#cx;
-    const text5 = raw.trim();
-    if (attachments.uploading && !text5.startsWith("/")) {
+    const text6 = raw.trim();
+    if (attachments.uploading && !text6.startsWith("/")) {
       composer2.set(raw, { pasted });
       transcript.notice("An image is still attaching. Send again in a moment.", "warning");
       return;
     }
-    if (!text5 && !attachments.items.length) {
+    if (!text6 && !attachments.items.length) {
       return;
     }
-    if (text5.startsWith("/")) {
-      void runSlash(text5, this.slash);
+    if (text6.startsWith("/")) {
+      void runSlash(text6, this.slash);
       return;
     }
-    if (text5.startsWith("!") && text5.slice(1).trim() && !pasted.some((p) => text5.startsWith(p.trim().split("\n")[0] ?? ""))) {
-      void this.#shell(text5.slice(1).trim());
+    if (text6.startsWith("!") && text6.slice(1).trim() && !pasted.some((p) => text6.startsWith(p.trim().split("\n")[0] ?? ""))) {
+      void this.#shell(text6.slice(1).trim());
       return;
     }
     this.#cx.connect.yieldOpen();
-    this.#cx.router.route({ images: attachments.take(), kind: "typed", pasted, text: text5 }, busy);
+    this.#cx.router.route({ images: attachments.take(), kind: "typed", pasted, text: text6 }, busy);
   }
   /** What the router's gates read: the session, the switch in flight, the turn, the compaction and the startup image. */
   gates() {
@@ -20047,29 +20220,29 @@ var AppActions = class {
   /** Puts a prompt that did not go back into the composer, before any text there, with its images. */
   restore(prompt) {
     const { composer: composer2 } = this.#cx;
-    const text5 = shownText(prompt);
-    composer2.set(text5 && composer2.text ? `${text5}
-${composer2.text}` : text5 || composer2.text, {
+    const text6 = shownText(prompt);
+    composer2.set(text6 && composer2.text ? `${text6}
+${composer2.text}` : text6 || composer2.text, {
       pasted: [...composer2.pasted, ...prompt.kind === "typed" ? prompt.pasted : []]
     });
     this.#cx.attachments.restore(prompt.images);
   }
   /** `!cmd`: runs `command` in the session's folder and shows its output; nothing reaches the model. */
-  async #shell(command2) {
+  async #shell(command) {
     const { transcript } = this.#cx;
     const sid = this.#cx.state.ref.live;
     if (!sid) {
       transcript.notice("Wait for the session to start before running a shell command.", "warning");
       return this.#cx.changed();
     }
-    transcript.user({ text: `!${command2}` });
+    transcript.user({ text: `!${command}` });
     this.#cx.changed();
     try {
-      for (const line of shellLines(await shellExec(this.#cx.gw, sid, command2))) {
+      for (const line of shellLines(await shellExec(this.#cx.gw, sid, command))) {
         transcript.notice(line.text, line.failed ? "warning" : "info");
       }
     } catch (error) {
-      transcript.notice(`!${command2} did not run: ${shellError(error)}.`, "error");
+      transcript.notice(`!${command} did not run: ${shellError(error)}.`, "error");
     }
     this.#cx.changed();
   }
@@ -20249,7 +20422,7 @@ ${composer2.text}` : text5 || composer2.text, {
     const linked = { guides: chat.prs.guides(), refs: [...chat.prs.entries()] };
     const write = (p) => writePrList(launch3.pane, prList(state.ref.stored ?? "", state.info?.cwd || launch3.cwd, linked, p && { ref: p, ...tab && { tab } }));
     void openPrs(
-      { entries: () => chat.prs.entries(), notice: (text5, tone) => chat.notice(text5, tone), purpose: tab === "guide" ? "guide" : "page", writeList: write },
+      { entries: () => chat.prs.entries(), notice: (text6, tone) => chat.notice(text6, tone), purpose: tab === "guide" ? "guide" : "page", writeList: write },
       pick2
     );
   }
@@ -20600,9 +20773,9 @@ function compactingNode(c, now) {
   });
 }
 function effortChip(r, on) {
-  const text5 = effortText(r.effort, r.effortWire);
+  const text6 = effortText(r.effort, r.effortWire);
   const glyph = r.effort === "none" ? "off" : r.effortWire || r.effort || DEFAULT_EFFORT;
-  const clamp2 = text5.includes("\u2192") ? ` (this route sends ${r.effortWire})` : "";
+  const clamp2 = text6.includes("\u2192") ? ` (this route sends ${r.effortWire})` : "";
   return /* @__PURE__ */ jsxs(
     "row",
     {
@@ -20611,10 +20784,10 @@ function effortChip(r, on) {
       onClick: on.onEffort,
       ...optional2("onMenu", on.onEffortMenu),
       role: "omp.composer.effort",
-      title: `Reasoning effort: ${text5}${r.effort ? clamp2 : " (the default)"} \xB7 click to cycle  \u21E7\u21E5 \xB7 right-click to choose or save as default`,
+      title: `Reasoning effort: ${text6}${r.effort ? clamp2 : " (the default)"} \xB7 click to cycle  \u21E7\u21E5 \xB7 right-click to choose or save as default`,
       children: [
         /* @__PURE__ */ jsx("effort", { level: glyph }, "glyph"),
-        /* @__PURE__ */ jsx("text", { spans: [{ ...optional2("s", r.effort ? void 0 : "muted"), t: text5 }], wrap: "none" }, "level")
+        /* @__PURE__ */ jsx("text", { spans: [{ ...optional2("s", r.effort ? void 0 : "muted"), t: text6 }], wrap: "none" }, "level")
       ]
     },
     "effort"
@@ -20726,11 +20899,11 @@ function localImage(target2) {
   const path = /^file:\/\//i.test(target2) ? decodeURIComponent(target2.replace(/^file:\/\//i, "")) : target2;
   return VIEWABLE.test(path) ? path : void 0;
 }
-function replyParts(text5, streaming = false) {
-  if (!text5.includes("MEDIA:") && !text5.includes("![")) {
-    return [{ kind: "md", text: text5 }];
+function replyParts(text6, streaming = false) {
+  if (!text6.includes("MEDIA:") && !text6.includes("![")) {
+    return [{ kind: "md", text: text6 }];
   }
-  const lines = text5.split("\n");
+  const lines = text6.split("\n");
   const parts2 = [];
   let run6 = [];
   let fence;
@@ -20764,12 +20937,12 @@ function replyParts(text5, streaming = false) {
     }
   });
   flush();
-  return parts2.length ? parts2 : [{ kind: "md", text: text5 }];
+  return parts2.length ? parts2 : [{ kind: "md", text: text6 }];
 }
 
 // src/transcript/messages.ts
-function userEntry(id, { text: text5, at = Date.now(), steered = false, attachments = [] }) {
-  return { at, id, kind: "user", text: text5, ...steered ? { steered } : {}, ...attachments.length ? { attachments } : {} };
+function userEntry(id, { text: text6, at = Date.now(), steered = false, attachments = [] }) {
+  return { at, id, kind: "user", text: text6, ...steered ? { steered } : {}, ...attachments.length ? { attachments } : {} };
 }
 function failure(error, code2) {
   const http = /^HTTP (\d{3}):\s*/.exec(error);
@@ -20784,7 +20957,7 @@ function displayNotice(kind, metadata) {
   if (kind !== "async_delegation_complete" && kind !== "process_complete") {
     return void 0;
   }
-  const meta2 = record(metadata);
+  const meta2 = record2(metadata);
   const shown2 = typeof meta2?.["display_text"] === "string" ? meta2["display_text"].trim() : "";
   if (shown2) {
     return shown2;
@@ -20797,43 +20970,43 @@ function displayNotice(kind, metadata) {
 }
 var INTERNAL_FOOTER = "[INTERNAL NOTIFICATION \u2014 generated by the Hermes gateway";
 function internalNotice(content) {
-  const text5 = content.trim();
-  if (text5.startsWith("[ASYNC DELEGATION BATCH COMPLETE")) {
+  const text6 = content.trim();
+  if (text6.startsWith("[ASYNC DELEGATION BATCH COMPLETE")) {
     return "Subagents finished";
   }
-  if (text5.startsWith("[ASYNC DELEGATION COMPLETE")) {
+  if (text6.startsWith("[ASYNC DELEGATION COMPLETE")) {
     return "Subagent finished";
   }
-  if (text5.startsWith("[ASYNC DELEGATION TASK FAILED")) {
+  if (text6.startsWith("[ASYNC DELEGATION TASK FAILED")) {
     return "Subagent failed";
   }
-  if (text5.startsWith("[Continuing toward your standing goal]")) {
+  if (text6.startsWith("[Continuing toward your standing goal]")) {
     return "Continuing toward the goal";
   }
-  const wakeup = /^\[\/loop wakeup #(\d+)(?:, ([^\]]+))?\]/.exec(text5);
+  const wakeup = /^\[\/loop wakeup #(\d+)(?:, ([^\]]+))?\]/.exec(text6);
   if (wakeup) {
     return `Loop run #${wakeup[1]}${wakeup[2] ? ` \xB7 ${wakeup[2]}` : ""}`;
   }
-  const watch2 = /^\[IMPORTANT: Background process \S+ matched watch pattern "([^"]*)"/.exec(text5);
+  const watch2 = /^\[IMPORTANT: Background process \S+ matched watch pattern "([^"]*)"/.exec(text6);
   if (watch2) {
     return `Watcher matched "${watch2[1]}"`;
   }
-  if (/^\[Background process \S+ heartbeat/.test(text5)) {
+  if (/^\[Background process \S+ heartbeat/.test(text6)) {
     return "Background command still running";
   }
-  const done = /^\[IMPORTANT: Background process \S+ ([^(]+?) \(exit code ([^)\s]+)/.exec(text5);
+  const done = /^\[IMPORTANT: Background process \S+ ([^(]+?) \(exit code ([^)\s]+)/.exec(text6);
   if (done) {
     const how = done[1] === "completed normally" ? "finished" : done[1];
     return `Background command ${how}${done[2] === "0" ? "" : ` (exit ${done[2]})`}`;
   }
-  return text5.includes(INTERNAL_FOOTER) ? "Hermes notice" : void 0;
+  return text6.includes(INTERNAL_FOOTER) ? "Hermes notice" : void 0;
 }
 function continuation(prev) {
   if (prev?.kind !== "turn") {
     return void 0;
   }
   const background2 = prev.blocks.some(
-    (b) => b.kind === "tool" && b.call.name === "delegate_task" && record(b.call.result)?.["mode"] === "background"
+    (b) => b.kind === "tool" && b.call.name === "delegate_task" && record2(b.call.result)?.["mode"] === "background"
   );
   if (background2) {
     return "Subagents finished";
@@ -20844,11 +21017,11 @@ function continuation(prev) {
 var STEER_OPEN = "[OUT-OF-BAND USER MESSAGE";
 var STEER_CLOSE = "[/OUT-OF-BAND USER MESSAGE]";
 function steerText(content) {
-  const text5 = content.trim();
-  if (!text5.startsWith(STEER_OPEN)) {
+  const text6 = content.trim();
+  if (!text6.startsWith(STEER_OPEN)) {
     return void 0;
   }
-  const body = text5.slice(text5.indexOf("]") + 1);
+  const body = text6.slice(text6.indexOf("]") + 1);
   const end = body.lastIndexOf(STEER_CLOSE);
   return (end >= 0 ? body.slice(0, end) : body).trim();
 }
@@ -20864,20 +21037,20 @@ var BOX = /[─-╿]/;
 var RULE2 = /^\s*\+[-=+]{3,}\+?\s*$/;
 var COLUMNS = /^\s{0,4}[^\s•\-*>#`|][^\n]*?\S {2,}\S/;
 var ESC3 = String.fromCharCode(27);
-function isPreformatted(text5) {
-  if (text5.includes(`${ESC3}[`) || BOX.test(text5)) {
+function isPreformatted(text6) {
+  if (text6.includes(`${ESC3}[`) || BOX.test(text6)) {
     return true;
   }
-  const lines = text5.split("\n").filter((l) => l.trim());
+  const lines = text6.split("\n").filter((l) => l.trim());
   if (lines.some((l) => RULE2.test(l))) {
     return true;
   }
   const aligned = lines.filter((l) => COLUMNS.test(l)).length;
   return aligned >= 3 && aligned >= lines.length / 2;
 }
-function hardBreaks(text5) {
+function hardBreaks(text6) {
   let fenced = false;
-  return text5.split("\n").map((line, i, all) => {
+  return text6.split("\n").map((line, i, all) => {
     if (/^\s*(```|~~~)/.test(line)) {
       fenced = !fenced;
       return line;
@@ -20935,11 +21108,11 @@ function build(title, inline, body) {
   const lines = body.filter((l) => l.trim());
   if (lower.includes("rate limit")) {
     const items = limits(inline || lines.join(" | "));
-    return items.length ? { items, kind: "limits", title: name } : text4(name, inline, lines);
+    return items.length ? { items, kind: "limits", title: name } : text5(name, inline, lines);
   }
   if (lower.includes("context breakdown")) {
     const items = lines.flatMap((l) => crumb(l) ?? []);
-    return items.length ? { items, kind: "breakdown", note: /_\((.*?)\)_/.exec(inline)?.[1], title: name } : text4(name, inline, lines);
+    return items.length ? { items, kind: "breakdown", note: /_\((.*?)\)_/.exec(inline)?.[1], title: name } : text5(name, inline, lines);
   }
   if (lower.includes("session") || lower.includes("token usage")) {
     const rows = [];
@@ -20955,7 +21128,7 @@ function build(title, inline, body) {
         rows.push(p);
       }
     }
-    return rows.length || context ? { context, kind: "session", rows, title: name } : text4(name, inline, lines);
+    return rows.length || context ? { context, kind: "session", rows, title: name } : text5(name, inline, lines);
   }
   if (lower.includes("credit")) {
     const rows = [];
@@ -20968,11 +21141,11 @@ function build(title, inline, body) {
         notes.push(l.trim());
       }
     }
-    return rows.length ? { kind: "credits", notes, rows, title: name } : text4(name, inline, lines);
+    return rows.length ? { kind: "credits", notes, rows, title: name } : text5(name, inline, lines);
   }
-  return text4(name, inline, lines);
+  return text5(name, inline, lines);
 }
-function text4(title, inline, lines) {
+function text5(title, inline, lines) {
   return { kind: "text", text: [inline, ...lines].filter(Boolean).join("\n"), title };
 }
 function parseUsage(raw) {
@@ -21013,8 +21186,8 @@ function slashBody(e) {
   }
   return [textBody(e.text, "body")];
 }
-function textBody(text5, key2) {
-  return isPreformatted(text5) ? /* @__PURE__ */ jsx("ansi", { text: text5 }, key2) : /* @__PURE__ */ jsx("md", { children: hardBreaks(text5) }, key2);
+function textBody(text6, key2) {
+  return isPreformatted(text6) ? /* @__PURE__ */ jsx("ansi", { text: text6 }, key2) : /* @__PURE__ */ jsx("md", { children: hardBreaks(text6) }, key2);
 }
 function heading(icon, title, note) {
   return /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", children: [
@@ -21280,8 +21453,8 @@ function workingNode2(turn, now) {
 }
 var LIVE_MAX = 120;
 function liveText(label) {
-  const text5 = label.length > LIVE_MAX ? `${label.slice(0, LIVE_MAX - 1)}\u2026` : label;
-  return shimmerText({ key: "label", role: "hermes.work.live", text: text5 });
+  const text6 = label.length > LIVE_MAX ? `${label.slice(0, LIVE_MAX - 1)}\u2026` : label;
+  return shimmerText({ key: "label", role: "hermes.work.live", text: text6 });
 }
 function latestFailed(items) {
   const last = items.findLast((i) => i.kind === "tool");
@@ -21530,10 +21703,10 @@ function pieceNodes(turn, blocks, parent, cx) {
     }
   });
 }
-function textNodes(id, text5, streaming) {
-  const parts2 = replyParts(text5, streaming);
+function textNodes(id, text6, streaming) {
+  const parts2 = replyParts(text6, streaming);
   if (parts2.length === 1 && parts2[0]?.kind === "md") {
-    return /* @__PURE__ */ jsx("md", { ...optional2("stream", streaming || void 0), children: text5 }, id);
+    return /* @__PURE__ */ jsx("md", { ...optional2("stream", streaming || void 0), children: text6 }, id);
   }
   return /* @__PURE__ */ jsx("col", { gap: "sm", role: "hermes.reply.parts", children: parts2.map(
     (p, i) => p.kind === "md" ? /* @__PURE__ */ jsx("md", { ...optional2("stream", streaming && i === parts2.length - 1 || void 0), children: p.text }, `md${i}`) : node("media", { key: `media${i}`, path: p.path.replace(/^~(?=\/)/, homedir8()) })
@@ -21552,13 +21725,13 @@ function steerNode(b, state) {
     ] }, "how")
   ] }, b.id);
 }
-function copyButton(text5, id, role, title, cx) {
+function copyButton(text6, id, role, title, cx) {
   const copied = cx.copied === id;
   return /* @__PURE__ */ jsx(
     "icon",
     {
       name: copied ? "check" : "copy",
-      onClick: () => cx.copy(text5, id),
+      onClick: () => cx.copy(text6, id),
       role,
       title: copied ? "Copied" : title
     },
@@ -21788,12 +21961,12 @@ var Agents = class {
     }
   }
   /** Queues steering text into a running agent; the owner answers `queued` or `rejected`. */
-  async steer(a, text5) {
+  async steer(a, text6) {
     const sid = this.#host.sid;
     if (!sid) {
       return false;
     }
-    const r = await rpc(this.#host.gw, "subagent.steer", { session_id: sid, subagent_id: a.id, text: text5 });
+    const r = await rpc(this.#host.gw, "subagent.steer", { session_id: sid, subagent_id: a.id, text: text6 });
     return r?.status === "queued";
   }
   /** Interrupts a running agent; its partial result still returns to the parent. */
@@ -21816,8 +21989,8 @@ var Agents = class {
    * Applies an async-delegation completion (the model text of its `message.start`,
    * tools/process_registry_notifications.py) to the rows whose end the owner did not report.
    */
-  settle(text5) {
-    const done = completionOutcomes(text5);
+  settle(text6) {
+    const done = completionOutcomes(text6);
     if (!done) {
       return;
     }
@@ -21870,7 +22043,7 @@ var Agents = class {
     const transcript = this.#host.transcript;
     const shown2 = [...this.#owners()].find(([a]) => a.id === event.subagent_id || event.parent_id && a.id === event.parent_id);
     const id = event.delegation_id;
-    return shown2?.[1] ?? (id ? transcript.delegations().findLast((c) => record(c.result)?.["delegation_id"] === id) : void 0) ?? transcript.lastCall((c) => c.name === "delegate_task");
+    return shown2?.[1] ?? (id ? transcript.delegations().findLast((c) => record2(c.result)?.["delegation_id"] === id) : void 0) ?? transcript.lastCall((c) => c.name === "delegate_task");
   }
   /** One round: the list when a probe or a row needs it, then the followed agent's transcript. */
   async #round(ticket) {
@@ -22400,7 +22573,7 @@ var ConnectWatcher = class {
   }
   /** `connection.request`: the gateway opened an operation for session `session`; its card goes on the call that opened it. */
   request(payload, session2) {
-    const drawn = this.#byOp(record(payload)?.["op_id"]);
+    const drawn = this.#byOp(record2(payload)?.["op_id"]);
     if (drawn) {
       this.#apply(drawn, payload);
       return;
@@ -22421,7 +22594,7 @@ var ConnectWatcher = class {
   }
   /** `connection.update`: a row moved or the operation settled. */
   update(payload, session2) {
-    const op = record(payload)?.["op_id"];
+    const op = record2(payload)?.["op_id"];
     const call = this.#byOp(op);
     if (call) {
       this.#apply(call, payload);
@@ -22557,7 +22730,7 @@ var ConnectWatcher = class {
   }
   /** A request the pane cannot draw: it says so, and answers Continue so the tool does not wait out its deadline. */
   #undrawable(payload, sid) {
-    const op = record(payload)?.["op_id"];
+    const op = record2(payload)?.["op_id"];
     const answered2 = typeof op === "string" && op && sid;
     this.#host.transcript.notice(
       answered2 ? "Hermes asked for a connection card this pane cannot draw, so the pane answered Continue: the tool carries on without it. Connect apps in Hermes Desktop or the Nous Portal." : "Hermes asked for a connection card this pane cannot read. Its tool waits until the card times out; press Esc twice to stop it.",
@@ -22587,7 +22760,7 @@ var ConnectWatcher = class {
     const card = call.connect;
     const final = this.#finals.has(call) ? void 0 : resultCard(call);
     this.#finals.add(call);
-    if (card && final && record(call.result)?.["op_id"] === op.id) {
+    if (card && final && record2(call.result)?.["op_id"] === op.id) {
       const before = new Map(card.targets.map((t) => [t.name, t]));
       const targets = final.targets.map((t) => ({ ...t, url: t.url ?? before.get(t.name)?.url }));
       this.#host.transcript.mutateCall(call, (c) => c.connect = { ...card, settled: final.settled, targets });
@@ -22796,8 +22969,8 @@ async function withClipboardImage(use, hermes, extract = extractClipboardImage) 
     await rm(dir2, { force: true, recursive: true });
   }
 }
-function imagePathOf(text5, cwd) {
-  let raw = text5.trim();
+function imagePathOf(text6, cwd) {
+  let raw = text6.trim();
   if (!raw || raw.includes("\n")) {
     return void 0;
   }
@@ -22850,12 +23023,12 @@ var Attachments = class {
     return Boolean(this.#startup);
   }
   /** A paste that is an image (no text: the clipboard's; one image path: that file); false for text. */
-  paste(text5) {
-    if (!text5.trim()) {
+  paste(text6) {
+    if (!text6.trim()) {
       void this.fromClipboard(true);
       return true;
     }
-    const path = imagePathOf(text5, this.#host.cwd());
+    const path = imagePathOf(text6, this.#host.cwd());
     if (path) {
       void this.#attach(path, basename4(path));
       return true;
@@ -23171,7 +23344,7 @@ var Completion = class {
   }
 };
 function slashItems(items, typed) {
-  const word = (text5) => text5.replace(/^\//, "").split(/\s/)[0]?.toLowerCase() ?? "";
+  const word = (text6) => text6.replace(/^\//, "").split(/\s/)[0]?.toLowerCase() ?? "";
   if (HIDDEN_COMMANDS.has(word(typed))) {
     return [];
   }
@@ -23955,7 +24128,7 @@ var SessionLifecycle = class {
   leaveAll(endReason) {
     return this.#views.leaveAll(endReason);
   }
-  /** The first session: HERMES_TERN_RESUME's, else a new one; then the launcher's startup image, if any. */
+  /** The first session: the launch's `resume`, else a new one; then the launcher's startup image, if any. */
   async #bootstrap() {
     const host = this.#host;
     const resume = host.launch.resume;
@@ -24170,8 +24343,8 @@ function runStatus(s, ranHere) {
   }
   return { state: s.lastTurn.status === "done" ? "done" : "idle" };
 }
-function encodeMsg(text5) {
-  let line = text5.replace(/[\x00-\x1f\x7f]+/g, " ").replace(/\s+/g, " ").trim();
+function encodeMsg(text6) {
+  let line = text6.replace(/[\x00-\x1f\x7f]+/g, " ").replace(/\s+/g, " ").trim();
   while (Buffer.byteLength(line) > MSG_MAX_BYTES) {
     line = line.slice(0, Math.floor(line.length * 0.9));
   }
@@ -24367,41 +24540,41 @@ var CONTEXT_REF = new RegExp(`^(?:\\S+ )?@(file|folder|url|image):${VALUE}`, "gm
 var IMAGE_FILE = /\.(png|jpe?g|gif|webp)$/i;
 var unquote2 = (v) => /^([`"']).*\1$/.test(v) ? v.slice(1, -1) : v;
 function splitPrompt(raw) {
-  let text5 = raw;
+  let text6 = raw;
   let hinted = [];
-  const hints = HINTS.exec(text5);
+  const hints = HINTS.exec(text6);
   if (hints) {
     const paths = [...(hints[1] ?? "").matchAll(/^\[Image attached(?: at)?: (?<path>.+)\]$/gm)].flatMap((m) => m.groups?.["path"] ?? []);
     const placeholders = (hints[2] ?? "").split("[screenshot]").length - 1;
     if (placeholders === 0 || placeholders === paths.length) {
-      text5 = text5.slice(0, hints.index);
+      text6 = text6.slice(0, hints.index);
       hinted = paths;
     }
   }
   const refs = [];
-  text5 = text5.replace(IMAGE_LINE2, (_line, value) => {
+  text6 = text6.replace(IMAGE_LINE2, (_line, value) => {
     refs.push(unquote2(value));
     return "";
   });
   if (refs.length) {
-    text5 = text5.replace(SCREENSHOT_LINE, "");
+    text6 = text6.replace(SCREENSHOT_LINE, "");
   }
   const files = [];
-  const marker = ATTACHED_CONTEXT.exec(text5);
+  const marker = ATTACHED_CONTEXT.exec(text6);
   if (marker) {
-    const context = text5.slice(marker.index + marker[0].length);
-    text5 = text5.slice(0, marker.index);
+    const context = text6.slice(marker.index + marker[0].length);
+    text6 = text6.slice(0, marker.index);
     for (const m of context.matchAll(CONTEXT_REF)) {
       const ref = `@${m[1]}:${m[2]}`;
       const end = context.indexOf("\n", m.index);
       const line = context.slice(m.index, end < 0 ? void 0 : end);
       const disk = /available on disk at `([^`]+)`/.exec(line)?.[1];
-      if (!text5.includes(ref) && !files.some((f) => f.ref === ref)) {
+      if (!text6.includes(ref) && !files.some((f) => f.ref === ref)) {
         files.push({ ref, ...disk ? { path: disk } : {} });
       }
     }
   }
-  return { files, images: [...refs, ...hinted], text: text5.replace(CONTEXT_WARNINGS, "").replace(/\n{3,}/g, "\n\n").trim() };
+  return { files, images: [...refs, ...hinted], text: text6.replace(CONTEXT_WARNINGS, "").replace(/\n{3,}/g, "\n\n").trim() };
 }
 function promptAttachments(parts2, exists = existsSync4) {
   const local = (p) => p.startsWith("/") && exists(p);
@@ -24424,8 +24597,8 @@ function history({ kept, messages, id }) {
   let todos2;
   for (const m of messages) {
     const at = typeof m.timestamp === "number" ? m.timestamp * 1e3 : 0;
-    const text5 = typeof m.text === "string" ? m.text : typeof m.content === "string" ? m.content : "";
-    const steered = m.role === "user" ? m.display_kind === "steer" ? text5.trim() : steerText(text5) : void 0;
+    const text6 = typeof m.text === "string" ? m.text : typeof m.content === "string" ? m.content : "";
+    const steered = m.role === "user" ? m.display_kind === "steer" ? text6.trim() : steerText(text6) : void 0;
     if (steered !== void 0 && turn) {
       turn.blocks.push({ at, id: id("s"), kind: "steer", text: steered });
       continue;
@@ -24433,19 +24606,19 @@ function history({ kept, messages, id }) {
     if (m.role === "user") {
       turn = void 0;
       promptAt = at;
-      const notice = displayNotice(m.display_kind, m.display_metadata) ?? internalNotice(text5);
+      const notice = displayNotice(m.display_kind, m.display_metadata) ?? internalNotice(text6);
       if (notice) {
         pendingContinued = notice;
       } else {
         pendingContinued = void 0;
-        entries.push(storedUser(id("u"), steered ?? text5, at));
+        entries.push(storedUser(id("u"), steered ?? text6, at));
       }
       continue;
     }
     if (m.role === "system") {
       turn = void 0;
-      if (text5.trim()) {
-        entries.push({ id: id("n"), kind: "notice", text: text5, tone: "info" });
+      if (text6.trim()) {
+        entries.push({ id: id("n"), kind: "notice", text: text6, tone: "info" });
       }
       continue;
     }
@@ -24461,19 +24634,19 @@ function history({ kept, messages, id }) {
       turn.end = { ...end, endedAt: Math.max(end.endedAt ?? at, at) };
     }
     if (m.role === "assistant") {
-      const meta2 = record(m.display_metadata);
+      const meta2 = record2(m.display_metadata);
       const thought = storedThought(m);
       if (thought.trim()) {
         turn.blocks.push({ endedAt: at, id: id("k"), kind: "thinking", startedAt: at, text: thought });
       }
       if (m.display_kind === "failed_turn") {
-        const surface = record(meta2?.["error_surface"]);
+        const surface = record2(meta2?.["error_surface"]);
         const error = str5(meta2?.["error"]) ?? str5(surface?.["message"]);
         const card = error ? failure(error, surface?.["code"]) : turn.end.status === "error" ? turn.end : {};
-        endTurn(turn, { ...card, hint: text5.trim() || void 0, status: "error" });
+        endTurn(turn, { ...card, hint: text6.trim() || void 0, status: "error" });
         continue;
       }
-      const reply2 = typeof m["display_content"] === "string" ? m["display_content"] : text5;
+      const reply2 = typeof m["display_content"] === "string" ? m["display_content"] : text6;
       const notes = Array.isArray(m["display_commentary"]) ? m["display_commentary"].filter((n) => typeof n === "string" && Boolean(n.trim())) : [];
       const flat2 = (s) => s.replace(/\s+/g, " ").trim();
       if (!reply2.trim() || flat2(notes.join("\n\n")) !== flat2(reply2)) {
@@ -24488,7 +24661,7 @@ function history({ kept, messages, id }) {
     } else if (m.role === "tool") {
       const callId = toolCallId(m.tool_call_id ?? id("c"));
       const result = typeof m.content === "string" && m.content ? m.content : void 0;
-      const diff2 = str5(record(record(m.display_metadata)?.["tool_result_metadata"])?.["inline_diff"]);
+      const diff2 = str5(record2(record2(m.display_metadata)?.["tool_result_metadata"])?.["inline_diff"]);
       const existing = calls.get(callId);
       if (existing) {
         existing.result = result ?? existing.result;
@@ -24512,7 +24685,7 @@ function history({ kept, messages, id }) {
         startedAt: at,
         via: u.via
       };
-      call.outcome = { duration: 0, kind: settleBridge(call) ?? Boolean(record(call.result)?.["error"]) ? "error" : "done" };
+      call.outcome = { duration: 0, kind: settleBridge(call) ?? Boolean(record2(call.result)?.["error"]) ? "error" : "done" };
       if (isTodoName(call.name)) {
         call.todosBefore = todos2;
       }
@@ -24581,25 +24754,25 @@ function storedThought(m) {
 function detailsText(details) {
   let blocks = details;
   if (typeof blocks === "string") {
-    const text5 = blocks.trim();
-    if (!text5.startsWith("[") && !text5.startsWith("{")) {
-      return text5;
+    const text6 = blocks.trim();
+    if (!text6.startsWith("[") && !text6.startsWith("{")) {
+      return text6;
     }
-    blocks = parseJson(text5);
+    blocks = parseJson(text6);
     if (blocks === void 0) {
-      return text5;
+      return text6;
     }
   }
   const out = [];
   for (const block of Array.isArray(blocks) ? blocks : [blocks]) {
-    const r = typeof block === "string" ? { text: block } : record(block);
+    const r = typeof block === "string" ? { text: block } : record2(block);
     if (!r || r["type"] === "reasoning.encrypted") {
       continue;
     }
-    const summary4 = Array.isArray(r["summary"]) ? r["summary"].map((s) => typeof s === "string" ? s : str5(record(s)?.["text"]) ?? "").join("\n\n") : r["summary"];
-    const text5 = [summary4, r["thinking"], r["content"], r["text"]].map(str5).find(Boolean)?.trim();
-    if (text5 && !out.includes(text5)) {
-      out.push(text5);
+    const summary4 = Array.isArray(r["summary"]) ? r["summary"].map((s) => typeof s === "string" ? s : str5(record2(s)?.["text"]) ?? "").join("\n\n") : r["summary"];
+    const text6 = [summary4, r["thinking"], r["content"], r["text"]].map(str5).find(Boolean)?.trim();
+    if (text6 && !out.includes(text6)) {
+      out.push(text6);
     }
   }
   return out.join("\n\n");
@@ -24690,15 +24863,15 @@ var Transcript = class {
    * since the agent reads it before its next step. With no turn running it is a plain prompt.
    * A `redirect` (session.redirect) is drawn the same way.
    */
-  steer(text5, at = Date.now(), { redirect = false } = {}) {
+  steer(text6, at = Date.now(), { redirect = false } = {}) {
     const turn = this.live;
     if (!turn) {
-      return this.user({ at, text: text5 });
+      return this.user({ at, text: text6 });
     }
     if (redirect) {
       this.#reply = void 0;
     }
-    turn.blocks.push({ at, id: this.id("s"), kind: "steer", text: text5 });
+    turn.blocks.push({ at, id: this.id("s"), kind: "steer", text: text6 });
     turn.rev++;
   }
   /** A prompt bubble at the end. */
@@ -24709,9 +24882,9 @@ var Transcript = class {
    * A queued prompt the shared gateway just started. Its message.start came first, so the bubble
    * goes before the turn it opened while that turn is still empty; else at the end.
    */
-  started(text5, at = Date.now(), attachments = []) {
+  started(text6, at = Date.now(), attachments = []) {
     const live = this.live;
-    const notice = attachments.length ? void 0 : internalNotice(text5);
+    const notice = attachments.length ? void 0 : internalNotice(text6);
     if (notice) {
       if (live && !live.blocks.length) {
         live.continued = notice;
@@ -24722,30 +24895,30 @@ var Transcript = class {
       return;
     }
     if (live && !live.blocks.length && this.#entries.at(-1) === live) {
-      this.#entries.splice(-1, 0, userEntry(this.id("u"), { at, attachments, text: text5 }));
+      this.#entries.splice(-1, 0, userEntry(this.id("u"), { at, attachments, text: text6 }));
       live.continued = void 0;
       live.rev++;
       return;
     }
-    this.user({ at, attachments, text: text5 });
+    this.user({ at, attachments, text: text6 });
   }
   /**
    * Background work that ended now (a subagent, a background process): a line in the live turn,
    * where it happened, else between the turns.
    */
-  event(text5, tone = "info", at = Date.now()) {
+  event(text6, tone = "info", at = Date.now()) {
     const turn = this.live;
     if (!turn) {
-      return this.notice(text5, tone);
+      return this.notice(text6, tone);
     }
-    turn.blocks.push({ at, id: this.id("e"), kind: "event", text: text5, tone });
+    turn.blocks.push({ at, id: this.id("e"), kind: "event", text: text6, tone });
     turn.rev++;
   }
-  notice(text5, tone = "info") {
-    this.push({ id: this.id("n"), kind: "notice", text: text5, tone });
+  notice(text6, tone = "info") {
+    this.push({ id: this.id("n"), kind: "notice", text: text6, tone });
   }
-  panel(title, text5) {
-    this.push({ id: this.id("p"), kind: "panel", text: text5, title });
+  panel(title, text6) {
+    this.push({ id: this.id("p"), kind: "panel", text: text6, title });
   }
   /** message.start: opens the live turn, unless one is already streaming. */
   messageStart(at = Date.now()) {
@@ -24777,16 +24950,16 @@ var Transcript = class {
     this.#continued = void 0;
     return turn;
   }
-  reasoning(text5, at = Date.now()) {
-    if (!text5) {
+  reasoning(text6, at = Date.now()) {
+    if (!text6) {
       return;
     }
     const turn = this.#open(at);
     const last = turn.blocks.at(-1);
     if (last?.kind === "thinking" && last.endedAt === void 0) {
-      last.text += text5;
+      last.text += text6;
     } else {
-      turn.blocks.push({ id: this.id("k"), kind: "thinking", startedAt: at, text: text5 });
+      turn.blocks.push({ id: this.id("k"), kind: "thinking", startedAt: at, text: text6 });
     }
     turn.rev++;
   }
@@ -24796,26 +24969,26 @@ var Transcript = class {
    * turn already shows is not a thought either. One that comes after its turn ended goes in that
    * turn.
    */
-  reasoningBlock(text5, at = Date.now()) {
+  reasoningBlock(text6, at = Date.now()) {
     const shown2 = this.#live ?? this.#ended;
-    const incoming = text5.trim();
+    const incoming = text6.trim();
     if (!incoming || shown2?.blocks.some((b) => b.kind === "thinking" && !b.label || b.kind === "text" && b.text.includes(incoming))) {
       return;
     }
     const turn = shown2 ?? this.#open(at);
-    turn.blocks.push({ endedAt: at, id: this.id("k"), kind: "thinking", startedAt: at, text: text5 });
+    turn.blocks.push({ endedAt: at, id: this.id("k"), kind: "thinking", startedAt: at, text: text6 });
     turn.rev++;
   }
   /** A Mixture-of-Agents reference model's answer: a sealed thought block of its own, under `label`. */
-  reference(label, text5, at = Date.now()) {
+  reference(label, text6, at = Date.now()) {
     const turn = this.#open(at);
     endThinking(turn, at);
-    turn.blocks.push({ endedAt: at, id: this.id("k"), kind: "thinking", label, startedAt: at, text: text5.trim() });
+    turn.blocks.push({ endedAt: at, id: this.id("k"), kind: "thinking", label, startedAt: at, text: text6.trim() });
     turn.rev++;
   }
   /** A message.delta: `stamp` is where Hermes says the chunk goes in its reply. */
-  text(text5, at = Date.now(), stamp = {}) {
-    if (!text5) {
+  text(text6, at = Date.now(), stamp = {}) {
+    if (!text6) {
       return;
     }
     const turn = this.#open(at);
@@ -24824,9 +24997,9 @@ var Transcript = class {
     const last = turn.blocks.at(-1);
     let block = last?.kind === "text" ? last : this.#steeredReply(turn, segment, stamp.offset);
     if (block) {
-      block.text += text5;
+      block.text += text6;
     } else {
-      block = { id: this.id("x"), kind: "text", text: text5 };
+      block = { id: this.id("x"), kind: "text", text: text6 };
       turn.blocks.push(block);
     }
     this.#reply = segment ? { block, segment } : void 0;
@@ -24848,11 +25021,11 @@ var Transcript = class {
     return i >= 0 && turn.blocks.slice(i + 1).every((b) => b.kind === "steer") ? reply2.block : void 0;
   }
   /** Interim commentary: seals the streamed text so the next delta starts a new block. */
-  interim(text5, { alreadyStreamed }, at = Date.now()) {
+  interim(text6, { alreadyStreamed }, at = Date.now()) {
     const turn = this.#open(at);
     endThinking(turn, at);
-    if (!alreadyStreamed && text5.trim()) {
-      turn.blocks.push({ id: this.id("x"), kind: "text", text: text5 });
+    if (!alreadyStreamed && text6.trim()) {
+      turn.blocks.push({ id: this.id("x"), kind: "text", text: text6 });
     }
     turn.blocks.push({ id: this.id("x"), kind: "text", text: "" });
     turn.rev++;
@@ -24900,7 +25073,7 @@ var Transcript = class {
       return;
     }
     const { call, turn } = found;
-    const output = record(p.result)?.["output"];
+    const output = record2(p.result)?.["output"];
     const interrupted = p.name === "terminal" && typeof output === "string" && /\[Command interrupted\]\s*$/.test(output);
     const duration3 = typeof p.duration_s === "number" ? Math.round(p.duration_s * 1e3) : at - call.startedAt;
     const summary4 = p.summary ?? void 0;
@@ -25272,11 +25445,11 @@ var PromptQueue = class {
       host.transcript.notice("A queued prompt with images cannot steer the turn. It stays queued.", "warning");
       return host.changed();
     }
-    const { text: text5 } = prompt;
+    const { text: text6 } = prompt;
     const ahead = this.#held.slice(0, index);
     this.#held.splice(index, 1);
     host.changed();
-    void steerTurn(host.gw, sid, text5).then((r) => {
+    void steerTurn(host.gw, sid, text6).then((r) => {
       if (!ticket.isCurrent()) {
         if (!r.ok) {
           host.restore(prompt);
@@ -25285,7 +25458,7 @@ var PromptQueue = class {
         return host.changed();
       }
       if (r.ok) {
-        host.transcript.steer(text5);
+        host.transcript.steer(text6);
       } else {
         const at = Math.max(0, ...ahead.map((h) => this.#held.indexOf(h) + 1));
         this.#held.splice(at, 0, item3);
@@ -25556,7 +25729,7 @@ var PromptRouter = class {
       return;
     }
     const { images } = prompt;
-    const text5 = prompt.text || (images.length ? IMAGE_ONLY_PROMPT : "");
+    const text6 = prompt.text || (images.length ? IMAGE_ONLY_PROMPT : "");
     const attachments = images.map(({ mime, path }) => ({ mime, path }));
     const submission = newInputId();
     host.transcript.user({ attachments: userImages(images), text: display?.trim() || prompt.text });
@@ -25566,7 +25739,7 @@ var PromptRouter = class {
     rpc(host.gw, "prompt.submit", {
       session_id: sid,
       submission_id: submission,
-      text: text5,
+      text: text6,
       ...queued ? { queued } : {},
       ...attachments.length ? { attachments } : {}
     }).catch((error) => {
@@ -25678,7 +25851,7 @@ function chatStores(chat, { act, gw: gw2, launch: launch3, settings: settings2, 
       cwd: () => session2.info?.cwd || launch3.cwd,
       gw: gw2,
       launchCwd: launch3.cwd,
-      note: (text5, tone) => transcript.notice(text5, tone),
+      note: (text6, tone) => transcript.notice(text6, tone),
       sid: () => session2.ref.live
     },
     { clipboard: (use) => withClipboardImage(use, launch3.hermes), startup: launch3.image }
@@ -25737,7 +25910,7 @@ function chatStores(chat, { act, gw: gw2, launch: launch3, settings: settings2, 
       drain: () => queue2.drain(),
       gw: gw2,
       launch: launch3,
-      rename: (sid, text5) => title.rename(sid, text5),
+      rename: (sid, text6) => title.rename(sid, text6),
       shownElsewhere: (id) => viewer.shown(id),
       request: (req) => act().onRequest(req),
       sheets: sheets2,
@@ -25758,7 +25931,7 @@ function chatStores(chat, { act, gw: gw2, launch: launch3, settings: settings2, 
       readBusyMode: () => void act().readBusyMode(),
       reportCwd: () => act().reportCwd(),
       restoreCompactions: () => void act().restoreCompactions(),
-      showThoughts: (sid) => showThoughts({ gw: gw2, notice: (text5, tone) => chat.notice(text5, tone), settings: settings2 }, sid)
+      showThoughts: (sid) => showThoughts({ gw: gw2, notice: (text6, tone) => chat.notice(text6, tone), settings: settings2 }, sid)
     })
   );
   const theme = new Theme({ palette: (palette) => surface().palette(palette), settings: settings2 }, saved.theme ?? "tern");
@@ -25845,7 +26018,7 @@ var App = class {
       surface: this.#surface
     };
     s.theme.apply();
-    onCardFault(noticeSink((text5) => this.notice(text5, "warning")));
+    onCardFault(noticeSink((text6) => this.notice(text6, "warning")));
     if (this.#tern.caps.features.includes("blobs")) {
       s.welcome.logo = this.#tern.blob(logo_default, "image/png");
     }
@@ -25924,8 +26097,8 @@ var App = class {
     this.#renders.request();
   }
   /** A notice in the transcript, rendered now. */
-  notice(text5, tone) {
-    this.transcript.notice(text5, tone);
+  notice(text6, tone) {
+    this.transcript.notice(text6, tone);
     this.changed();
   }
   /** An error nothing caught (a rejected promise no caller awaited): shown, so the pane lives on. */
@@ -26090,7 +26263,7 @@ function randomUuid() {
 }
 
 // node_modules/@hermes/shared/src/gateway-canonical.ts
-function canonicalRequest(method, original, contract, text5 = gatewayText, identity = {}) {
+function canonicalRequest(method, original, contract, text6 = gatewayText, identity = {}) {
   const params = { ...original };
   if (method === "session.create") {
     const source2 = identity.source ?? "tui";
@@ -26099,7 +26272,7 @@ function canonicalRequest(method, original, contract, text5 = gatewayText, ident
     params.source = source2;
     params.request_id ??= randomUuid();
     if (!contract?.sources.includes(source2)) {
-      throw new Error(neutral ? text5("canonical.launch.noSourcePolicy", source2) : text5("canonical.launch.noTuiPolicy"));
+      throw new Error(neutral ? text6("canonical.launch.noSourcePolicy", source2) : text6("canonical.launch.noTuiPolicy"));
     }
     if (!contract.parameters.includes("client_env")) {
       delete params.client_env;
@@ -26113,7 +26286,7 @@ function canonicalRequest(method, original, contract, text5 = gatewayText, ident
     }
     const unsupported = Object.keys(params).filter((key2) => !contract.parameters.includes(key2));
     if (unsupported.length) {
-      throw new Error(text5(
+      throw new Error(text6(
         neutral ? "canonical.launch.unsupportedSessionOptions" : "canonical.launch.unsupportedOptions",
         unsupported.join(", ")
       ));
@@ -26551,21 +26724,21 @@ var GatewayClient = class extends EventEmitter {
     this.publish(ev);
   }
   handleWebSocketFrame(raw) {
-    const text5 = wireFrameText(raw);
-    if (!text5) {
+    const text6 = wireFrameText(raw);
+    if (!text6) {
       return;
     }
-    const frame = this.channel.handleFrame(text5);
+    const frame = this.channel.handleFrame(text6);
     if (!frame) {
-      this.protocolError("malformed websocket frame", text5, "(empty frame)");
+      this.protocolError("malformed websocket frame", text6, "(empty frame)");
       return;
     }
     if (frame.method === "event") {
-      this.mirrorEventToSidecar(text5);
+      this.mirrorEventToSidecar(text6);
     }
   }
-  protocolError(what, text5, emptyLabel) {
-    const preview4 = text5.trim().slice(0, MAX_LOG_PREVIEW) || emptyLabel;
+  protocolError(what, text6, emptyLabel) {
+    const preview4 = text6.trim().slice(0, MAX_LOG_PREVIEW) || emptyLabel;
     this.pushLog(`[protocol] ${what}: ${preview4}`);
     this.publish({ type: "gateway.protocol_error", payload: { preview: preview4 } });
   }
@@ -26627,7 +26800,7 @@ var GatewayClient = class extends EventEmitter {
       const ws = new WebSocketCtor(attachUrl, protocols);
       let settled2 = false;
       this.ws = ws;
-      this.channel.attach({ send: (text5) => ws.send(text5) });
+      this.channel.attach({ send: (text6) => ws.send(text6) });
       const connectPromise = new Promise((resolve4, reject) => {
         ws.addEventListener(
           "open",
@@ -27032,8 +27205,8 @@ var WatchApp = class {
     });
     this.#gw.drain();
     onCardFault(
-      noticeSink((text5) => {
-        this.transcript.notice(text5, "warning");
+      noticeSink((text6) => {
+        this.transcript.notice(text6, "warning");
         this.changed();
       })
     );
@@ -27151,12 +27324,12 @@ var WatchApp = class {
     }
   }
   async #submit(raw) {
-    const text5 = raw.trim();
+    const text6 = raw.trim();
     const a = this.#agent;
-    if (!text5) {
+    if (!text6) {
       return;
     }
-    if (text5 === "/stop") {
+    if (text6 === "/stop") {
       return this.#stop();
     }
     if (!isRunning(a)) {
@@ -27167,7 +27340,7 @@ var WatchApp = class {
       const r = await rpc(this.#gw, "subagent.steer", {
         session_id: this.#spec.sid,
         subagent_id: a.id,
-        text: text5
+        text: text6
       });
       this.transcript.notice(
         r?.status === "queued" ? `Steering sent: it reaches ${a.name} after its current step.` : `${a.name} is not taking steering now.`,
