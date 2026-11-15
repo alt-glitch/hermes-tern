@@ -8,7 +8,14 @@ import type { ToolCall } from '../model.js'
 import { record } from '../wire/json.js'
 import type { Requester } from '../wire/rpc.js'
 
-import type { PrRef } from './pullRequest.js'
+/** A linked pull request, as pull_requests.py stores it. */
+export interface PrRef {
+  host: string
+  /** `owner/repo`, lower case. */
+  repository: string
+  number: number
+  url: string
+}
 
 export const LINK_TOOLS = new Set(['link_pull_request', 'list_pull_requests', 'unlink_pull_request'])
 

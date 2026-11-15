@@ -1,7 +1,8 @@
 """The session's pull requests: ``link_pull_request``, ``unlink_pull_request`` and
 ``list_pull_requests``, after T3 Code's tools of the same purpose.
 
-The agent links each PR it opens or works on; ``hermes tern`` shows them beside the chat. Links live
+The agent links each PR it opens or works on; ``hermes tern`` counts them on its PR pill and hands them
+to Tern's ``prs`` plugin (github.com/alt-glitch/tern-plugins), which shows them beside the chat. Links live
 in ``<HERMES_HOME>/plugin-data/hermes-tern/pull-requests.json`` under the conversation's root
 session, so a compressed conversation (whose session id changes) keeps them. A subagent runs in a
 session of its own; its links go to the conversation that delegated it:
@@ -10,8 +11,7 @@ session of its own; its links go to the conversation that delegated it:
      "conversations": {ROOT: [{"host", "repository", "number", "url", "linked_at", "session_id", "cwd"}]},
      "aliases": {SESSION_ID: ROOT}}
 
-Nothing here calls GitHub: a link is the URL's host, repository and number. The frontend reads the
-rest from the GitHub API, with the user's token for that host.
+Nothing here or in the frontend calls GitHub: a link is the URL's host, repository and number.
 
 The frontend reads a conversation's links with the plugin RPC method
 ``plugin.hermes-tern.pull_requests.linked`` ``{session_id}``, which answers ``{"linked": [...]}`` like
@@ -21,8 +21,7 @@ session of its own, so the parent's pane sees no tool result for it.
 
 A link may name only github.com or a GitHub Enterprise host the user listed in the plugin's
 ``enterprise_hosts`` setting (``plugins.entries.hermes-tern.settings.enterprise_hosts``): the host
-comes from the model, and the frontend sends the enterprise token to it. The frontend checks the
-same list again before every request (frontend/src/github/hosts.ts).
+comes from the model, so a link to any other host is refused.
 """
 
 from __future__ import annotations
@@ -49,7 +48,7 @@ LINKED_METHOD = "pull_requests.linked"
 CHANGED_EVENT = "pull_requests.changed"
 
 GITHUB = "github.com"
-# The plugin setting that lists the GitHub Enterprise hosts the user trusts with GITHUB_ENTERPRISE_TOKEN.
+# The plugin setting that lists the GitHub Enterprise hosts whose PRs the agent may link.
 CONFIG_KEY = "enterprise_hosts"
 CONFIG_PATH = f"plugins.entries.{PLUGIN}.settings.{CONFIG_KEY}"
 
@@ -131,7 +130,7 @@ def normalize_host(raw: Any) -> str | None:
 def enterprise_hosts() -> list[str]:
     """The GitHub Enterprise hosts the user listed in the plugin's ``enterprise_hosts`` setting (a
     list, or one comma-separated string), normalised. An entry that is not a plain host is dropped,
-    and github.com always takes the github.com token, never the enterprise one."""
+    and so is github.com, which is always allowed."""
     raw: Any = None
     with contextlib.suppress(Exception):
         raw = _ctx.get_config(CONFIG_KEY) if _ctx is not None else None
@@ -151,7 +150,7 @@ def enterprise_hosts() -> list[str]:
 
 def _untrusted(host: str) -> TargetError:
     return TargetError(
-        f"{host} is not a GitHub host tern trusts. tern reads pull requests from github.com and from the "
+        f"{host} is not a GitHub host tern trusts. tern links pull requests from github.com and from the "
         f"GitHub Enterprise hosts the user lists in the plugin setting {CONFIG_PATH}. If the user trusts "
         f"{host}, they can add it there; do not add it yourself.")
 

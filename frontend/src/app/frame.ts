@@ -7,7 +7,6 @@ import type { Hud } from '../chrome/hud.js'
 import type { Sidebar } from '../chrome/sidebar.js'
 import type { Completion } from '../overlays/completion.js'
 import type { Overlay } from '../overlays/overlay.js'
-import type { PrAside } from '../prs/aside.js'
 import { COMPOSER_ID, INPUT_ID, type SurfaceHost } from '../surface/host.js'
 import type { Transcript } from '../transcript/store.js'
 import { type DockActions, dockNodes } from '../view/dock.js'
@@ -22,9 +21,8 @@ export interface FrameCx extends DockSources {
   readonly completion: Pick<Completion, 'ghost' | 'nodes' | 'update'>
   readonly overlays: readonly Pick<Overlay, 'focus' | 'key' | 'modal' | 'node'>[]
   readonly transcript: Pick<Transcript, 'currentTodos' | 'entries'>
-  readonly prAside: Pick<PrAside, 'node' | 'open'>
   readonly sidebar: Pick<Sidebar, 'node'>
-  /** Tern has the aside feature: the PR aside or the session sidebar docks at the right edge. */
+  /** Tern has the aside feature: the session sidebar docks at the right edge. */
   aside(): boolean
   /** The dock's buttons, bound once. */
   readonly actions: DockActions
@@ -54,7 +52,7 @@ export function drawFrame(cx: FrameCx, now = Date.now()) {
   cx.surface.render({
     dock: dockNodes(dockModel(cx, now), cx.actions),
     layer: [
-      ...(cx.aside() ? [cx.prAside.open ? cx.prAside.node('layer.prs') : cx.sidebar.node('layer.sidebar')].filter(n => n !== null) : []),
+      ...(cx.aside() ? [cx.sidebar.node('layer.sidebar')].filter(n => n !== null) : []),
       ...cx.overlays.map(o => o.node(`layer.${o.key}`)),
       ...(modal ? [] : cx.completion.nodes(COMPOSER_ID))
     ],

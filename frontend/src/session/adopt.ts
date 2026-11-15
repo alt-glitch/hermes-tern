@@ -11,7 +11,7 @@ import type { NoticeStrip } from '../chrome/notices.js'
 import type { Sidebar } from '../chrome/sidebar.js'
 import type { ConnectWatcher } from '../connections/watcher.js'
 import { durable, type DurableSessionId, type LiveSessionId, type SessionIds, type SessionRef } from '../core/ids.js'
-import type { PullRequests } from '../github/store.js'
+import type { LinkedPrs } from '../prs/linked.js'
 import type { Media } from '../media.js'
 import type { ToolCall } from '../model.js'
 import type { Processes } from '../processes/store.js'
@@ -59,7 +59,7 @@ export interface AdoptHost {
   readonly media: Pick<Media, 'showAll'>
   readonly notices: Pick<NoticeStrip, 'reset'>
   readonly processes: Pick<Processes, 'poke'>
-  readonly prs: Pick<PullRequests, 'adopt'>
+  readonly prs: Pick<LinkedPrs, 'adopt'>
   readonly queue: { readonly server: Pick<PromptQueue['server'], 'reset'> }
   readonly sheets: Pick<PromptSheets, 'dropAll'>
   readonly sidebar: Pick<Sidebar, 'adopt'>

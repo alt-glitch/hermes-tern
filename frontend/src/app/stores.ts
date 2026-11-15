@@ -19,13 +19,10 @@ import { Attachments } from '../draft/attachments.js'
 import { Composer } from '../draft/composer.js'
 import type { Presses } from '../draft/keys.js'
 import type { Warned } from '../gateway/handlers/chrome.js'
-import { linkedPullRequests, LINKS_CHANGED } from '../github/links.js'
-import { PullRequests } from '../github/store.js'
 import { Media } from '../media.js'
 import type { BackgroundProcess, Subagent } from '../model.js'
 import { Completion } from '../overlays/completion.js'
 import { OverlayStack } from '../overlays/overlay.js'
-import { openUrl } from '../overlays/pullRequests.js'
 import { Cron } from '../processes/cron.js'
 import { Processes } from '../processes/store.js'
 import { withClipboardImage } from '../hermes/clipboardImage.js'
@@ -33,7 +30,10 @@ import { Viewer } from '../hermes/viewer.js'
 import { gatewayAuthor } from '../processes/widgets/author.js'
 import { chartMemory } from '../processes/widgets/memory.js'
 import { PromptSheets } from '../prompts/sheets.js'
-import { PrAside } from '../prs/aside.js'
+import { LinkedPrs } from '../prs/linked.js'
+import { linkedPullRequests, LINKS_CHANGED } from '../prs/links.js'
+import { prList, writePrList } from '../prs/listFile.js'
+import { openUrl } from '../prs/open.js'
 import { adoptSteps } from '../session/adopt.js'
 import { Automation } from '../session/automation.js'
 import { SessionLifecycle } from '../session/lifecycle.js'
@@ -121,22 +121,20 @@ export function chatStores(chat: ChatPorts, { act, gw, launch, settings, surface
   const title = new SessionTitle(chat)
   /** The pills above the composer: the one holding the keys, and the todo panel's fold. */
   const hud = new Hud({ changed, open: pill => act().openPill(pill) })
-  /** The conversation's PRs; links are stored under the stored session id the tools see. */
-  const prs = new PullRequests({ changed, cwd: () => session.info?.cwd || null, links: sid => linkedPullRequests(gw, sid), sid: () => session.ref.live })
+  /** The conversation's linked PRs, kept in the pane's list file for Tern's `prs` plugin (prs/listFile.ts). */
+  const prs = new LinkedPrs({
+    changed: refs => {
+      writePrList(launch.pane, prList(session.ref.stored ?? '', session.info?.cwd || launch.cwd, refs))
+      changed()
+    },
+    links: sid => linkedPullRequests(gw, sid),
+    sid: () => session.ref.live
+  })
   // A link tool changed this conversation's links (a subagent's, which this transcript never sees).
   gw.on('event', (ev: { type: string }) => {
     if (ev.type === LINKS_CHANGED) {
       prs.relink()
     }
-  })
-  /** The pull request docked at the pane's right edge (the PR aside). */
-  const prAside = new PrAside({
-    changed,
-    notice: (text, tone) => chat.notice(text, tone),
-    open: openUrl,
-    prs,
-    reveal: id => chat.reveal(id),
-    scroll: (id, to) => chat.scroll(id, to)
   })
   const composer = new Composer()
   /** The open overlays; a modal one takes the keys from the completion list. */
@@ -212,7 +210,6 @@ export function chatStores(chat: ChatPorts, { act, gw, launch, settings, surface
     media,
     notices,
     overlays: stack.items,
-    prAside,
     presses,
     processes,
     prs,
@@ -279,7 +276,6 @@ export function disposeStores(s: ChatStores) {
   s.title.dispose()
   s.agents.dispose()
   s.processes.dispose()
-  s.prs.dispose()
   s.sidebar.dispose()
   s.cron.dispose()
 }

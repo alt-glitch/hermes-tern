@@ -1,6 +1,6 @@
 // What the user starts, and what the stores call back into, bound once over the app's stores:
 // the dock's buttons (DockActions), a draft's way to the router (a command, a `!cmd` or a prompt),
-// the interrupt, the pills' sheets, the Copy buttons, the sidebar and the PR aside; and the
+// the interrupt, the pills' sheets, the Copy buttons, the sidebar and the PRs; and the
 // contexts the key rules, the Tern actions and the commands reach. App makes one AppActions in
 // its constructor; nothing here is made again per frame.
 
@@ -20,7 +20,6 @@ import type { ConnectWatcher } from '../connections/watcher.js'
 import type { Disposables } from '../core/disposables.js'
 import { errorText } from '../core/errors.js'
 import { Flash } from '../core/flash.js'
-import type { PrKey } from '../core/ids.js'
 import type { Attachments } from '../draft/attachments.js'
 import type { Composer } from '../draft/composer.js'
 import type { KeyCx, Presses } from '../draft/keys.js'
@@ -36,10 +35,11 @@ import type { Completion } from '../overlays/completion.js'
 import { openEffortPicker } from '../overlays/effort.js'
 import { openModelPicker } from '../overlays/models.js'
 import { promptOverlay } from '../overlays/prompts.js'
-import { openPrMenu, openPrSheet, openUrl } from '../overlays/pullRequests.js'
 import { parsePrompt } from '../prompts/parse.js'
 import type { PromptSheets } from '../prompts/sheets.js'
-import type { PrAside } from '../prs/aside.js'
+import type { PrRef } from '../prs/links.js'
+import { prList, writePrList } from '../prs/listFile.js'
+import { openPrs, openUrl } from '../prs/open.js'
 import { cycleEffort, DEFAULT_EFFORT } from '../session/effort.js'
 import type { SessionLifecycle } from '../session/lifecycle.js'
 import type { SessionState } from '../session/state.js'
@@ -65,7 +65,7 @@ export interface ActionsCx {
   readonly chat: ChatPorts
   readonly tern: Pick<Session, 'blob' | 'caps'>
   readonly gw: GatewayClient
-  readonly launch: Pick<LaunchEnv, 'home'>
+  readonly launch: Pick<LaunchEnv, 'cwd' | 'home' | 'pane'>
   readonly state: SessionState
   readonly activity: Activity
   readonly attachments: Attachments
@@ -80,7 +80,6 @@ export interface ActionsCx {
   readonly media: Media
   readonly connect: ConnectWatcher
   readonly sidebar: Sidebar
-  readonly prAside: PrAside
   /** Timers with no field of their own (a compaction's summary read). */
   readonly timers: Disposables
   /** The last lone Esc and the first Ctrl+C of a quit, for the double presses. */
@@ -132,7 +131,7 @@ export class AppActions {
       onInterrupt: () => this.interrupt(),
       onLoop: () => openAutomation(chat, 'loop'),
       onModel: () => openModelPicker(chat),
-      onPrs: () => openPrMenu(chat),
+      onPrs: () => this.openPrs(),
       onQueueDiscard: i => queue.discard(i),
       onQueueEdit: i => queue.dequeue(i),
       onQueueSteer: i => queue.steer(i),
@@ -166,7 +165,7 @@ export class AppActions {
       now: Date.now,
       openAgents: () => openAgents(chat),
       openBackground: () => openBackground(chat),
-      openPrs: () => openPrMenu(chat),
+      openPrs: () => this.openPrs(),
       presses: cx.presses,
       queue,
       quit: () => chat.quit(),
@@ -501,7 +500,7 @@ export class AppActions {
     }
   }
 
-  // ── Pills, the sidebar and the PR aside ────────────────────────────
+  // ── Pills, the sidebar and the PRs ────────────────────────────
 
   /** Down from an empty prompt focuses the pills; ←/→, Enter and Esc/↑ while one holds the keys. */
   hudKey(key: Key): boolean {
@@ -530,7 +529,7 @@ export class AppActions {
         break
 
       case 'prs':
-        openPrMenu(chat)
+        this.openPrs()
 
         break
 
@@ -545,8 +544,6 @@ export class AppActions {
 
   /** Opens or closes the session sidebar (Tern's aside); says why where Tern has none. */
   toggleSidebar() {
-    const { prAside, sidebar } = this.#cx
-
     if (!this.#cx.tern.caps.features.includes('aside')) {
       this.#cx.transcript.notice('This Tern has no side panel (the aside feature). /changes and /prs still work.', 'warning')
       this.#cx.changed()
@@ -554,25 +551,15 @@ export class AppActions {
       return
     }
 
-    // One sheet docks at the edge at a time: the session sidebar takes the PR aside's place.
-    if (!sidebar.open && prAside.open) {
-      prAside.close()
-    }
-
-    sidebar.toggle()
+    this.#cx.sidebar.toggle()
   }
 
-  /** Docks PR `key` at the pane's right edge, in place of the session sidebar. */
-  openPrAside(key: PrKey | undefined) {
-    if (!this.#cx.tern.caps.features.includes('aside')) {
-      return openPrSheet(this.#cx.chat, key)
-    }
+  /** Shows the session's PRs beside the chat in Tern's `prs` plugin, `pick` first; on GitHub without it. */
+  openPrs(pick?: PrRef) {
+    const { chat, launch, state } = this.#cx
+    const write = (p?: PrRef) => writePrList(launch.pane, prList(state.ref.stored ?? '', state.info?.cwd || launch.cwd, chat.prs.entries(), p))
 
-    if (this.#cx.sidebar.open) {
-      this.#cx.sidebar.toggle()
-    }
-
-    this.#cx.prAside.show(key)
+    void openPrs({ entries: () => chat.prs.entries(), notice: (text, tone) => chat.notice(text, tone), writeList: write }, pick)
   }
 
   /** Shows subagent `id` beside the chat in a Tern split; its timeline sheet where no split can open. */

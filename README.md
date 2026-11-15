@@ -148,54 +148,27 @@ Goals that the command states draw as dashed lines. The plugin keeps each proces
 
 ## Pull requests
 
-The agent links every PR that it opens or works on, as T3 Code does. The pill above the composer counts them. Click it (or press <kbd>Alt</kbd>+<kbd>P</kbd>) to open a tray with each PR's state and age.
+The agent links every PR that it opens or works on, as T3 Code does. The pill above the composer counts them. Click it (or press <kbd>Alt</kbd>+<kbd>P</kbd>, or run `/prs`) to open them beside the chat in Tern's PR plugin, [`prs`](https://github.com/alt-glitch/tern-plugins/tree/main/prs). `/prs 22` opens #22's page directly, and so does a PR's Open button in the session sidebar.
 
-<p align="center"><img alt="The PR tray above the composer" src="docs/images/pr-tray.png" width="760"></p>
+<p align="center"><img alt="The prs block beside the chat, on its This session tab with the two PRs this conversation linked" src="docs/images/prs-block.png" width="760"></p>
 
-Pick a PR, and it docks at the chat's right edge, beside the conversation. The chat gets narrower but keeps the keys, so you can continue to talk to the agent while the PR stays in view. `/prs 22` opens #22 directly.
-
-<table>
-  <tr>
-    <td width="42%"><img alt="The Files tab: Tern's own edit cards and diffs" src="docs/images/pr-files.png"></td>
-    <td>
-
-**Drawn as GitHub draws it.** PR bodies and comments go through the same pipeline as T3 Code's PR panel (`remark-gfm`, `rehype-raw`, GitHub's sanitize schema). `<details>` become folds, bot badges become links, and HTML comments are removed. Tables, task lists, alerts and mermaid diagrams draw natively. `#123` and `@login` are links.
-
-**Three tabs, as on GitHub.**
-
-- **Conversation:** the description, then every comment, review, review thread and commit, in order.
-- **Checks:** failing and running checks are open; passed and skipped checks are folded.
-- **Files:** each file is Tern's own edit card with its diff, highlighted, and folded around the hunks.
-
-**Actions.** Merge and close (both ask first), mark ready for review, update the branch, re-run failed jobs, copy `gh pr checkout N`, and open on GitHub.
-
-The aside is as wide as Tern's Settings sheet. To resize it, drag that sheet's edge (<kbd>⌘</kbd>+<kbd>,</kbd>).
-
-</td>
-  </tr>
-</table>
-
-The links are kept for each conversation in `$HERMES_HOME/plugin-data/hermes-tern/pull-requests.json`, so they survive compression and resume. The list also shows two kinds of PR that the agent did not link:
-
-- the PR of the session's branch;
-- the other layers of a GitHub stack that a listed PR is part of.
-
-The plugin reads PRs from GitHub with your own token, which Hermes provides. Set it once:
+The plugin is a separate install, because it is a Tern block rather than part of the chat:
 
 ```sh
-hermes config set GITHUB_TOKEN "$(gh auth token)"
+tern plugin install github.com/alt-glitch/tern-plugins/prs
 ```
 
-The plugin never reads another tool's login.
+It reads GitHub with the GitHub CLI (`gh`) on the machine that runs your panes, so `gh auth login` there is all the setup. Its **This session** tab lists the PRs this conversation linked and the PR of the session's branch; a PR's page has the conversation, checks, diffs, reviews and the merge. Without the plugin, the pill opens the newest PR on GitHub and says how to install it.
 
-The plugin reads PRs from github.com, and from a GitHub Enterprise Server only when you list its host. A PR link's host comes from the agent, so the plugin refuses every other host and sends a token to none of them:
+The pane keeps its linked PRs in `$HERMES_HOME/plugin-data/hermes-tern/panes/<pane>.prs.json`, which the plugin reads (the format is in the plugin's README), and removes the file when you quit. The links themselves are kept for each conversation in `$HERMES_HOME/plugin-data/hermes-tern/pull-requests.json`, so they survive compression and resume.
+
+The agent may link PRs from github.com, and from a GitHub Enterprise Server only when you list its host, because a link's host comes from the agent:
 
 ```sh
 hermes config set plugins.entries.hermes-tern.settings.enterprise_hosts '["github.mycompany.com"]'
-hermes config set GITHUB_ENTERPRISE_TOKEN <token>
 ```
 
-Open a new pane after you change the list. `GITHUB_TOKEN` goes only to `api.github.com`, and `GITHUB_ENTERPRISE_TOKEN` goes only to the hosts you list. Write a host with a port (`github.mycompany.com:8443`) only if its web address has one. A link that an older version stored for another host stays on the list, marked as not read, until you unlink it.
+The `prs` plugin shows github.com PRs only.
 
 ## Security and privacy
 
@@ -203,11 +176,11 @@ This section lists what the plugin does beyond drawing the chat, so you can deci
 
 | | |
 | --- | --- |
-| **Network** | GitHub's API, with the token that Hermes gives it: `GITHUB_TOKEN` to `api.github.com` only, and `GITHUB_ENTERPRISE_TOKEN` only to the hosts in `enterprise_hosts`. Redirects to another host are not followed. It is used for the pull request view and for the actions you click; merge and close ask first. The job charts send the command and samples of a background process's output to your own auxiliary model (`auxiliary.tern_charts`), once per process, after Hermes redacts them. The first figure check downloads the `merman` package (version 0.8.0) from your Python package index through Hermes' `uv`; later checks use uv's cache. Nothing else. **No telemetry.** |
+| **Network** | None for pull requests: the plugin never calls GitHub (Tern's `prs` plugin does, through `gh`). The job charts send the command and samples of a background process's output to your own auxiliary model (`auxiliary.tern_charts`), once per process, after Hermes redacts them. The first figure check downloads the `merman` package (version 0.8.0) from your Python package index through Hermes' `uv`; later checks use uv's cache. Nothing else. **No telemetry.** |
 | **Commands** | The agent's shell commands get the chat's Tern pane variables (`TERN_PANE` and the window's) in their environment, through Hermes' per-session environment, in sessions that a Tern pane shows. The command itself is not changed: the approval sheet shows exactly what runs. `!cmd` and `{!cmd}` in the composer run through Hermes' own `shell.exec`, so its dangerous-command refusal applies. They run only when you type them: a pasted `{!cmd}` never runs. The composer's `/` commands are Hermes' own. |
-| **Processes** | `hermes tern` runs the frontend with Node, and the frontend runs `hermes gateway attach` each time it connects. A pasted image is read with `osascript` on macOS and with `hermes clipboard image` elsewhere. Opening the sidebar, or a file beside the chat, runs Tern's own `tern` CLI. With `-w`, Hermes' own worktree functions run `git` in the repository. After a reply that has a mermaid or svg figure, the gateway runs `figure_check.py` in a `uv` subprocess, one at a time, with the figure's text on its standard input. |
+| **Processes** | `hermes tern` runs the frontend with Node, and the frontend runs `hermes gateway attach` each time it connects. A pasted image is read with `osascript` on macOS and with `hermes clipboard image` elsewhere. Opening the sidebar, a file or the pull requests beside the chat runs Tern's own `tern` CLI (`tern plugin list` checks for the `prs` plugin first). With `-w`, Hermes' own worktree functions run `git` in the repository. After a reply that has a mermaid or svg figure, the gateway runs `figure_check.py` in a `uv` subprocess, one at a time, with the figure's text on its standard input. |
 | **Reads outside its data** | Hermes' session database, read-only, from the plugin's Python half through Hermes' own `hermes_state` API: a conversation's compression lineage, its subagents' parents and the session a pane resumes. The frontend opens no Hermes file: sessions, transcripts and subagents come from the gateway. The output of the session's background processes, and the log files that their commands write to (for charts). The files you open from the chat. |
-| **Stored data** | `$HERMES_HOME/plugin-data/hermes-tern/`: linked pull requests, the conversation each Tern pane last showed (to resume it after a crash) and chart rules. Which pane shows which session (with its Tern variables) is kept in the gateway's memory only. `$HERMES_HOME/hermes-tern/settings.json`: the theme and chart settings. While a chat runs, a temporary file holds the id of the session the pane shows; `hermes tern` reads it when the chat ends and deletes it. |
+| **Stored data** | `$HERMES_HOME/plugin-data/hermes-tern/`: linked pull requests (and each pane's list of them for the `prs` plugin), the conversation each Tern pane last showed (to resume it after a crash) and chart rules. Which pane shows which session (with its Tern variables) is kept in the gateway's memory only. `$HERMES_HOME/hermes-tern/settings.json`: the theme and chart settings. While a chat runs, a temporary file holds the id of the session the pane shows; `hermes tern` reads it when the chat ends and deletes it. |
 
 ## How it works
 

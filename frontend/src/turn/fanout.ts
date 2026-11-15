@@ -8,8 +8,8 @@ import type { Sidebar } from '../chrome/sidebar.js'
 import { CONNECT_TOOL } from '../connections/cards.js'
 import type { ConnectWatcher } from '../connections/watcher.js'
 import { toolCallId } from '../core/ids.js'
-import { LINK_TOOLS } from '../github/links.js'
-import type { PullRequests } from '../github/store.js'
+import { LINK_TOOLS } from '../prs/links.js'
+import type { LinkedPrs } from '../prs/linked.js'
 import type { ToolCall } from '../model.js'
 import type { Processes } from '../processes/store.js'
 import type { Compactions } from '../transcript/compactions.js'
@@ -24,7 +24,7 @@ const CHANGES_FILES = ['patch', 'terminal', 'write_file', 'execute_code']
 export interface ToolFanout {
   readonly transcript: Pick<Transcript, 'call' | 'calls'>
   readonly agents: Pick<Agents, 'scan'>
-  readonly prs: Pick<PullRequests, 'onCall'>
+  readonly prs: Pick<LinkedPrs, 'onCall'>
   readonly sidebar: Pick<Sidebar, 'poke'>
   readonly connect: Pick<ConnectWatcher, 'watch'>
   readonly processes: Pick<Processes, 'poke'>
@@ -67,7 +67,6 @@ export function afterToolComplete(p: Pick<ToolCompletePayload, 'name' | 'tool_id
 export interface MessageFanout {
   readonly transcript: Pick<Transcript, 'complete'> & { readonly compactions: Pick<Compactions, 'uncompact'> }
   readonly activity: Pick<Activity, 'endBusy' | 'endCompaction'>
-  readonly prs: Pick<PullRequests, 'poke'>
   readonly sidebar: Pick<Sidebar, 'poke'>
   /** Gives the compactions seen here their summaries from the store. */
   summarize(): void
@@ -79,7 +78,7 @@ export interface MessageFanout {
 
 /**
  * A message.complete that ends the turn: the transcript folds it, the working line ends, its
- * figures are checked, any compaction ends, the queue drains, and the PRs and the sidebar read again, in that order.
+ * figures are checked, any compaction ends, the queue drains, and the sidebar reads again, in that order.
  */
 export function afterMessageComplete(p: MessageCompletePayload, cx: MessageFanout) {
   cx.transcript.complete(p)
@@ -90,7 +89,6 @@ export function afterMessageComplete(p: MessageCompletePayload, cx: MessageFanou
   cx.transcript.compactions.uncompact('running')
   cx.summarize()
   cx.drain()
-  // The turn may have pushed a branch, opened a PR or changed files.
-  cx.prs.poke()
+  // The turn may have changed files.
   cx.sidebar.poke()
 }
