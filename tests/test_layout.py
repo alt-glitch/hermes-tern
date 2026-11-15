@@ -12,6 +12,7 @@ process; ``shared`` imports neither.
 from __future__ import annotations
 
 import ast
+import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -20,8 +21,10 @@ ALLOWED = {"launch": {"launch", "shared"}, "gateway": {"gateway", "shared"}, "sh
 
 
 def _modules() -> list[Path]:
-    skip = {"tests", "frontend", "lab", "node_modules", ".worktrees", ".claude", ".scratch", ".git"}
-    return [p for p in ROOT.rglob("*.py") if not skip & set(p.relative_to(ROOT).parts)]
+    """The plugin's Python files git tracks: a local venv, worktree or scratch folder is not the plugin."""
+    tracked = subprocess.run(["git", "ls-files", "-z", "--", "*.py"], cwd=ROOT, capture_output=True, text=True, check=True)
+    skip = {"tests", "frontend", "lab"}
+    return [ROOT / f for f in tracked.stdout.split("\0") if f and not skip & set(Path(f).parts)]
 
 
 def _plugin_imports(path: Path) -> set[str]:
