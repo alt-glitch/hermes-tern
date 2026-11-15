@@ -6542,7 +6542,8 @@ var unresolved = (t) => ["expired", "failed", "initiated", "pending"].includes(t
 var cardRef = (call) => call.connect?.op?.id ?? call.id;
 
 // src/prs/links.ts
-var LINK_TOOLS = /* @__PURE__ */ new Set(["link_pull_request", "list_pull_requests", "unlink_pull_request"]);
+var GUIDE_TOOL = "write_review_guide";
+var LINK_TOOLS = /* @__PURE__ */ new Set(["link_pull_request", "list_pull_requests", "unlink_pull_request", GUIDE_TOOL]);
 var LINKED_METHOD = "plugin.hermes-tern.pull_requests.linked";
 var LINKS_CHANGED = "plugin.hermes-tern.pull_requests.changed";
 function refOf(v) {
@@ -6552,16 +6553,21 @@ function refOf(v) {
   const number3 = typeof r?.["number"] === "number" ? r["number"] : 0;
   return host && repository && number3 > 0 ? { host, number: number3, repository, url: typeof r?.["url"] === "string" ? r["url"] : `https://${host}/${repository}/pull/${number3}` } : void 0;
 }
-function linkedFromResult(call) {
-  if (!LINK_TOOLS.has(call.name) || call.outcome.kind !== "done") {
-    return void 0;
-  }
-  const linked = record(call.result)?.["linked"];
-  return Array.isArray(linked) ? linked.map(refOf).filter((r) => Boolean(r)) : void 0;
+function linkedOf(v) {
+  const r = record(v);
+  const linked = r?.["linked"];
+  return Array.isArray(linked) ? { guides: record(r?.["guides"]) ?? {}, refs: linked.map(refOf).filter((x) => Boolean(x)) } : void 0;
 }
+function linkedFromResult(call) {
+  return LINK_TOOLS.has(call.name) && call.outcome.kind === "done" ? linkedOf(call.result) : void 0;
+}
+function guideWritten(call) {
+  const written = call.name === GUIDE_TOOL && call.outcome.kind === "done" ? record(call.result)?.["written"] : void 0;
+  return typeof written === "string" ? written : void 0;
+}
+var guideKey = (ref) => `${ref.repository.toLowerCase()}#${ref.number}`;
 async function linkedPullRequests(gw2, sid) {
-  const linked = record(await gw2.request(LINKED_METHOD, { session_id: sid }))?.["linked"];
-  return Array.isArray(linked) ? linked.map(refOf).filter((r) => Boolean(r)) : [];
+  return linkedOf(await gw2.request(LINKED_METHOD, { session_id: sid })) ?? { guides: {}, refs: [] };
 }
 
 // src/turn/fanout.ts
@@ -6805,14 +6811,16 @@ var dataDir = (env = process.env) => join2(env["HERMES_HOME"] || join2(homedir2(
 
 // src/prs/listFile.ts
 var prListFile = (pane, dir2 = dataDir()) => join3(dir2, "panes", `${pane}.prs.json`);
-function prList(sessionId, cwd, refs, pick2, now = Date.now()) {
+function prList(sessionId, cwd, linked, pick2, now = Date.now()) {
   return {
     cwd,
-    prs: refs.map((r) => ({ url: r.url })),
+    prs: linked.refs.map((r) => ({ url: r.url })),
     session_id: sessionId,
     title: "This session",
     version: 1,
-    ...pick2 ? { opened_at: now, selected: `${pick2.repository}#${pick2.number}` } : {}
+    ...Object.keys(linked.guides).length > 0 ? { guides: linked.guides } : {},
+    ...pick2 ? { opened_at: now, selected: `${pick2.ref.repository}#${pick2.ref.number}` } : {},
+    ...pick2?.tab ? { tab: pick2.tab } : {}
   };
 }
 function writePrList(pane, list3, dir2 = dataDir()) {
@@ -19521,6 +19529,10 @@ async function openPrs(host, pick2, deps = DEPS) {
     await deps.open(path).catch(() => void 0);
     return;
   }
+  if (host.purpose === "guide" && pick2) {
+    host.notice(`The review guide for #${pick2.number} is ready. To see it beside the chat, install Tern's PR plugin: ${INSTALL}`, "info");
+    return;
+  }
   const target2 = pick2 ?? host.entries().at(-1);
   if (target2) {
     deps.browse(target2.url);
@@ -20231,11 +20243,15 @@ ${composer2.text}` : text5 || composer2.text, {
     }
     this.#cx.sidebar.toggle();
   }
-  /** Shows the session's PRs beside the chat in Tern's `prs` plugin, `pick` first; on GitHub without it. */
-  openPrs(pick2) {
+  /** Shows the session's PRs beside the chat in Tern's `prs` plugin, `pick` first (on `tab`); on GitHub without it. */
+  openPrs(pick2, tab) {
     const { chat, launch: launch3, state } = this.#cx;
-    const write = (p) => writePrList(launch3.pane, prList(state.ref.stored ?? "", state.info?.cwd || launch3.cwd, chat.prs.entries(), p));
-    void openPrs({ entries: () => chat.prs.entries(), notice: (text5, tone) => chat.notice(text5, tone), writeList: write }, pick2);
+    const linked = { guides: chat.prs.guides(), refs: [...chat.prs.entries()] };
+    const write = (p) => writePrList(launch3.pane, prList(state.ref.stored ?? "", state.info?.cwd || launch3.cwd, linked, p && { ref: p, ...tab && { tab } }));
+    void openPrs(
+      { entries: () => chat.prs.entries(), notice: (text5, tone) => chat.notice(text5, tone), purpose: tab === "guide" ? "guide" : "page", writeList: write },
+      pick2
+    );
   }
   /** Shows subagent `id` beside the chat in a Tern split; its timeline sheet where no split can open. */
   async openAgent(id) {
@@ -23362,11 +23378,11 @@ function chartMemory(dir2 = join8(dataDir(), "charts"), now = Date.now) {
 }
 
 // src/prs/linked.ts
-var same = (a, b) => a.map(prKey).join() === b.map(prKey).join();
+var same = (a, b) => a.refs.map(prKey).join() === b.refs.map(prKey).join() && JSON.stringify(a.guides) === JSON.stringify(b.guides);
 var LinkedPrs = class {
   #host;
   #sid = null;
-  #refs = [];
+  #linked = { guides: {}, refs: [] };
   /** Bumped by every change, so a read that started before one drops its answer. */
   #version = 0;
   constructor(host) {
@@ -23374,11 +23390,15 @@ var LinkedPrs = class {
   }
   /** The links, oldest first. */
   entries() {
-    return this.#refs;
+    return this.#linked.refs;
+  }
+  /** The guides, by `owner/repo#number`. */
+  guides() {
+    return this.#linked.guides;
   }
   /** The newest link to PR number `n`. */
   find(n) {
-    return this.#refs.findLast((r) => r.number === n);
+    return this.#linked.refs.findLast((r) => r.number === n);
   }
   /** The pane shows another session: its links replace the old ones. */
   adopt() {
@@ -23387,14 +23407,19 @@ var LinkedPrs = class {
       return;
     }
     this.#sid = sid;
-    this.#set([]);
+    this.#set({ guides: {}, refs: [] });
     this.relink();
   }
-  /** A finished tool call: a link tool's result is the conversation's whole list. */
+  /** A finished tool call: a link tool's result is the conversation's whole list and its guides. */
   onCall(call) {
     const linked = linkedFromResult(call);
-    if (linked && !same(linked, this.#refs)) {
+    if (linked && !same(linked, this.#linked)) {
       this.#set(linked);
+    }
+    const written = guideWritten(call);
+    const ref = written ? this.#linked.refs.findLast((r) => guideKey(r) === written) : void 0;
+    if (ref) {
+      this.#host.guideWritten(ref);
     }
   }
   /** Reads the links again (a subagent's link tool changed them). */
@@ -23408,14 +23433,14 @@ var LinkedPrs = class {
     }
     const version2 = this.#version;
     const linked = await this.#host.links(sid).catch(() => void 0);
-    if (linked && sid === this.#sid && version2 === this.#version && !same(linked, this.#refs)) {
+    if (linked && sid === this.#sid && version2 === this.#version && !same(linked, this.#linked)) {
       this.#set(linked);
     }
   }
-  #set(refs) {
-    this.#refs = refs;
+  #set(linked) {
+    this.#linked = linked;
     this.#version++;
-    this.#host.changed(refs);
+    this.#host.changed(linked);
   }
 };
 
@@ -25615,10 +25640,11 @@ function chatStores(chat, { act, gw: gw2, launch: launch3, settings: settings2, 
   const title = new SessionTitle(chat);
   const hud2 = new Hud({ changed, open: (pill2) => act().openPill(pill2) });
   const prs = new LinkedPrs({
-    changed: (refs) => {
-      writePrList(launch3.pane, prList(session2.ref.stored ?? "", session2.info?.cwd || launch3.cwd, refs));
+    changed: (linked) => {
+      writePrList(launch3.pane, prList(session2.ref.stored ?? "", session2.info?.cwd || launch3.cwd, linked));
       changed();
     },
+    guideWritten: (ref) => act().openPrs(ref, "guide"),
     links: (sid) => linkedPullRequests(gw2, sid),
     sid: () => session2.ref.live
   });
