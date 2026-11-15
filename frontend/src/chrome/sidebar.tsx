@@ -1,7 +1,7 @@
 // The session sidebar (⌥S, `/sidebar`): Tern's aside, a `prefs` sheet docked at the pane's right
 // edge that narrows the chat beside it. It shows where the session works: the branch and how far it
 // is from its upstream, the session's pull requests, and the changed files. It takes no keys; the
-// composer keeps them. A PR opens in the PR aside (in its place); a file opens the Changes sheet on its diff.
+// composer keeps them. A PR opens beside the chat in Tern's `prs` plugin; a file opens the Changes sheet on its diff.
 
 import type { JSX, PrefsRow } from '@stencil-hq/tern'
 
@@ -14,12 +14,10 @@ import { Flash } from '../core/flash.js'
 import { type LiveSessionId, prKey } from '../core/ids.js'
 import { Poller } from '../core/poller.js'
 import { type GitState, gitState } from '../git/status.js'
-import { checksState } from '../github/pullRequest.js'
 import { type ChangesHost, openChanges } from '../overlays/changes.js'
-import { openPullRequests, type PullRequestsSheetHost, stateLabel } from '../overlays/pullRequests.js'
 
 /** What the session sidebar reaches of the app. */
-export type SidebarHost = Pick<ChatPorts, 'changed' | 'prs' | 'session'> & ChangesHost & PullRequestsSheetHost
+export type SidebarHost = Pick<ChatPorts, 'changed' | 'openPrs' | 'prs' | 'session'> & ChangesHost
 
 const POLL_MS = 5000
 /** The sheet's actions: its close, and each row button's `act`. */
@@ -130,22 +128,12 @@ export class Sidebar {
       : [{ disabled: this.#cwd ? 'This folder is not in a git repository.' : 'The session has no folder yet.', id: 'branch', label: 'No git' }]
 
     const prRows: PrefsRow[] = prs.length
-      ? prs.map(e => ({
+      ? prs.map(ref => ({
           control: { act: 'open-pr', k: 'action', label: 'Open' },
-          hint: e.pr
-            ? [
-                stateLabel(e.pr),
-                e.pr.checks.length ? `checks ${checksState(e.pr.checks)}` : '',
-                e.source === 'branch' ? 'this branch' : e.source === 'stack' ? 'stack layer' : ''
-              ]
-                .filter(Boolean)
-                .join(' · ')
-            : (e.error ?? 'Reading GitHub…'),
-          id: `pr:${prKey(e.ref)}`,
-          label: `#${e.ref.number} ${e.pr?.title ?? e.ref.repository}`,
-          ...optional('warning', e.pr?.state === 'open' && e.pr.mergeable === 'conflicting' ? 'Conflicts with its base branch' : undefined)
+          id: `pr:${prKey(ref)}`,
+          label: `#${ref.number} ${ref.repository}`
         }))
-      : [{ disabled: 'Hermes links each PR it opens; the branch’s PR shows here too.', id: 'no-prs', label: 'None yet' }]
+      : [{ disabled: 'Hermes links each PR it opens.', id: 'no-prs', label: 'None yet' }]
 
     const fileRows: PrefsRow[] = files.length
       ? files.slice(0, MAX_FILES).map(f => ({
@@ -209,7 +197,7 @@ export class Sidebar {
         return
 
       case 'open-pr':
-        return openPullRequests(this.#host, this.#host.prs.keyOf(row.replace(/^pr:/, '')))
+        return this.#host.openPrs(this.#host.prs.entries().find(ref => `pr:${prKey(ref)}` === row))
 
       case 'diff':
         return openChanges(this.#host, row.replace(/^file:/, ''))

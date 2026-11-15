@@ -53,7 +53,6 @@ def launched(monkeypatch, tmp_path, hermes):
     monkeypatch.setattr(launcher, "node_binary", lambda: "/bin/node")
     monkeypatch.setattr(launcher, "_local_terminal", lambda: True)
     monkeypatch.setattr(launcher, "_session_cwd", lambda sid: None)
-    monkeypatch.setattr(launcher.pull_requests, "enterprise_hosts", lambda: [])
     monkeypatch.delenv("TERN_PANE", raising=False)
     constants = types.ModuleType("hermes_constants")
     constants.get_hermes_home = lambda: tmp_path / "home"
@@ -105,16 +104,6 @@ def test_the_frontend_gets_its_own_variables(launched, monkeypatch, tmp_path):
     assert env["HERMES_TERN_CWD"] == env["HERMES_TERN_SESSION_CWD"] == env["HERMES_TERN_LAUNCH_CWD"] == str(tmp_path)
     assert env["HERMES_HOME"] == str(tmp_path / "home")
     assert "--max-old-space-size=8192" in env["NODE_OPTIONS"]
-
-
-def test_the_frontend_learns_the_listed_enterprise_hosts(launched, monkeypatch):
-    # The frontend sends the enterprise token only to these. A value inherited from the shell never counts.
-    monkeypatch.setenv("HERMES_TERN_GITHUB_ENTERPRISE_HOSTS", "github.evil.example")
-    _, [(_, env)] = launched(parse([]))
-    assert env["HERMES_TERN_GITHUB_ENTERPRISE_HOSTS"] == ""
-    monkeypatch.setattr(launcher.pull_requests, "enterprise_hosts", lambda: ["ghe.corp.example", "git.corp.example:8443"])
-    _, [(_, env)] = launched(parse([]))
-    assert env["HERMES_TERN_GITHUB_ENTERPRISE_HOSTS"] == "ghe.corp.example,git.corp.example:8443"
 
 
 def test_resume_and_continue_pick_the_session(launched, monkeypatch):

@@ -12,12 +12,12 @@ import type { Reconnect } from '../chrome/reconnect.js'
 import type { SessionIds } from '../core/ids.js'
 import type { Attachments } from '../draft/attachments.js'
 import type { Composer } from '../draft/composer.js'
-import type { PullRequests } from '../github/store.js'
+import type { LinkedPrs } from '../prs/linked.js'
 import type { Todo } from '../model.js'
 import { capsOf } from '../modelCaps.js'
 import type { Completion } from '../overlays/completion.js'
 import type { Overlay } from '../overlays/overlay.js'
-import { prsPill } from '../overlays/pullRequests.js'
+import { prsPill } from '../prs/open.js'
 import { isRunning, type Processes, processTone } from '../processes/store.js'
 import type { Automation } from '../session/automation.js'
 import { fastTier } from '../session/fast.js'
@@ -46,7 +46,7 @@ export interface DockSources {
   readonly transcript: Pick<Transcript, 'currentTodos'>
   readonly agents: Pick<Agents, 'running'>
   readonly processes: Pick<Processes, 'recent'>
-  readonly prs: Pick<PullRequests, 'entries'>
+  readonly prs: Pick<LinkedPrs, 'entries'>
   readonly notices: Pick<NoticeStrip, 'current'>
   readonly title: Pick<SessionTitle, 'text'>
   readonly queue: Pick<PromptQueue, 'rows'>

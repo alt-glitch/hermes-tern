@@ -6,7 +6,6 @@ import { usageFromTick } from '@hermes/shared/usage-tick'
 import type { Reconnect } from '../../chrome/reconnect.js'
 import type { Theme } from '../../chrome/theme.js'
 import type { LiveSessionId } from '../../core/ids.js'
-import type { PullRequests } from '../../github/store.js'
 import type { Automation } from '../../session/automation.js'
 import type { SessionLifecycle } from '../../session/lifecycle.js'
 import type { SessionState } from '../../session/state.js'
@@ -30,7 +29,6 @@ export interface SessionCx {
   readonly title: Pick<SessionTitle, 'read' | 'set'>
   readonly queue: { readonly server: Pick<PromptQueue['server'], 'update'> }
   readonly transcript: Pick<Transcript, 'started' | 'usageTick'> & { readonly compactions: Pick<Compactions, 'contextUsed'> }
-  readonly prs: Pick<PullRequests, 'poke'>
   /** Tells Tern the session's folder (OSC 7), when it moved. */
   reportCwd(): void
 }
@@ -74,9 +72,7 @@ export const sessionHandlers = {
 
     cx.title.set(typeof ev.payload?.title === 'string' ? ev.payload.title : undefined)
 
-    // Another folder: another branch, maybe another PR.
     if (session.info?.cwd && session.info.cwd !== cwd) {
-      cx.prs.poke()
       cx.reportCwd()
     }
 

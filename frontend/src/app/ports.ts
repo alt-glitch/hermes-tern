@@ -1,4 +1,4 @@
-// What the app lends the modules it drives: the sheets, the sidebar, the PR aside and the slash
+// What the app lends the modules it drives: the sheets, the sidebar, the PRs and the slash
 // commands. Each consumer names the few ports it uses (`Pick<ChatPorts, …>`), so none of them
 // imports App, and App is the one place that implements them all. The names are the ones the
 // ports keep: a later package changes what stands behind a port, not the code that reads it.
@@ -9,9 +9,10 @@ import type { SessionInfo } from '@hermes/shared/gateway-types'
 
 import type { Agents } from '../agents/store.js'
 import type { SessionHost } from '../commands/session.js'
-import type { PrKey, SessionIds, StoredSessionId } from '../core/ids.js'
+import type { SessionIds, StoredSessionId } from '../core/ids.js'
 import type { GitState } from '../git/status.js'
-import type { PullRequests } from '../github/store.js'
+import type { LinkedPrs } from '../prs/linked.js'
+import type { PrRef } from '../prs/links.js'
 import type { NoticeEntry } from '../model.js'
 import type { OverlayHost, Overlay } from '../overlays/overlay.js'
 import type { Cron } from '../processes/cron.js'
@@ -42,7 +43,7 @@ export interface ChatPorts extends OverlayHost {
   readonly agents: Agents
   readonly processes: Processes
   readonly cron: Cron
-  readonly prs: PullRequests
+  readonly prs: LinkedPrs
   readonly automation: Automation
   /** The session sidebar's last read of git, which the Changes sheet starts from. */
   readonly sidebar: { readonly state: GitState | undefined }
@@ -64,8 +65,8 @@ export interface ChatPorts extends OverlayHost {
   openAgent(id: string): Promise<void>
   /** Opens the help sheet. */
   openHelp(): Promise<void>
-  /** Docks PR `key` at the pane's right edge, in place of the session sidebar. */
-  openPrAside(key: PrKey | undefined): void
+  /** Shows the session's PRs beside the chat in Tern's `prs` plugin, `pick` first; on GitHub without it. */
+  openPrs(pick?: PrRef): void
   /** Shows or hides the session sidebar. */
   toggleSidebar(): void
   /** Starts a new session, named `title` when given. */

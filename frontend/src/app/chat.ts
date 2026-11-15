@@ -16,11 +16,13 @@ import { sessionHost } from '../commands/host.js'
 import type { SessionHost } from '../commands/session.js'
 import { type LaunchEnv, readLaunchEnv } from '../config/env.js'
 import { errorText } from '../core/errors.js'
-import { entryId, type PrKey, type StoredSessionId } from '../core/ids.js'
+import { entryId, type StoredSessionId } from '../core/ids.js'
 import { RenderScheduler } from '../core/scheduler.js'
 import { onKey } from '../draft/keys.js'
 import { followGateway } from '../gateway/follow.js'
-import type { PullRequests } from '../github/store.js'
+import type { LinkedPrs } from '../prs/linked.js'
+import type { PrRef } from '../prs/links.js'
+import { forgetPrList } from '../prs/listFile.js'
 import type { NoticeEntry } from '../model.js'
 import { openHelp } from '../overlays/help.js'
 import type { Overlay } from '../overlays/overlay.js'
@@ -59,7 +61,7 @@ export class App implements ChatPorts {
   readonly cron: Cron
   readonly sidebar: Sidebar
   readonly automation: Automation
-  readonly prs: PullRequests
+  readonly prs: LinkedPrs
   readonly overlays: Overlay[]
   /** Every store, the ports' among them: entry.ts and the tests reach the rest here, a module through its ports. */
   readonly stores: ChatStores
@@ -250,8 +252,8 @@ export class App implements ChatPorts {
     this.#surface.scroll(id, to)
   }
 
-  openPrAside(key: PrKey | undefined) {
-    this.#act.openPrAside(key)
+  openPrs(pick?: PrRef) {
+    this.#act.openPrs(pick)
   }
 
   openAgent(id: string): Promise<void> {
@@ -265,6 +267,7 @@ export class App implements ChatPorts {
   /** The user quits (Ctrl+C twice, Ctrl+D, /quit): a later `hermes tern` in this pane starts a new session. */
   quit(code = 0) {
     forgetPane(this.#launch)
+    forgetPrList(this.#launch.pane)
     this.#end(code)
   }
 

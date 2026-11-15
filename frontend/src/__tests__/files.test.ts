@@ -11,7 +11,6 @@ import { describe, expect, it } from 'vitest'
 import * as z from 'zod/mini'
 
 import { liveSessionId } from '../core/ids.js'
-import { parseStacks } from '../github/branch.js'
 import { chartMemory } from '../processes/widgets/memory.js'
 import { loadSettings, saveSettings } from '../settings.js'
 import { readWatchSpec, WATCH_ENV, type WatchSpec } from '../watch/spec.js'
@@ -100,16 +99,6 @@ describe('the watch spec', () => {
     expect(readWatchSpec({})).toBeUndefined()
     expect(readWatchSpec({ [WATCH_ENV]: '{"sid":' })).toBeUndefined()
     expect(readWatchSpec({ [WATCH_ENV]: 'null' })).toBeUndefined()
-  })
-})
-
-describe('stack layers', () => {
-  it('skips a layer with no number', () => {
-    expect(parseStacks('github.com', 'a/b', [{ number: 4, pull_requests: [{ head: { ref: 'x' } }, { number: 9 }] }])[0]?.layers).toEqual([{ head: '', number: 9, state: 'open' }])
-  })
-
-  it('throws for a null layer, as reading its number did before the schema', () => {
-    expect(() => parseStacks('github.com', 'a/b', [{ number: 4, pull_requests: [null, { number: 9 }] }])).toThrow(TypeError)
   })
 })
 

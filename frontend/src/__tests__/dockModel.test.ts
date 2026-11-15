@@ -201,7 +201,6 @@ function frame(over: Partial<FrameCx> = {}) {
       },
       todosOpen: false
     },
-    prAside: { node: () => null, open: false },
     sidebar: { node: () => null },
     surface: { closed: false, follow: id => void log.push(`follow ${id}`), render: () => void log.push('render') },
     transcript: { currentTodos: () => undefined, entries: [] },

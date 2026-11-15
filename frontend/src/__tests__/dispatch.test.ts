@@ -292,7 +292,6 @@ describe('afterMessageComplete', () => {
       activity: { endBusy: note('endBusy'), endCompaction: note('endCompaction') },
       checkFigures: note('checkFigures'),
       drain: note('drain'),
-      prs: { poke: note('prs.poke') },
       sidebar: { poke: note('sidebar.poke') },
       summarize: note('summarize'),
       transcript: { compactions: { uncompact: which => void log.push(`uncompact ${String(which)}`) }, complete: note('complete') }
@@ -300,6 +299,6 @@ describe('afterMessageComplete', () => {
 
     afterMessageComplete({}, cx)
 
-    expect(log).toEqual(['complete', 'endBusy', 'checkFigures', 'endCompaction', 'uncompact running', 'summarize', 'drain', 'prs.poke', 'sidebar.poke'])
+    expect(log).toEqual(['complete', 'endBusy', 'checkFigures', 'endCompaction', 'uncompact running', 'summarize', 'drain', 'sidebar.poke'])
   })
 })

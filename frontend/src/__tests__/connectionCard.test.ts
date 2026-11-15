@@ -20,8 +20,8 @@ process.env['HERMES_HOME'] = home
 /** The links the app opened in the browser. */
 const browsed = vi.hoisted((): string[] => [])
 
-vi.mock('../overlays/pullRequests.js', async importOriginal => ({
-  ...(await importOriginal<typeof import('../overlays/pullRequests.js')>()),
+vi.mock('../prs/open.js', async importOriginal => ({
+  ...(await importOriginal<typeof import('../prs/open.js')>()),
   openUrl: (url: string) => void browsed.push(url)
 }))
 const { App } = await import('../app/chat.js')

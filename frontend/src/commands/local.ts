@@ -13,7 +13,6 @@ import { type ChangesHost, openChanges } from '../overlays/changes.js'
 import { type EffortHost, openEffortPicker } from '../overlays/effort.js'
 import { type ModelsHost, openModelPicker, switchModel } from '../overlays/models.js'
 import { confirmOverlay } from '../overlays/prompts.js'
-import { prsCommand, type PullRequestsSheetHost } from '../overlays/pullRequests.js'
 import { openSessionPicker, type SessionsHost } from '../overlays/sessions.js'
 import { isThemeMode, openThemePicker, type ThemeHost } from '../overlays/theme.js'
 import { LEVELS } from '../session/effort.js'
@@ -37,6 +36,8 @@ export type CommandHost = Pick<
   | 'newSession'
   | 'open'
   | 'openHelp'
+  | 'openPrs'
+  | 'prs'
   | 'quit'
   | 'resume'
   | 'setEffort'
@@ -51,7 +52,6 @@ export type CommandHost = Pick<
   EffortHost &
   FastHost &
   ModelsHost &
-  PullRequestsSheetHost &
   RefusedHost &
   SessionsHost &
   ThemeHost
@@ -233,7 +233,7 @@ const COMMANDS: readonly LocalCommand[] = [
   },
   {
     aliases: ['pr', 'pulls'],
-    help: 'Pull requests Hermes linked, beside the chat (/prs 22 opens #22)',
+    help: 'Pull requests Hermes linked, beside the chat in Tern\'s prs plugin (/prs 22 opens #22)',
     name: 'prs',
     run: (host, arg) => prsCommand(host, arg)
   },
@@ -261,6 +261,18 @@ const COMMANDS: readonly LocalCommand[] = [
  * this frontend neither offers nor resolves them, and answers one typed whole with why.
  */
 export { HIDDEN_COMMANDS } from './refused.js'
+
+/** `/prs`: the session's PRs beside the chat; `/prs 22` opens #22. */
+function prsCommand(host: CommandHost, arg: string) {
+  const n = arg.trim().replace(/^#/, '')
+  const pick = n ? host.prs.find(Number(n)) : undefined
+
+  if (n && !pick) {
+    return host.transcript.notice(`No linked pull request #${n}.`, 'warning')
+  }
+
+  host.openPrs(pick)
+}
 
 /** `/copy [n]`: the last (or `n`th) answer to the clipboard. */
 function copyAnswer(host: CommandHost, arg: string) {

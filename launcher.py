@@ -32,7 +32,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Optional
 
-from . import panes, pull_requests, sessions
+from . import panes, sessions
 
 FRONTEND = Path(__file__).resolve().parent / "frontend"
 
@@ -47,7 +47,7 @@ CONTINUE_SOURCES = ({"source": ["tui", "local"], "local_created_sources": ["tui"
 # The launch variables of an outer `hermes tern`; this launch sets its own.
 OWN_ENV = ("HERMES_TERN_HERMES", "HERMES_TERN_SESSION_FILE", "HERMES_TERN_RESUME", "HERMES_TERN_QUERY",
            "HERMES_TERN_IMAGE", "HERMES_TERN_CWD", "HERMES_TERN_SESSION_CWD", "HERMES_TERN_CREATE", "HERMES_TERN_TOOL_PROGRESS",
-           "HERMES_TERN_GITHUB_ENTERPRISE_HOSTS", panes.RESTORED_ENV, panes.LAUNCH_CWD_ENV)
+           panes.RESTORED_ENV, panes.LAUNCH_CWD_ENV)
 # Exit codes of a quit (`/quit`, Ctrl+C): the summary is printed and a dirty `-w` tree is asked about.
 QUIT_CODES = (0, 130)
 TOO_OLD = "hermes tern: this Hermes is older than hermes tern needs. Run `hermes update`."
@@ -242,9 +242,6 @@ def frontend_env(args: argparse.Namespace, resume: Optional[str], restored: Opti
         "HERMES_TERN_SESSION_FILE": session_file,
         "HERMES_TERN_CWD": cwd,
         "HERMES_TERN_CREATE": json.dumps(create_options(args, hermes.shell_client_env())),
-        # The only hosts besides github.com the frontend sends a GitHub token to. Always set, so a
-        # value inherited from the shell never widens the list.
-        "HERMES_TERN_GITHUB_ENTERPRISE_HOSTS": ",".join(pull_requests.enterprise_hosts()),
         panes.LAUNCH_CWD_ENV: launch_cwd,
         "NODE_ENV": env.get("NODE_ENV") or "production",
     })
