@@ -63,8 +63,10 @@ export function setup(replies: Record<string, Reply> = {}, { features = [] }: { 
     const rows = topNodes(tern.region('dock')).find(n => n.props['role'] === 'omp.queue')?.children ?? []
 
     return rows.map((r: Node) => {
-      const noteNode = r.children.find(c => c.props['role'] === 'omp.queue.note')
-      const note = noteNode ? words(noteNode).join(' ') : undefined
+      // The row's text: the prompt, then a note after a `·` when it has one.
+      const textNode = r.children.find(c => c.props['key'] === 'text')
+      const [text, rest] = textNode ? words(textNode) : []
+      const note = rest?.replace(/^\s*·\s*/, '')
 
       return {
         actions: r.children.flatMap(c => {
@@ -73,7 +75,7 @@ export function setup(replies: Record<string, Reply> = {}, { features = [] }: { 
           return action ? [action] : []
         }),
         ...(note === undefined ? {} : { note }),
-        text: r.children.find(c => c.props['text'] !== undefined && c.props['role'] !== 'omp.queue.note')?.props['text']
+        text
       }
     })
   }

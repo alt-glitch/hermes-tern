@@ -220,7 +220,7 @@ describe('App: the working line', () => {
 
     stop.reject(new Error('boom'))
     await vi.waitFor(() => expect(app.stores.activity.busy?.label).toBe('Working…'))
-    expect(app.transcript.entries.at(-1)).toMatchObject({ kind: 'notice', text: 'Could not stop the turn: boom' })
+    expect(app.transcript.live?.blocks.at(-1)).toMatchObject({ kind: 'event', text: 'Could not stop the turn: boom', tone: 'error' })
   })
 })
 

@@ -128,7 +128,7 @@ export class PromptQueue {
             // Hermes' own row (a delegation's or a process's completion) is a whole turn of its own:
             // the gateway never steers it into the running one.
             const notice = internalNotice(q.text)
-            const why = notice ? (busy ? 'starts when this turn ends' : 'starts next') : undefined
+            const why = notice ? (busy ? 'Hermes picks it up after this turn' : 'Hermes picks it up next') : undefined
 
             return { kind: 'foreign', note: q.row.status === 'unknown' ? 'unknown' : 'elsewhere', text: notice ?? q.text, why }
           }
