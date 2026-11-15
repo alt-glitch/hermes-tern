@@ -6,7 +6,8 @@ import types
 
 import pytest
 
-from hermes_tern_plugin import pull_requests, sessions
+from hermes_tern_plugin.backend.gateway import pull_requests
+from hermes_tern_plugin.backend.shared import sessions
 
 
 @pytest.fixture()

@@ -32,9 +32,10 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Optional
 
-from . import panes, sessions
+from ..shared import sessions
+from . import panes
 
-FRONTEND = Path(__file__).resolve().parent / "frontend"
+FRONTEND = Path(__file__).resolve().parents[2] / "frontend"
 
 # frontend/src/entry.ts NO_TSP: the terminal never answered the TSP handshake.
 NO_TSP_EXIT = 75

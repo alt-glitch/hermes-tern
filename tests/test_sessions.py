@@ -7,7 +7,7 @@ import types
 
 import pytest
 
-from hermes_tern_plugin import processes, sessions
+from hermes_tern_plugin.backend.shared import processes, sessions
 
 DEAD = 2**22 + 12345  # no such process
 

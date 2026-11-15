@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from hermes_tern_plugin import launcher
+from hermes_tern_plugin.backend.launch import launcher
 
 
 def parse(argv, **top):

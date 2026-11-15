@@ -6,7 +6,7 @@ import types
 
 import pytest
 
-from hermes_tern_plugin import charts
+from hermes_tern_plugin.backend.gateway import charts
 
 PARAMS = {"job": "j1", "system": "design a widget", "user": "token sk-secret"}
 

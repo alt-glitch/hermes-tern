@@ -6,7 +6,8 @@ import types
 
 import pytest
 
-from hermes_tern_plugin import processes, sessions, tern_env, viewers
+from hermes_tern_plugin.backend.gateway import tern_env, viewers
+from hermes_tern_plugin.backend.shared import processes, sessions
 
 LINEAGE = {"tip": ["root", "tip"]}
 DELEGATOR = {"child": "tip"}

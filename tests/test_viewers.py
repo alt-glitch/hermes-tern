@@ -5,7 +5,8 @@ import types
 
 import pytest
 
-from hermes_tern_plugin import processes, sessions, viewers
+from hermes_tern_plugin.backend.gateway import viewers
+from hermes_tern_plugin.backend.shared import processes, sessions
 
 LINEAGE = {"live": ["stored", "live"]}
 

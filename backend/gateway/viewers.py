@@ -19,7 +19,7 @@ import threading
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
-from . import processes, sessions
+from ..shared import processes, sessions
 
 # The variables a Tern pane sets that Tern's CLI reads to find the pane and its window.
 TERN_VARS = ("TERN_PANE", "TERN_PANE_SOCKET", "TERN_WINDOW_KEY", "TERN_WINDOW_SOCKET", "TERN_DAEMON_SOCKET")

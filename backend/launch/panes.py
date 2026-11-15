@@ -29,7 +29,7 @@ import time
 from pathlib import Path
 from typing import Any, Iterator, Mapping, Optional
 
-from . import plugin_data, processes, sessions
+from ..shared import plugin_data, processes, sessions
 
 logger = logging.getLogger(__name__)
 

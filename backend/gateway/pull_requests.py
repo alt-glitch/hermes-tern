@@ -41,7 +41,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from . import sessions
+from ..shared import sessions
 
 logger = logging.getLogger(__name__)
 

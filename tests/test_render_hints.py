@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from hermes_tern_plugin import figure_check, render_hints
+from hermes_tern_plugin.backend.gateway import figure_check, render_hints
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -24,7 +24,7 @@ def test_the_section_is_for_sessions_the_tern_frontend_created():
 
 @pytest.fixture(scope="module")
 def check():
-    spec = importlib.util.spec_from_file_location("figure_check", ROOT / "figure_check.py")
+    spec = importlib.util.spec_from_file_location("figure_check", ROOT / "backend" / "gateway" / "figure_check.py")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return lambda *figs: json.loads(json.dumps(module.check(json.dumps({"figures": list(figs)}))))
