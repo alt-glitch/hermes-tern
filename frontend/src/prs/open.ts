@@ -36,6 +36,8 @@ export interface OpenPrsHost {
   /** Writes the list file with `pick` as the PR to open; its path, '' when there is none to write. */
   writeList(pick?: PrRef): string
   notice(text: string, tone: 'error' | 'info' | 'warning'): void
+  /** What `pick` is opened for: its page, or its review guide (which GitHub does not show). */
+  purpose?: 'guide' | 'page'
 }
 
 export interface OpenPrsDeps {
@@ -55,6 +57,12 @@ export async function openPrs(host: OpenPrsHost, pick?: PrRef, deps: OpenPrsDeps
     // The plugin's route opens or focuses the block and tells Tern it handled the open; `tern open`
     // then exits 1 ("cannot open in a file block") although the block shows, so its result says nothing.
     await deps.open(path).catch(() => undefined)
+
+    return
+  }
+
+  if (host.purpose === 'guide' && pick) {
+    host.notice(`The review guide for #${pick.number} is ready. To see it beside the chat, install Tern's PR plugin: ${INSTALL}`, 'info')
 
     return
   }

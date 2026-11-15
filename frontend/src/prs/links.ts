@@ -1,8 +1,8 @@
-// The PRs the agent linked to this conversation (`link_pull_request`, the plugin's own tool). The
-// plugin's Python half keeps them under the conversation's root (pull_requests.py) and answers the
-// plugin RPC method below with them. A live turn's link calls carry the whole list in their
-// results; a subagent's, which run in a session of their own, reach the pane as the session event
-// `LINKS_CHANGED`, after which it reads the list again.
+// The PRs the agent linked to this conversation (`link_pull_request`, the plugin's own tool) and the
+// review guides it wrote for them (`write_review_guide`). The plugin's Python half keeps both under
+// the conversation's root (pull_requests.py) and answers the plugin RPC method below with them. A
+// live turn's link calls carry both in their results; a subagent's, which run in a session of their
+// own, reach the pane as the session event `LINKS_CHANGED`, after which it reads them again.
 
 import type { ToolCall } from '../model.js'
 import { record } from '../wire/json.js'
@@ -17,7 +17,20 @@ export interface PrRef {
   url: string
 }
 
-export const LINK_TOOLS = new Set(['link_pull_request', 'list_pull_requests', 'unlink_pull_request'])
+/**
+ * The conversation's review guides by `owner/repo#number` (lower case), as pull_requests.py stores
+ * them. The pane passes them to the list file untouched: the `prs` plugin reads them.
+ */
+export type Guides = Readonly<Record<string, unknown>>
+
+/** What a link tool's result and the plugin RPC carry: the links, oldest first, and the guides. */
+export interface Linked {
+  refs: PrRef[]
+  guides: Guides
+}
+
+export const GUIDE_TOOL = 'write_review_guide'
+export const LINK_TOOLS = new Set(['link_pull_request', 'list_pull_requests', 'unlink_pull_request', GUIDE_TOOL])
 
 /** The plugin RPC method that answers a conversation's links, and the session event that says they changed (pull_requests.py). */
 export const LINKED_METHOD = 'plugin.hermes-tern.pull_requests.linked'
@@ -34,20 +47,31 @@ function refOf(v: unknown): PrRef | undefined {
     : undefined
 }
 
-/** The list a link tool's result carries (`linked`), when the call succeeded. */
-export function linkedFromResult(call: Pick<ToolCall, 'name' | 'outcome' | 'result'>): PrRef[] | undefined {
-  if (!LINK_TOOLS.has(call.name) || call.outcome.kind !== 'done') {
-    return undefined
-  }
+function linkedOf(v: unknown): Linked | undefined {
+  const r = record(v)
+  const linked = r?.['linked']
 
-  const linked = record(call.result)?.['linked']
-
-  return Array.isArray(linked) ? linked.map(refOf).filter((r): r is PrRef => Boolean(r)) : undefined
+  return Array.isArray(linked)
+    ? { guides: record(r?.['guides']) ?? {}, refs: linked.map(refOf).filter((x): x is PrRef => Boolean(x)) }
+    : undefined
 }
 
-/** The links of session `sid`'s conversation, oldest first, as the plugin answers them. */
-export async function linkedPullRequests(gw: Requester, sid: string): Promise<PrRef[]> {
-  const linked = record(await gw.request<unknown>(LINKED_METHOD, { session_id: sid }))?.['linked']
+/** The links and guides a link tool's result carries, when the call succeeded. */
+export function linkedFromResult(call: Pick<ToolCall, 'name' | 'outcome' | 'result'>): Linked | undefined {
+  return LINK_TOOLS.has(call.name) && call.outcome.kind === 'done' ? linkedOf(call.result) : undefined
+}
 
-  return Array.isArray(linked) ? linked.map(refOf).filter((r): r is PrRef => Boolean(r)) : []
+/** The `owner/repo#number` a finished `write_review_guide` wrote. */
+export function guideWritten(call: Pick<ToolCall, 'name' | 'outcome' | 'result'>): string | undefined {
+  const written = call.name === GUIDE_TOOL && call.outcome.kind === 'done' ? record(call.result)?.['written'] : undefined
+
+  return typeof written === 'string' ? written : undefined
+}
+
+/** `ref` as the list file keys it: `owner/repo#number`, lower case. */
+export const guideKey = (ref: PrRef) => `${ref.repository.toLowerCase()}#${ref.number}`
+
+/** The links and guides of session `sid`'s conversation, as the plugin answers them. */
+export async function linkedPullRequests(gw: Requester, sid: string): Promise<Linked> {
+  return linkedOf(await gw.request<unknown>(LINKED_METHOD, { session_id: sid })) ?? { guides: {}, refs: [] }
 }
