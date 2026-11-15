@@ -162,6 +162,8 @@ It reads GitHub with the GitHub CLI (`gh`) on the machine that runs your panes, 
 
 Ask the agent to guide you through a PR ("walk me through #22") and it reads the PR, then writes a review guide with the `write_review_guide` tool: a summary, then stops in reading order, each with notes, the files it is about and questions to consider. The PR's page opens beside the chat on its **Guide** tab. Asking again replaces the guide, and the tab says when the branch has moved past the commit the guide was written for.
 
+<p align="center"><img alt="The chat after asking for a guide, beside the prs block on the Guide tab of NousResearch/hermes-agent#153155: a summary and three numbered stops with notes, files and questions" src="docs/images/prs-guide.png" width="760"></p>
+
 The pane keeps its linked PRs and their guides in `$HERMES_HOME/plugin-data/hermes-tern/panes/<pane>.prs.json`, which the plugin reads (the format is in the plugin's README), and removes the file when you quit.
 
 The links and guides themselves are kept for each conversation in `$HERMES_HOME/plugin-data/hermes-tern/pull-requests.json`, so they survive compression and resume.
