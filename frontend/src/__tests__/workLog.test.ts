@@ -198,6 +198,14 @@ describe('parts', () => {
     ])
   })
 
+  it('keeps the words the agent wrote before asking, past its thoughts, as it keeps a reply a steer cut in on', () => {
+    const asked = turn([think('k1'), tool('a', call('terminal')), text('answer'), think('k2'), tool('ask', call('clarify', { question: 'delete it or keep it?' })), text('coda')])
+    const steered = turn([tool('a', call('terminal')), text('reply'), think('k'), steer('s', 44_000), text('answer')])
+
+    expect(parts(asked).map(p => p.kind + ':' + p.blocks.map(b => b.id).join())).toEqual(['fold:k1,a,k2', 'shown:answer,ask,coda'])
+    expect([...must(foldOf(steered)).hidden]).toEqual(['a', 'k'])
+  })
+
   it('keeps the reply before steers sent one after another, and folds a note with a step after it', () => {
     const replied = turn([text('reply'), steer('s1', 10_000), steer('s2', 11_000), text('answer')])
     const noted = turn([text('note'), tool('a', call('terminal')), steer('s', 10_000), text('answer')])
