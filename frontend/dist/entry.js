@@ -15882,7 +15882,7 @@ function foldOf(turn) {
     return void 0;
   }
   const answer = turn.blocks.findLastIndex((b) => b.kind === "text" && b.text.trim());
-  const replies = steeredReplies(turn.blocks);
+  const replies = repliesBeforeUser(turn.blocks);
   const hidden = /* @__PURE__ */ new Set();
   for (const [i, b] of turn.blocks.entries()) {
     if (i === answer || replies.has(i) || b.kind === "steer" || b.kind === "compaction" || b.kind === "event") {
@@ -15902,13 +15902,13 @@ function foldOf(turn) {
   const ms2 = (turnEndedAt(turn) ?? turn.startedAt) - turn.startedAt;
   return { hidden, label: workedFor(ms2) };
 }
-function steeredReplies(blocks) {
+function repliesBeforeUser(blocks) {
   const out = /* @__PURE__ */ new Set();
   for (const [i, b] of blocks.entries()) {
-    if (b.kind !== "steer") {
+    if (b.kind !== "steer" && !(b.kind === "tool" && isAsk(b.call))) {
       continue;
     }
-    const j = blocks.findLastIndex((c, k) => k < i && c.kind !== "steer" && !(c.kind === "text" && !c.text.trim()));
+    const j = blocks.findLastIndex((c, k) => k < i && c.kind !== "steer" && c.kind !== "thinking" && !(c.kind === "text" && !c.text.trim()));
     const reply2 = blocks[j];
     if (reply2?.kind === "text") {
       out.add(j);
