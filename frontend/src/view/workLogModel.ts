@@ -101,10 +101,11 @@ export interface Fold {
 
 /**
  * The fold of a finished turn: everything but its replies hides behind "Worked for 54s". The
- * replies are the answer (the turn's last text) and each reply a steer cut in on (see
- * `steeredReplies`). A clarify card, a background process and a delegation whose agents still run keep their
- * cards in view; so does a call after the answer that failed or still runs. A turn that failed
- * or was interrupted does not fold, and neither does one with nothing to hide.
+ * replies are the answer (the turn's last text) and the agent's last words before each steer or
+ * question (see `repliesBeforeUser`). A clarify card, a background process and a delegation
+ * whose agents still run keep their cards in view; so does a call after the answer that failed
+ * or still runs. A turn that failed or was interrupted does not fold, and neither does one with
+ * nothing to hide.
  */
 export function foldOf(turn: TurnEntry): Fold | undefined {
   if (turn.end.status !== 'done') {
@@ -112,7 +113,7 @@ export function foldOf(turn: TurnEntry): Fold | undefined {
   }
 
   const answer = turn.blocks.findLastIndex(b => b.kind === 'text' && b.text.trim())
-  const replies = steeredReplies(turn.blocks)
+  const replies = repliesBeforeUser(turn.blocks)
   const hidden = new Set<string>()
 
   for (const [i, b] of turn.blocks.entries()) {
@@ -154,22 +155,22 @@ export function foldOf(turn: TurnEntry): Fold | undefined {
 }
 
 /**
- * The indexes of the replies a steer (or a redirect, which the pane marks the same way) cut in
- * on: the text right before each steer, the agent's last words before the user spoke. The agent
- * wrote it as its answer (the steer can land while it streams, or after it, before
- * message.complete), so it stays in view like one. A text with a step after it was a note on the
- * way, and folds.
+ * The indexes of the agent's last words before the user had the floor: the text right before a
+ * steer (or a redirect, which the pane marks the same way) or a clarify call. The agent wrote it
+ * for the user to read first (an answer often comes before the question that follows it; a steer
+ * can land while the text streams, or after it, before message.complete), so it stays in view like
+ * the answer. A text with a step after it was a note on the way, and folds.
  */
-function steeredReplies(blocks: readonly Block[]): Set<number> {
+function repliesBeforeUser(blocks: readonly Block[]): Set<number> {
   const out = new Set<number>()
 
   for (const [i, b] of blocks.entries()) {
-    if (b.kind !== 'steer') {
+    if (b.kind !== 'steer' && !(b.kind === 'tool' && isAsk(b.call))) {
       continue
     }
 
-    // Past the seals (empty texts) and the steers sent one after another.
-    const j = blocks.findLastIndex((c, k) => k < i && c.kind !== 'steer' && !(c.kind === 'text' && !c.text.trim()))
+    // Past the thoughts, the seals (empty texts) and the steers sent one after another.
+    const j = blocks.findLastIndex((c, k) => k < i && c.kind !== 'steer' && c.kind !== 'thinking' && !(c.kind === 'text' && !c.text.trim()))
     const reply = blocks[j]
 
     if (reply?.kind === 'text') {

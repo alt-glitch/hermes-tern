@@ -12,6 +12,8 @@ the user's prompt, so one home covers every flow:
                    choices, "clarify several": three questions in one card
     "tool"      -> a harmless terminal call (tool card)
     "steps"     -> four calls in a row (commands, a read, a search), then an answer
+    "answerask…" -> (at the start) a command, then a long answer sent with a clarify call, then a
+                   short reply once it is answered: the agent's words before the question must not fold
     "work…"     -> (at the start) a turn like a real one: reasoning, short notes and tool calls
                    in rounds (commands, reads, a search, a slow command), then a long answer
     "script"    -> a heredoc script with sections and long output, run alone
@@ -413,6 +415,18 @@ CLARIFY = {
                 {"question": "Anything the PR description must mention?"}],
 }
 
+# "answerask": the answer comes with the question it ends on, and the turn's last text is a short coda.
+ANSWER_ASK = [
+    ("Probing the repo with and without the App token.", [("terminal", {"command": "echo 'no token: 200' && echo 'app token: 403'"})]),
+    ("""Short answers first, then the db check.
+
+1. **Type failure: agreed.** GitHub's schema lets a timeline's `nodes` hold `null`; ours says every entry is an object.
+2. **Why the App can't read a public repo.** The org has an IP allow list, and it applies to authenticated requests even on public repos.
+3. **The nightly db check.** Honestly, I'd delete it: derived data is recomputed on every change.""",
+     [("clarify", {"questions": [{"question": "The nightly db check: delete it, or keep it?", "choices": ["Delete it", "Keep it"]}]})]),
+    ("Noted. Either way, the timeline fix from point 1 is needed.", []),
+]
+
 
 def _clarify_questions(words: str) -> list[dict]:
     """The questions for "clarify [free|long|many|several]"; plain "clarify" picks a colour."""
@@ -557,6 +571,16 @@ class Model(BaseHTTPRequestHandler):
             note, round_calls = TODOS_FLOW[min(done, len(TODOS_FLOW) - 1)]
             calls = [_call(name, args, f"call-t{done}-{i}") for i, (name, args) in enumerate(round_calls)] or None
             content, delay = note, 0.0
+        elif prompt.lower().lstrip().startswith("answerask"):
+            # One round per request, as the work prompt does: a probe, the answer with its question, a coda.
+            last_user = max(i for i, m in enumerate(messages) if m.get("role") == "user")
+            done = sum(1 for m in messages[last_user:] if m.get("role") == "assistant")
+            content, round_calls = ANSWER_ASK[min(done, len(ANSWER_ASK) - 1)]
+            calls = [_call(name, args, f"call-aa{done}") for name, args in round_calls] or None
+            if request.get("stream"):
+                self._stream(content, calls, 0.05)
+                return
+            delay = 0.0
         elif prompt.lower().lstrip().startswith("stream"):
             # A quick command (so the turn has work to fold), then the reply, slowly.
             answered = bool(messages) and messages[-1].get("role") == "tool"
